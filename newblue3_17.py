@@ -13,8 +13,8 @@ from PyQt6.QtCore import Qt
 from bleak import BleakScanner, BleakClient
 from qasync import QEventLoop, asyncSlot
 from hex_model import HexFileModel
-
-
+from program_controller import DownloadController
+from program_controller import TextDecode
 
 class BluetoothTool(QWidget):
     task_flag = 0
@@ -24,6 +24,7 @@ class BluetoothTool(QWidget):
         self.client = None  # 当前连接的蓝牙设备
         self.initUI()
         self.hex_model = HexFileModel()
+        self.text_decode = TextDecode()
         # asyncio.create_task(self.scan_devices())
         QTimer.singleShot(0, self.on_scan_devices_clicked)
     def initUI(self):
@@ -81,6 +82,7 @@ class BluetoothTool(QWidget):
         self.send_input = QLineEdit()
         self.send_input.setPlaceholderText('输入要发送的数据')
         self.hex_send_checkbox = QCheckBox('16进制发送')
+        self.hex_send_checkbox.setChecked(True)
         self.send_button = QPushButton('发送数据')
         self.send_button.clicked.connect(self.on_send_data_clicked)
         self.send_button.setEnabled(False)  # 初始状态下发送按钮不可用
@@ -111,6 +113,7 @@ class BluetoothTool(QWidget):
 
         # 16进制显示选项
         self.hex_display_checkbox = QCheckBox('16进制显示')
+        self.hex_display_checkbox.setChecked(True)
         self.hex_display_checkbox.stateChanged.connect(self.on_hex_display_changed)
         layout.addWidget(self.hex_display_checkbox)
 
@@ -312,12 +315,17 @@ class BluetoothTool(QWidget):
                 await self.client.start_notify("0000ffe1-0000-1000-8000-00805f9b34fb", self.on_data_received)
             except Exception as e:
                 QMessageBox.critical(self, '接收失败', str(e))
+    async def download_data(self):
+        
 
+        """异步方法，接收蓝牙设备发送的数据"""
+        pass
     def on_data_received(self, sender, data):
         """回调函数，处理接收到的数据"""
         if not hasattr(self, 'received_data_buffer'):
             self.received_data_buffer = []
         self.received_data_buffer.append(data)
+        self.text_decode.split_data(data)
         self.display_received_data(data)
 
     def on_select_hex_file(self):
