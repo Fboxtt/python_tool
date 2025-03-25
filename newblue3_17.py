@@ -7,12 +7,12 @@ from datetime import datetime
 from PyQt6.QtCore import QTimer  # 导入 QTimer
 from PyQt6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QPushButton, QListWidget, QLabel, QMessageBox, QTextEdit, QLineEdit, QHBoxLayout,
-    QCheckBox
+    QCheckBox, QFileDialog
 )
 from PyQt6.QtCore import Qt
 from bleak import BleakScanner, BleakClient
 from qasync import QEventLoop, asyncSlot
-
+from hex_model import HexFileModel
 
 
 
@@ -23,13 +23,26 @@ class BluetoothTool(QWidget):
         super().__init__()
         self.client = None  # 当前连接的蓝牙设备
         self.initUI()
-        
+        self.hex_model = HexFileModel()
         # asyncio.create_task(self.scan_devices())
         QTimer.singleShot(0, self.on_scan_devices_clicked)
     def initUI(self):
         self.setWindowTitle('蓝牙查询与连接工具')
 
         layout = QVBoxLayout()
+
+        # HEX文件解析部分
+        self.hex_layout = QHBoxLayout()
+        self.hex_file_label = QLabel('HEX文件：未选择')
+        self.hex_file_button = QPushButton('选择HEX文件')
+        self.hex_file_button.clicked.connect(self.on_select_hex_file)
+        self.hex_layout.addWidget(self.hex_file_label)
+        self.hex_layout.addWidget(self.hex_file_button)
+        layout.addLayout(self.hex_layout)
+
+        # HEX文件信息显示
+        self.hex_info_label = QLabel('文件大小：0 字节')
+        layout.addWidget(self.hex_info_label)
 
         # 设备扫描部分
         self.label = QLabel('发现的蓝牙设备:')
@@ -306,6 +319,22 @@ class BluetoothTool(QWidget):
             self.received_data_buffer = []
         self.received_data_buffer.append(data)
         self.display_received_data(data)
+
+    def on_select_hex_file(self):
+        """选择HEX文件并解析"""
+        filename, _ = QFileDialog.getOpenFileName(
+            self,
+            "选择HEX文件",
+            "",
+            "HEX文件 (*.hex);;所有文件 (*.*)"
+        )
+        if filename:
+            if self.hex_model.parse_hex_file(filename):
+                file_info = self.hex_model.get_file_info()
+                self.hex_file_label.setText(f'HEX文件：{file_info["filename"]}')
+                self.hex_info_label.setText(f'文件大小：{file_info["size"]} 字节')
+            else:
+                QMessageBox.warning(self, '警告', 'HEX文件解析失败')
 
 
 if __name__ == '__main__':
