@@ -6,7 +6,8 @@ from datetime import datetime
 
 from PyQt6.QtCore import QTimer  # 导入 QTimer
 from PyQt6.QtWidgets import (
-    QApplication, QWidget, QVBoxLayout, QPushButton, QListWidget, QLabel, QMessageBox, QTextEdit, QLineEdit, QHBoxLayout
+    QApplication, QWidget, QVBoxLayout, QPushButton, QListWidget, QLabel, QMessageBox, QTextEdit, QLineEdit, QHBoxLayout,
+    QCheckBox
 )
 from PyQt6.QtCore import Qt
 from bleak import BleakScanner, BleakClient
@@ -66,10 +67,12 @@ class BluetoothTool(QWidget):
         self.send_layout = QHBoxLayout()
         self.send_input = QLineEdit()
         self.send_input.setPlaceholderText('输入要发送的数据')
+        self.hex_send_checkbox = QCheckBox('16进制发送')
         self.send_button = QPushButton('发送数据')
         self.send_button.clicked.connect(self.on_send_data_clicked)
         self.send_button.setEnabled(False)  # 初始状态下发送按钮不可用
         self.send_layout.addWidget(self.send_input)
+        self.send_layout.addWidget(self.hex_send_checkbox)
         self.send_layout.addWidget(self.send_button)
         layout.addLayout(self.send_layout)
 
@@ -93,7 +96,35 @@ class BluetoothTool(QWidget):
         self.receive_output.setReadOnly(True)
         layout.addWidget(self.receive_output)
 
+        # 16进制显示选项
+        self.hex_display_checkbox = QCheckBox('16进制显示')
+        self.hex_display_checkbox.stateChanged.connect(self.on_hex_display_changed)
+        layout.addWidget(self.hex_display_checkbox)
+
         self.setLayout(layout)
+
+    def on_hex_display_changed(self, state):
+        """当16进制显示选项改变时，重新显示接收到的数据"""
+        if hasattr(self, 'received_data_buffer'):
+            self.receive_output.clear()
+            for data in self.received_data_buffer:
+                self.display_received_data(data)
+
+    def display_received_data(self, data):
+        """显示接收到的数据，根据16进制显示选项决定显示格式"""
+        if self.hex_display_checkbox.isChecked():
+            # 16进制显示
+            hex_data = ' '.join([f'{b:02X}' for b in data])
+            self.receive_output.append(f"接收: {hex_data}")
+        else:
+            # 文本显示
+            try:
+                text_data = data.decode('utf-8')
+                self.receive_output.append(f"接收: {text_data}")
+            except UnicodeDecodeError:
+                # 如果无法解码为文本，则显示16进制
+                hex_data = ' '.join([f'{b:02X}' for b in data])
+                self.receive_output.append(f"接收(HEX): {hex_data}")
 
     def closeEvent(self, event):
         """重写关闭事件，退出时断开蓝牙连接"""
@@ -190,9 +221,31 @@ class BluetoothTool(QWidget):
         """异步方法，发送数据到蓝牙设备"""
         if self.client and self.client.is_connected:
             try:
+                if self.hex_send_checkbox.isChecked():
+                    # 16进制发送
+                    try:
+                        # 移除所有空格并检查是否为有效的16进制字符串
+                        hex_data = data.replace(" ", "")
+                        if not all(c in '0123456789ABCDEFabcdef' for c in hex_data):
+                            raise ValueError("Invalid hex string")
+                        # 将16进制字符串转换为字节
+                        data_bytes = bytes.fromhex(hex_data)
+                    except ValueError as e:
+                        QMessageBox.warning(self, '警告', '无效的16进制数据')
+                        return
+                else:
+                    # 文本发送
+                    data_bytes = data.encode()
+
                 # 假设设备的写特征 UUID 是 "0000ffe1-0000-1000-8000-00805f9b34fb"
-                await self.client.write_gatt_char("0000ffe1-0000-1000-8000-00805f9b34fb", data.encode())
-                self.receive_output.append(f"发送: {data}")
+                await self.client.write_gatt_char("0000ffe1-0000-1000-8000-00805f9b34fb", data_bytes)
+                
+                # 显示发送的数据
+                if self.hex_send_checkbox.isChecked():
+                    hex_data = ' '.join([f'{b:02X}' for b in data_bytes])
+                    self.receive_output.append(f"发送: {hex_data}")
+                else:
+                    self.receive_output.append(f"发送: {data}")
             except Exception as e:
                 QMessageBox.critical(self, '发送失败', str(e))
         else:
@@ -249,7 +302,10 @@ class BluetoothTool(QWidget):
 
     def on_data_received(self, sender, data):
         """回调函数，处理接收到的数据"""
-        self.receive_output.append(f"接收: {data.decode()}")
+        if not hasattr(self, 'received_data_buffer'):
+            self.received_data_buffer = []
+        self.received_data_buffer.append(data)
+        self.display_received_data(data)
 
 
 if __name__ == '__main__':
