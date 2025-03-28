@@ -430,8 +430,8 @@ class TextDecode:
                     self.no_packet_len = self.data_len - 2  # 取长度
                     self.no_packet_hex = self.data_hex[2:2 + self.no_packet_len]
                     self.cmd_packet_num = (self.data_hex[0] & 0xFF) + (self.data_hex[1] & 0xFF) * 256
-            else:
-                raise Exception("PC_SET_WRITE_FLASH命令长度错误")
+            # else:
+            #     raise Exception("PC_SET_WRITE_FLASH命令长度错误")
         except Exception as e:
             print(f"接收命令无法解析: {e}")
             traceback.print_exc()
