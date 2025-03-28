@@ -368,70 +368,76 @@ class TextDecode:
         self.check_sum = 0
         self.cmd_ack = 0
         self.is_download_cmd = False
-        # 检查数据长度
-        if len(hex_data) >= 9:
-            self.have_hex = True
-            self.actual_hex = hex_data
-            self.actual_len = len(hex_data)
-        else:
-            self.legality = ERR_CMD_LEN
-            return False
-
-        # 解析数据
-        self.address = self.actual_hex[0]
-        self.data_len = self.actual_hex[1] * 0x100 + self.actual_hex[2] - 5
-        self.bms_type = self.actual_hex[3]
-        self.cmd = self.actual_hex[4]
-        self.no80_cmd = self.actual_hex[4] & 0x7F
-        self.cmd_ack = self.actual_hex[8]
-
-        # 验证命令是否在 BmsCmdType 中
         try:
+            # 检查数据长度  
+            if len(hex_data) >= 9:
+                self.have_hex = True
+                self.actual_hex = hex_data
+                self.actual_len = len(hex_data)
+            else:
+                self.legality = ERR_CMD_LEN
+                raise Exception("命令长度错误")
+
+            # 解析数据
+            self.address = self.actual_hex[0]
+            self.data_len = self.actual_hex[1] * 0x100 + self.actual_hex[2] - 5
+            self.bms_type = self.actual_hex[3]
+            self.cmd = self.actual_hex[4]
+            self.no80_cmd = self.actual_hex[4] & 0x7F
+            self.cmd_ack = self.actual_hex[7]
+
+            # 验证命令是否在 BmsCmdType 中
             
+                
             for cmd_type in BmsCmdType:
                 if self.no80_cmd == cmd_type.value:
                     self.is_download_cmd = True
                     break
             else:
                 self.is_download_cmd = False
-                print(f"无效的命令类型: 0x{self.no80_cmd:02X}")
+
+            # 计算校验和
+            self.check_sum = 0
+            for i in range(1, self.actual_len - 1):
+                self.check_sum += self.actual_hex[i] & 0xFF
+
+            # 检查命令类型
+            if (self.cmd & 0x80) == 0:
+                # 这是主机发送的数据，无法解析
+                pass
+            else:
+                if self.actual_len != self.data_len + 9:
+                    self.legality = ERR_CMD_LEN
+                else:
+                    self.data_hex = self.actual_hex[8:8 + self.data_len]
+
+            # 检查特殊命令的数据长度
+            if (self.no80_cmd not in [PC_SET_WRITE_FLASH, PC_SET_ALL_CHECKSUM, 
+                                    PC_SET_DOWNLOAD_BUFFER, PC_SET_DOWNLOAD_BACKUP]):
+                if self.actual_len != 9:
+                    self.legality = ERR_CMD_LEN
+                    raise Exception("命令长度错误")
+
+            # 校验和检查
+            if (self.check_sum & 0xFF) != (self.actual_hex[self.actual_len - 1] & 0xFF):
+                print(f"checksum get = 0x{self.actual_hex[-1]:02x} cali = 0x{self.check_sum & 0xFF:02x}")
+                self.legality = ERR_CHKSUM
+                raise Exception("校验和错误")
+
+            # 处理写入闪存命令
+            if len(self.actual_hex) >= 11:
+                if self.no80_cmd == PC_SET_WRITE_FLASH:
+                    self.no_packet_len = self.data_len - 2  # 取长度
+                    self.no_packet_hex = self.data_hex[2:2 + self.no_packet_len]
+                    self.cmd_packet_num = (self.data_hex[0] & 0xFF) + (self.data_hex[1] & 0xFF) * 256
+            else:
+                raise Exception("PC_SET_WRITE_FLASH命令长度错误")
         except Exception as e:
-            print(f"命令验证失败: {e}")
+            print(f"接收命令无法解析: {e}")
             traceback.print_exc()
 
-        # 计算校验和
-        self.check_sum = 0
-        for i in range(1, self.actual_len - 1):
-            self.check_sum += self.actual_hex[i] & 0xFF
-
-        # 检查命令类型
-        if (self.cmd & 0x80) == 0:
-            # 这是主机发送的数据，无法解析
-            pass
-        else:
-            if self.actual_len != self.data_len + 9:
-                self.legality = ERR_CMD_LEN
-            else:
-                self.data_hex = self.actual_hex[8:8 + self.data_len]
-
-        # 检查特殊命令的数据长度
-        if (self.no80_cmd not in [PC_SET_WRITE_FLASH, PC_SET_ALL_CHECKSUM, 
-                                 PC_SET_DOWNLOAD_BUFFER, PC_SET_DOWNLOAD_BACKUP]):
-            if self.actual_len != 9:
-                self.legality = ERR_CMD_LEN
-
-        # 校验和检查
-        print(f"get checksum = 0x{self.actual_hex[-1]:02x}")
-        print(f"calc checksum = 0x{self.check_sum & 0xFF:02x}")
-        if (self.check_sum & 0xFF) != (self.actual_hex[self.actual_len - 1] & 0xFF):
-            self.legality = ERR_CHKSUM
-
-        # 处理写入闪存命令
-        if len(self.actual_hex) >= 11:
-            if self.no80_cmd == PC_SET_WRITE_FLASH:
-                self.no_packet_len = self.data_len - 2  # 取长度
-                self.no_packet_hex = self.data_hex[2:2 + self.no_packet_len]
-                self.cmd_packet_num = (self.data_hex[0] & 0xFF) + (self.data_hex[1] & 0xFF) * 256
+        if self.legality == ERR_NO:
+            print(f"cmd = 0x{self.cmd:02x} cmd_ack = 0x{self.cmd_ack:02x} cmd_data_len = {self.data_len}")
         return
     
 
