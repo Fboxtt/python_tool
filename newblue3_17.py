@@ -242,7 +242,7 @@ class BluetoothTool(QWidget):
         else:
             QMessageBox.warning(self, '警告', '未连接到设备')
     
-    async def send_data(self, data):
+    async def send_data(self, data:str):
         """异步方法，发送数据到蓝牙设备"""
         if self.client and self.client.is_connected:
             try:
@@ -315,7 +315,7 @@ class BluetoothTool(QWidget):
             else:
                 # QMessageBox.warning(self, '警告', '未连接到设备')
                 break
-    async def byte_send(self,data):
+    async def byte_send(self,data:bytes):
         if(len(data) == 0):
             return
         if(self.client and self.client.is_connected):
@@ -367,16 +367,16 @@ class BluetoothTool(QWidget):
             QMessageBox.warning(self, '警告', '请先连接设备')
             return
         
-        # 禁用烧录按钮，避免重复点击
-        self.program_button.setEnabled(False)
-        self.program_button.setText('烧录中...')
-        
         # 创建烧录任务
         asyncio.create_task(self.start_programming())
 
     async def start_programming(self):
         """异步方法，执行烧录过程"""
         try:
+            # 禁用烧录按钮，避免重复点击
+            self.program_button.setEnabled(False)
+            self.program_button.setText('烧录中...')
+
             err_count = 0
             while err_count < 3:
                 data = bytearray([0x00,0x00,0x04,0x01,0x76,0x55,0xaa,0x7a])
