@@ -15,6 +15,8 @@ from qasync import QEventLoop, asyncSlot
 from hex_model import HexFileModel
 from program_controller import DownloadController
 from program_controller import TextDecode
+from program_controller import ReceveDataStatus,BmsCmdType,ComStatus,DownloadErr
+
 
 class BluetoothTool(QWidget):
     task_flag = 0
@@ -232,7 +234,7 @@ class BluetoothTool(QWidget):
                 QMessageBox.critical(self, '断开失败', str(e))
         else:
             QMessageBox.warning(self, '警告', '未连接到设备')
-
+    
     async def send_data(self, data):
         """异步方法，发送数据到蓝牙设备"""
         if self.client and self.client.is_connected:
@@ -306,6 +308,14 @@ class BluetoothTool(QWidget):
             else:
                 # QMessageBox.warning(self, '警告', '未连接到设备')
                 break
+    async def byte_send(self,data):
+        if(len(data) == 0):
+            return
+        if(self.client and self.client.is_connected):
+            self.text_decode.legality = ReceveDataStatus.ERR_NOTHING
+            """异步方法，发送字节数据"""
+            await self.client.write_gatt_char("0000ffe1-0000-1000-8000-00805f9b34fb", data)
+
 
     async def receive_data(self):
         """异步方法，接收蓝牙设备发送的数据"""
@@ -316,10 +326,17 @@ class BluetoothTool(QWidget):
             except Exception as e:
                 QMessageBox.critical(self, '接收失败', str(e))
     async def download_data(self):
+        """启动下载"""
+        data = bytearray([0x00,0x00,0x04,0x01,0x76,0x55,0xaa,0x7a])
+        await self.client.write_gatt_char("0000ffe1-0000-1000-8000-00805f9b34fb", data)
+        await asyncio.sleep(0.5)
         
-
         """异步方法，接收蓝牙设备发送的数据"""
         pass
+    def create_download_task(self):
+        """创建下载任务"""
+        self.download_task = asyncio.create_task(self.download_data())
+
     def on_data_received(self, sender, data):
         """回调函数，处理接收到的数据"""
         if not hasattr(self, 'received_data_buffer'):

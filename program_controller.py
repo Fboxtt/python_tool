@@ -136,6 +136,12 @@ class ComStatus(IntEnum):
     RECEIVING = 2
     FAILED = 3
 
+class ReceveDataStatus(IntEnum):
+    ERR_NO = 0
+    ERR_CMD_LEN = 1
+    ERR_CHKSUM = 2
+    ERR_NOTHING = 3
+
 ERR_NO = 0
 ERR_CMD_LEN = 1
 ERR_CHKSUM = 2
