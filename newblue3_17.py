@@ -361,7 +361,7 @@ class BluetoothTool(QWidget):
         """同步方法，用于触发异步烧录"""
         if not self.hex_model.is_file_loaded:
             QMessageBox.warning(self, '警告', '请先选择HEX文件')
-            return
+            # return
         
         if not self.client or not self.client.is_connected:
             QMessageBox.warning(self, '警告', '请先连接设备')
@@ -387,7 +387,8 @@ class BluetoothTool(QWidget):
                 if err_count == 3:
                     raise Exception("下载命令发送失败")
             # 发送下载命令并等待响应
-
+            if not self.hex_model.is_file_loaded:
+                return
             # TODO: 在这里添加后续的烧录步骤
             # 例如：发送数据块、校验等
             
