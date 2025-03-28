@@ -6,7 +6,7 @@ class HexFileModel:
         self.filename = ""
         self.hex_data = None
         self.size = 0
-
+        self.is_file_loaded = False
     def parse_hex_file(self, filename: str) -> bool:
         """解析 Intel HEX 文件"""
         try:
@@ -17,7 +17,12 @@ class HexFileModel:
             start = self.hex_data.minaddr()
             end = self.hex_data.maxaddr()
             self.size = end - start + 1
-            return True
+            if self.size > 0:   
+                self.is_file_loaded = True
+                return True
+            else:
+                self.is_file_loaded = False
+                return False
         except Exception as e:
             print(f"解析HEX文件失败: {e}")
             traceback.print_exc()

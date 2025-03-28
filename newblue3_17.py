@@ -105,6 +105,13 @@ class BluetoothTool(QWidget):
         self.test_send_button.clicked.connect(self.on_test_send_buttoned)
         layout.addLayout(self.test_layout)
 
+        # 烧录控制部分
+        self.program_layout = QHBoxLayout()
+        self.program_button = QPushButton('开始烧录')
+        self.program_button.clicked.connect(self.on_program_clicked)
+        self.program_layout.addWidget(self.program_button)
+        layout.addLayout(self.program_layout)
+
         # 数据接收部分
         self.receive_label = QLabel('接收到的数据:')
         layout.addWidget(self.receive_label)
@@ -325,17 +332,6 @@ class BluetoothTool(QWidget):
                 await self.client.start_notify("0000ffe1-0000-1000-8000-00805f9b34fb", self.on_data_received)
             except Exception as e:
                 QMessageBox.critical(self, '接收失败', str(e))
-    async def download_data(self):
-        """启动下载"""
-        data = bytearray([0x00,0x00,0x04,0x01,0x76,0x55,0xaa,0x7a])
-        await self.client.write_gatt_char("0000ffe1-0000-1000-8000-00805f9b34fb", data)
-        await asyncio.sleep(0.5)
-        
-        """异步方法，接收蓝牙设备发送的数据"""
-        pass
-    def create_download_task(self):
-        """创建下载任务"""
-        self.download_task = asyncio.create_task(self.download_data())
 
     def on_data_received(self, sender, data):
         """回调函数，处理接收到的数据"""
@@ -360,6 +356,52 @@ class BluetoothTool(QWidget):
                 self.hex_info_label.setText(f'文件大小：{file_info["size"]} 字节')
             else:
                 QMessageBox.warning(self, '警告', 'HEX文件解析失败')
+
+    def on_program_clicked(self):
+        """同步方法，用于触发异步烧录"""
+        if not self.hex_model.is_file_loaded:
+            QMessageBox.warning(self, '警告', '请先选择HEX文件')
+            return
+        
+        if not self.client or not self.client.is_connected:
+            QMessageBox.warning(self, '警告', '请先连接设备')
+            return
+        
+        # 禁用烧录按钮，避免重复点击
+        self.program_button.setEnabled(False)
+        self.program_button.setText('烧录中...')
+        
+        # 创建烧录任务
+        asyncio.create_task(self.start_programming())
+
+    async def start_programming(self):
+        """异步方法，执行烧录过程"""
+        try:
+            err_count = 0
+            while err_count < 3:
+                data = bytearray([0x00,0x00,0x04,0x01,0x76,0x55,0xaa,0x7a])
+                await self.client.write_gatt_char("0000ffe1-0000-1000-8000-00805f9b34fb", data)
+                await asyncio.sleep(0.5)
+                err_count += 1
+            else:
+                if err_count == 3:
+                    raise Exception("下载命令发送失败")
+            # 发送下载命令并等待响应
+
+            # TODO: 在这里添加后续的烧录步骤
+            # 例如：发送数据块、校验等
+            
+            self.receive_output.append("烧录完成")
+            QMessageBox.information(self, '成功', '烧录完成')
+            
+        except Exception as e:
+            self.receive_output.append(f"烧录失败: {str(e)}")
+            QMessageBox.critical(self, '错误', f'烧录失败: {str(e)}')
+        
+        finally:
+            # 恢复按钮状态
+            self.program_button.setEnabled(True)
+            self.program_button.setText('开始烧录')
 
 
 if __name__ == '__main__':
