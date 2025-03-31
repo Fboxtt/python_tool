@@ -12,96 +12,96 @@ class ProgramController(QObject):
     status_updated = pyqtSignal(str)
     program_completed = pyqtSignal(bool)
 
-    def __init__(self, serial_controller, hex_model):
+    def __init__(self):
         super().__init__()
-        self.serial_controller = serial_controller
-        self.hex_model = hex_model
+        # self.serial_controller = serial_controller
+        # self.hex_model = hex_model
         self.is_programming = False
 
-    def start_programming(self):
-        """开始烧录过程"""
-        if not self.hex_model.hex_data or not self.serial_controller.model.is_connected:
-            self.status_updated.emit("请先选择HEX文件并连接串口")
-            return False
+    # def start_programming(self):
+    #     """开始烧录过程"""
+    #     if not self.hex_model.hex_data or not self.serial_controller.model.is_connected:
+    #         self.status_updated.emit("请先选择HEX文件并连接串口")
+    #         return False
 
-        self.is_programming = True
-        try:
-            # 获取数据
-            data = self.hex_model.get_data()
-            total_size = len(data)
-            sent_size = 0
+    #     self.is_programming = True
+    #     try:
+    #         # 获取数据
+    #         data = self.hex_model.get_data()
+    #         total_size = len(data)
+    #         sent_size = 0
 
-            # 发送开始烧录命令
-            self.serial_controller.send_data_bytes(b'\xAA\x55\x01')  # 示例命令
-            response = self._wait_for_response()
-            if not response or response[0] != 0xAA:  # 检查响应
-                raise Exception("设备未就绪")
+    #         # 发送开始烧录命令
+    #         self.serial_controller.send_data_bytes(b'\xAA\x55\x01')  # 示例命令
+    #         response = self._wait_for_response()
+    #         if not response or response[0] != 0xAA:  # 检查响应
+    #             raise Exception("设备未就绪")
 
-            # 分包发送数据
-            packet_size = 256  # 每包256字节
-            while sent_size < total_size and self.is_programming:
-                # 准备数据包
-                packet = data[sent_size:sent_size + packet_size]
-                packet_header = bytes([0xAA, 0x55, 0x02, len(packet)])
+    #         # 分包发送数据
+    #         packet_size = 256  # 每包256字节
+    #         while sent_size < total_size and self.is_programming:
+    #             # 准备数据包
+    #             packet = data[sent_size:sent_size + packet_size]
+    #             packet_header = bytes([0xAA, 0x55, 0x02, len(packet)])
                 
-                # 发送数据包
-                self.serial_controller.send_data_bytes(packet_header + packet)
+    #             # 发送数据包
+    #             self.serial_controller.send_data_bytes(packet_header + packet)
                 
-                # 等待响应
-                response = self._wait_for_response()
-                if not response or response[0] != 0xAA:
-                    raise Exception(f"数据包 {sent_size//packet_size} 发送失败")
+    #             # 等待响应
+    #             response = self._wait_for_response()
+    #             if not response or response[0] != 0xAA:
+    #                 raise Exception(f"数据包 {sent_size//packet_size} 发送失败")
 
-                # 更新进度
-                sent_size += len(packet)
-                progress = int(sent_size * 100 / total_size)
-                self.progress_updated.emit(progress)
+    #             # 更新进度
+    #             sent_size += len(packet)
+    #             progress = int(sent_size * 100 / total_size)
+    #             self.progress_updated.emit(progress)
                 
-                # 短暂延时，避免发送过快
-                time.sleep(0.01)
+    #             # 短暂延时，避免发送过快
+    #             time.sleep(0.01)
 
-            # 发送结束命令
-            self.serial_controller.send_data_bytes(b'\xAA\x55\x03')
-            response = self._wait_for_response()
-            if not response or response[0] != 0xAA:
-                raise Exception("烧录完成确认失败")
+    #         # 发送结束命令
+    #         self.serial_controller.send_data_bytes(b'\xAA\x55\x03')
+    #         response = self._wait_for_response()
+    #         if not response or response[0] != 0xAA:
+    #             raise Exception("烧录完成确认失败")
 
-            self.status_updated.emit("烧录完成")
-            self.program_completed.emit(True)
-            return True
+    #         self.status_updated.emit("烧录完成")
+    #         self.program_completed.emit(True)
+    #         return True
 
-        except Exception as e:
-            self.status_updated.emit(f"烧录失败: {str(e)}")
-            traceback.print_exc()
-            self.program_completed.emit(False)
-            return False
-        finally:
-            self.is_programming = False
+    #     except Exception as e:
+    #         self.status_updated.emit(f"烧录失败: {str(e)}")
+    #         traceback.print_exc()
+    #         self.program_completed.emit(False)
+    #         return False
+    #     finally:
+    #         self.is_programming = False
 
     def stop_programming(self):
         """停止烧录过程"""
         self.is_programming = False
         self.status_updated.emit("烧录已停止")
 
-    def _wait_for_response(self, timeout=1.0) -> bytes:
-        """等待设备响应"""
-        try:
-            start_time = time.time()
-            response = b''
+    # def _wait_for_response(self, timeout=1.0) -> bytes:
+    #     """等待设备响应"""
+    #     try:
+    #         start_time = time.time()
+    #         response = b''
             
-            while time.time() - start_time < timeout:
-                data = self.serial_controller.model.read_data()
-                if data:
-                    response += data
-                    if len(response) >= 2:  # 假设响应至少2字节
-                        return response
-                time.sleep(0.01)
+    #         while time.time() - start_time < timeout:
+    #             data = self.serial_controller.model.read_data()
+    #             if data:
+    #                 response += data
+    #                 if len(response) >= 2:  # 假设响应至少2字节
+    #                     return response
+    #             time.sleep(0.01)
             
-            return b''
-        except Exception as e:
-            print(f"等待响应失败: {e}")
-            traceback.print_exc()
-            return b'' 
+    #         return b''
+    #     except Exception as e:
+    #         print(f"等待响应失败: {e}")
+    #         traceback.print_exc()
+    #         return b'' 
 
 
 
@@ -154,10 +154,12 @@ PC_SET_DOWNLOAD_BACKUP = 0x7C
 
 class DownloadController:
     NO_DATA_TYPE_LENGTH = 4
-    def __init__(self, serial_controller, hex_model):
+    n00data_array = bytearray()
+    # def __init__(self, serial_controller, hex_model):
+    def __init__(self):
         super().__init__()
-        self.serial_controller = serial_controller
-        self.hex_model = hex_model
+        # self.serial_controller = serial_controller
+        # self.hex_model = hex_model
         self.is_programming = False
 
         # HexDecode 的属性
@@ -186,7 +188,7 @@ class DownloadController:
         self.download_start_time = datetime.now()
         
         # bytes 数据
-        self.n00data_array = bytearray()
+        # self.n00data_array = bytearray()
         # self.n01end_array = bytearray()
         # self.n02extend_array = bytearray()
         # self.n03start_array = bytearray()
@@ -195,7 +197,7 @@ class DownloadController:
         # self.data_all = bytearray()
         # self.merge_hex_ok = False
         # self.hex_array: List[int] = []
-        self.total_checksum_array = bytearray()
+        self.total_checksum_array = bytearray(2)
         
         # TestObject 的属性
         self.com_status = ComStatus.NO_START
@@ -206,7 +208,24 @@ class DownloadController:
         self.report_log = ""
         self.dcode0 = None
         self.dcode0 = TextDecode()  # 创建一个 TextDecode 实例
-
+    def hex_init(self, hex_data:bytearray):
+        self.n00data_array = bytearray(hex_data)
+        self.hex_length = len(hex_data)
+        print( "type hex_length = ", type(self.hex_length))
+        if self.hex_length % self.packet_size != 0:
+            self.packet_num = self.hex_length // self.packet_size + 1
+            for i in range(self.packet_size - self.hex_length % self.packet_size):
+                self.n00data_array.extend(bytearray([0xff]))
+            # self.n00data_array.append(bytearray([0xFF] * (self.packet_size - self.hex_length % self.packet_size)))
+            self.hex_length = len(self.n00data_array)
+        else:   
+            self.packet_num = self.hex_length // self.packet_size
+        check_sum = 0
+        for i in range(self.hex_length):
+            check_sum += self.n00data_array[i]
+        self.total_checksum_array[0] = check_sum & 0xff
+        self.total_checksum_array[1] = (check_sum & 0xff00) // 0x100
+        
     def get_download_data(self, cmd_type: BmsCmdType, packet_id: int = 0) -> bytes:
         send_data_array = bytearray()
         data_array = bytearray()
@@ -251,10 +270,10 @@ class DownloadController:
 
     def start_download(self, received_data):
         self.dcode0.split_data(received_data)
-        if not self.hex_model.hex_data or not self.serial_controller.model.is_connected:
-            # self.status_updated.emit("请先选择HEX文件并连接串口")
-            print("请先选择HEX文件并连接串口")
-            return False
+        # if not self.hex_model.hex_data or not self.serial_controller.model.is_connected:
+        #     # self.status_updated.emit("请先选择HEX文件并连接串口")
+        #     print("请先选择HEX文件并连接串口")
+        #     return False
         write_str = ""
         
         if self.com_status == ComStatus.RECEIVING:
@@ -323,19 +342,19 @@ class DownloadController:
         self.com_status = ComStatus.NO_START
         pass
 
-    def process_download(self):
-        """处理下载流程：先读取数据，再开始下载"""
-        try:
-            # 1. 读取串口数据
-            data = self.serial_controller.read_data()
-            if data:
-                # 3. 开始下载流程
-                return self.start_download(data)
-            return None
-        except Exception as e:
-            print(f"处理下载流程失败: {e}")
-            traceback.print_exc()
-            return None
+    # def process_download(self):
+    #     """处理下载流程：先读取数据，再开始下载"""
+    #     try:
+    #         # 1. 读取串口数据
+    #         data = self.serial_controller.read_data()
+    #         if data:
+    #             # 3. 开始下载流程
+    #             return self.start_download(data)
+    #         return None
+    #     except Exception as e:
+    #         print(f"处理下载流程失败: {e}")
+    #         traceback.print_exc()
+    #         return None
 
 class TextDecode:
     def __init__(self):
@@ -442,23 +461,27 @@ class TextDecode:
     
 
 if __name__ == "__main__":
-    cmd = bytearray([0x00,0x00, 0x07, 0x01, 0xf7, 0x55 , 0xaa, 0x8a, 0x00, 0x88])
-    dcode0 = TextDecode()
-    dcode0.split_data(cmd)
-    print(f"cmd = 0x{dcode0.cmd:02x}")
-    print(f"cmd_ack = 0x{dcode0.cmd_ack:02x}")
-    print(f"legality = {dcode0.legality}")
-    print(f"actual_len = {dcode0.actual_len}")
-    print(f"address = 0x{dcode0.address:02x}")
-    print(f"bms_type = 0x{dcode0.bms_type:02x}")
-    print(f"data_len = {dcode0.data_len}")
+    # cmd = bytearray([0x00,0x00, 0x07, 0x01, 0xf7, 0x55 , 0xaa, 0x8a, 0x00, 0x88])
+    # dcode0 = TextDecode()
+    # dcode0.split_data(cmd)
+    # print(f"cmd = 0x{dcode0.cmd:02x}")
+    # print(f"cmd_ack = 0x{dcode0.cmd_ack:02x}")
+    # print(f"legality = {dcode0.legality}")
+    # print(f"actual_len = {dcode0.actual_len}")
+    # print(f"address = 0x{dcode0.address:02x}")
+    # print(f"bms_type = 0x{dcode0.bms_type:02x}")
+    # print(f"data_len = {dcode0.data_len}")
 
-    # download_controller = DownloadController()
+    download_controller = DownloadController()
     # download_controller.start_download(dcode0)
-
-    while True:
-        result = download_controller.process_download()
-        if result:
-            # 处理返回结果
-            pass
-        time.sleep(0.01)  # 短暂延时，避免CPU占用过高
+    hex_data = bytearray(1000)
+    download_controller.hex_init(hex_data)
+    print(download_controller.n00data_array,"lenth = ",len(download_controller.n00data_array))
+    print(download_controller.total_checksum_array,"lenth = ",len(download_controller.total_checksum_array))
+    print(download_controller.get_download_data(BmsCmdType.WRITE_FLASH,1))
+    # while True:
+    #     # result = download_controller.process_download()
+    #     # if result:
+    #     #     # 处理返回结果
+    #     #     pass
+    #     time.sleep(0.01)  # 短暂延时，避免CPU占用过高

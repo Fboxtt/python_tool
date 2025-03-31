@@ -27,7 +27,7 @@ class BluetoothTool(QWidget):
         self.initUI()
         self.hex_model = HexFileModel()
         self.text_decode = TextDecode()
-        self.download_data = DownloadController(self.client,self.hex_model)
+        self.download_data = DownloadController()
         # asyncio.create_task(self.scan_devices())
         QTimer.singleShot(0, self.on_scan_devices_clicked)
     def initUI(self):
@@ -98,8 +98,8 @@ class BluetoothTool(QWidget):
 
         self.test_layout = QHBoxLayout()
         self.test_send_button = QPushButton('连续发送')
-        self.test128 = QLineEdit('0')
-        self.test512 = QLineEdit('460')
+        self.test128 = QLineEdit('40')
+        self.test512 = QLineEdit('400')
         self.test_layout.addWidget(self.test128)
         self.test_layout.addWidget(self.test512)
         self.test_layout.addWidget(self.test_send_button)
@@ -398,7 +398,7 @@ class BluetoothTool(QWidget):
                 while err_count < 3:
                     data = bytearray([0x00,0x00,0x04,0x01,0x76,0x55,0xaa,0x7a])
                     await self.client.write_gatt_char("0000ffe1-0000-1000-8000-00805f9b34fb", data)
-                    self.receive_output.append("76发送")
+                    # self.receive_output.append("76发送")
                     await asyncio.sleep(0.5)
                     if(self.text_decode.is_download_cmd):
                         break
@@ -436,9 +436,35 @@ class BluetoothTool(QWidget):
             if not self.hex_model.is_file_loaded:
                 raise Exception("HEX文件未加载")
             else:
+                self.download_data.hex_init(self.hex_model.get_data())   
                 pass
-            # TODO: 在这里添加后续的烧录步骤
-            # 例如：发送数据块、校验等
+            hex_packet = 0
+            while 1:
+                err_count = 0
+                while err_count < 5:
+                    data = self.download_data.get_download_data(BmsCmdType.WRITE_FLASH, hex_packet)
+                    if(data == None):
+                        print(f"数据发送完成")
+                        break
+                    else:
+                        time128 = int(self.test128.text()) / 1000
+                        time512 = int(self.test512.text()) / 1000
+                        await self.client.write_gatt_char("0000ffe1-0000-1000-8000-00805f9b34fb", data[0:128])
+                        await asyncio.sleep(time128)
+                        await self.client.write_gatt_char("0000ffe1-0000-1000-8000-00805f9b34fb", data[128:256])
+                        await asyncio.sleep(time128)
+                        await self.client.write_gatt_char("0000ffe1-0000-1000-8000-00805f9b34fb", data[256:])
+                        await asyncio.sleep(time512)  
+                    if(self.text_decode.no80_cmd == BmsCmdType.WRITE_FLASH  and self.text_decode.cmd_ack == 0x00):
+                        err_count = 0
+                        hex_packet += 1
+                        break
+                    else:
+                        err_count += 1
+                else:
+                    print(f"数据发送失败")
+                    break
+
             
             self.receive_output.append("烧录完成")
             QMessageBox.information(self, '成功', '烧录完成')
