@@ -27,6 +27,7 @@ class BluetoothTool(QWidget):
         self.initUI()
         self.hex_model = HexFileModel()
         self.text_decode = TextDecode()
+        self.download_data = DownloadController(self.client,self.hex_model)
         # asyncio.create_task(self.scan_devices())
         QTimer.singleShot(0, self.on_scan_devices_clicked)
     def initUI(self):
@@ -376,19 +377,66 @@ class BluetoothTool(QWidget):
             # 禁用烧录按钮，避免重复点击
             self.program_button.setEnabled(False)
             self.program_button.setText('烧录中...')
-
-            err_count = 0
-            while err_count < 3:
-                data = bytearray([0x00,0x00,0x04,0x01,0x76,0x55,0xaa,0x7a])
+            err_count = 0  
+            while err_count < 4:
+                data = self.download_data.get_download_data(BmsCmdType.DOWNLOAD_BUFFER)
                 await self.client.write_gatt_char("0000ffe1-0000-1000-8000-00805f9b34fb", data)
+                self.receive_output.append("75发送")
                 await asyncio.sleep(0.5)
-                err_count += 1
+                if self.text_decode.legality == ReceveDataStatus.ERR_NOTHING:
+                    await asyncio.sleep(1.5)
+                if(self.text_decode.no80_cmd == BmsCmdType.DOWNLOAD_BUFFER  and self.text_decode.cmd_ack == 0x00):
+                    err_count -= 1
+                    break
+                else:
+                    err_count += 1
+            await asyncio.sleep(1)
+
+            shake_count = 0
+            while shake_count < 3:
+                err_count = 0
+                while err_count < 3:
+                    data = bytearray([0x00,0x00,0x04,0x01,0x76,0x55,0xaa,0x7a])
+                    await self.client.write_gatt_char("0000ffe1-0000-1000-8000-00805f9b34fb", data)
+                    self.receive_output.append("76发送")
+                    await asyncio.sleep(0.5)
+                    if(self.text_decode.is_download_cmd):
+                        break
+                    err_count += 1
+                else:
+                    if err_count == 3:
+                        print(f"握手命令发送失败")
+                        # raise Exception("握手命令发送失败")
+                shake_count += 1
             else:
-                if err_count == 3:
-                    raise Exception("下载命令发送失败")
+                print(f"握手命令发送成功")
+            self.text_decode.legality = ReceveDataStatus.ERR_NOTHING
+
+
+
+            err_count = 0  
+            while err_count < 1:
+                data = self.download_data.get_download_data(BmsCmdType.DOWNLOAD_BUFFER)
+                await self.client.write_gatt_char("0000ffe1-0000-1000-8000-00805f9b34fb", data)
+                # self.receive_output.append("75发送")
+                await asyncio.sleep(0.5)
+                if self.text_decode.legality == ReceveDataStatus.ERR_NOTHING:
+                    await asyncio.sleep(1.5)
+                if(self.text_decode.no80_cmd == BmsCmdType.DOWNLOAD_BUFFER  and self.text_decode.cmd_ack == 0x00):
+                    break
+                else:
+                    err_count += 1
+            else:
+                print(f"擦除命令发送失败")
+                
+            # while 
+            
+
             # 发送下载命令并等待响应
             if not self.hex_model.is_file_loaded:
-                return
+                raise Exception("HEX文件未加载")
+            else:
+                pass
             # TODO: 在这里添加后续的烧录步骤
             # 例如：发送数据块、校验等
             
@@ -396,6 +444,7 @@ class BluetoothTool(QWidget):
             QMessageBox.information(self, '成功', '烧录完成')
             
         except Exception as e:
+            traceback.print_exc()
             self.receive_output.append(f"烧录失败: {str(e)}")
             QMessageBox.critical(self, '错误', f'烧录失败: {str(e)}')
         

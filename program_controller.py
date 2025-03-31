@@ -207,7 +207,7 @@ class DownloadController:
         self.dcode0 = None
         self.dcode0 = TextDecode()  # 创建一个 TextDecode 实例
 
-    def packet_to_send_string(self, cmd_type: BmsCmdType, packet_id: int = 0) -> str:
+    def get_download_data(self, cmd_type: BmsCmdType, packet_id: int = 0) -> bytes:
         send_data_array = bytearray()
         data_array = bytearray()
         
@@ -247,7 +247,7 @@ class DownloadController:
         
         send_data_array.extend([check_sum & 0xFF])
         
-        return ' '.join([f"{b:02X}" for b in send_data_array])
+        return send_data_array
 
     def start_download(self, received_data):
         self.dcode0.split_data(received_data)
