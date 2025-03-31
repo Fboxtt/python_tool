@@ -118,6 +118,7 @@ class BmsCmdType(IntEnum):
     REC_TOTAL_CHECKSUM = 0x78
     READ_FLASH = 0x79
     ENTER_APP = 0x7A
+    BMS_MCU_OPEN = 0x7B
     DOWNLOAD_BACKUP = 0x7C
     RESTORE_BACKUP = 0x7D
 
@@ -236,13 +237,14 @@ class DownloadController:
             data_array.extend([self.packet_num & 0xFF])
             data_array.extend([(self.packet_num >> 8) & 0xFF])
             
-            if packet_id < self.packet_num - 1:
+            if packet_id < self.packet_num:
                 data_array.extend(self.n00data_array[packet_id * self.packet_size:
                                                    packet_id * self.packet_size + self.packet_size])
             else:
-                data_array.extend(self.n00data_array[packet_id * self.packet_size:])
-                if self.hex_length % self.packet_size != 0:
-                    data_array.extend([0xFF] * (self.packet_size - self.hex_length % self.packet_size))
+                return None
+                # data_array.extend(self.n00data_array[packet_id * self.packet_size:])
+                # if self.hex_length % self.packet_size != 0:
+                #     data_array.extend([0xFF] * (self.packet_size - self.hex_length % self.packet_size))
         
         if cmd_type == BmsCmdType.REC_TOTAL_CHECKSUM:
             data_array.extend(self.total_checksum_array)
@@ -264,8 +266,8 @@ class DownloadController:
         for byte in data_array:
             check_sum += byte
         
-        send_data_array.extend([check_sum & 0xFF])
-        
+        send_data_array.extend(bytearray([check_sum & 0xFF]))
+        # print(f"Hex: {send_data_array.hex()}") 
         return send_data_array
 
     def start_download(self, received_data):
@@ -476,9 +478,15 @@ if __name__ == "__main__":
     # download_controller.start_download(dcode0)
     hex_data = bytearray(1000)
     download_controller.hex_init(hex_data)
+    print(f"packet num = ", download_controller.packet_num)
     print(download_controller.n00data_array,"lenth = ",len(download_controller.n00data_array))
     print(download_controller.total_checksum_array,"lenth = ",len(download_controller.total_checksum_array))
-    print(download_controller.get_download_data(BmsCmdType.WRITE_FLASH,1))
+    print(f"packet 0 = ", download_controller.get_download_data(BmsCmdType.WRITE_FLASH,0))
+    print(f"packet 1 = ", download_controller.get_download_data(BmsCmdType.WRITE_FLASH,1))
+    print(f"packet 2 = ", download_controller.get_download_data(BmsCmdType.WRITE_FLASH,2))
+    print(f"packet 3 = ", download_controller.get_download_data(BmsCmdType.WRITE_FLASH,3))
+
+    print(f"check sum = ", download_controller.get_download_data(BmsCmdType.REC_TOTAL_CHECKSUM))
     # while True:
     #     # result = download_controller.process_download()
     #     # if result:
