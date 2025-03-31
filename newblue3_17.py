@@ -98,8 +98,8 @@ class BluetoothTool(QWidget):
 
         self.test_layout = QHBoxLayout()
         self.test_send_button = QPushButton('连续发送')
-        self.test128 = QLineEdit('40')
-        self.test512 = QLineEdit('400')
+        self.test128 = QLineEdit('0')
+        self.test512 = QLineEdit('300')
         self.test_layout.addWidget(self.test128)
         self.test_layout.addWidget(self.test512)
         self.test_layout.addWidget(self.test_send_button)
@@ -317,13 +317,27 @@ class BluetoothTool(QWidget):
             else:
                 # QMessageBox.warning(self, '警告', '未连接到设备')
                 break
-    async def byte_send(self,data:bytes):
+    async def byte_send(self,time_interval,data:bytes):
         if(len(data) == 0):
             return
-        if(self.client and self.client.is_connected):
-            self.text_decode.legality = ReceveDataStatus.ERR_NOTHING
-            """异步方法，发送字节数据"""
+        if(not self.client or not self.client.is_connected):
+            QMessageBox.warning(self, '警告', '未连接到设备')
+
+        self.text_decode.legality = ReceveDataStatus.ERR_NOTHING
+        """异步方法，发送字节数据"""
+        if len(data) <= 128:
             await self.client.write_gatt_char("0000ffe1-0000-1000-8000-00805f9b34fb", data)
+        elif len(data) <= 256:
+            await self.client.write_gatt_char("0000ffe1-0000-1000-8000-00805f9b34fb", data[0:128])
+            await asyncio.sleep(time_interval)
+            await self.client.write_gatt_char("0000ffe1-0000-1000-8000-00805f9b34fb", data[128:256])
+        else:
+            await self.client.write_gatt_char("0000ffe1-0000-1000-8000-00805f9b34fb", data[0:128])
+            await asyncio.sleep(time_interval)
+            await self.client.write_gatt_char("0000ffe1-0000-1000-8000-00805f9b34fb", data[128:256])
+            await asyncio.sleep(time_interval)
+            await self.client.write_gatt_char("0000ffe1-0000-1000-8000-00805f9b34fb", data[256:])
+        
 
 
     async def receive_data(self):
@@ -378,32 +392,36 @@ class BluetoothTool(QWidget):
     async def start_programming(self):
         """异步方法，执行烧录过程"""
         try:
+            
+            time128 = int(self.test128.text()) / 1000
+            time512 = int(self.test512.text()) / 1000
             # 禁用烧录按钮，避免重复点击
             self.program_button.setEnabled(False)
             self.program_button.setText('烧录中...')
             err_count = 0  
             while err_count < 4:
                 data = self.download_data.get_download_data(BmsCmdType.DOWNLOAD_BUFFER)
-                await self.client.write_gatt_char("0000ffe1-0000-1000-8000-00805f9b34fb", data)
+                await self.byte_send(time128,data)
+                # await self.client.write_gatt_char("0000ffe1-0000-1000-8000-00805f9b34fb", data)
                 self.receive_output.append("75发送")
-                await asyncio.sleep(0.5)
+                await asyncio.sleep(time512)
                 if self.text_decode.legality == ReceveDataStatus.ERR_NOTHING:
-                    await asyncio.sleep(1.5)
+                    await asyncio.sleep(time512 * 4)
                 if(self.text_decode.no80_cmd == BmsCmdType.DOWNLOAD_BUFFER  and self.text_decode.cmd_ack == 0x00):
                     err_count -= 1
                     break
                 else:
                     err_count += 1
-            await asyncio.sleep(1)
+            # await asyncio.sleep(1)
 
             shake_count = 0
             while shake_count < 3:
                 err_count = 0
                 while err_count < 3:
                     data = bytearray([0x00,0x00,0x04,0x01,0x76,0x55,0xaa,0x7a])
-                    await self.client.write_gatt_char("0000ffe1-0000-1000-8000-00805f9b34fb", data)
+                    await self.byte_send(time128,data)
                     # self.receive_output.append("76发送")
-                    await asyncio.sleep(0.5)
+                    await asyncio.sleep(time512)
                     if(self.text_decode.is_download_cmd):
                         break
                     err_count += 1
@@ -421,11 +439,11 @@ class BluetoothTool(QWidget):
             err_count = 0  
             while err_count < 1:
                 data = self.download_data.get_download_data(BmsCmdType.DOWNLOAD_BUFFER)
-                await self.client.write_gatt_char("0000ffe1-0000-1000-8000-00805f9b34fb", data)
+                await self.byte_send(time128,data)
                 # self.receive_output.append("75发送")
-                await asyncio.sleep(0.5)
+                await asyncio.sleep(time512)
                 if self.text_decode.legality == ReceveDataStatus.ERR_NOTHING:
-                    await asyncio.sleep(1.5)
+                    await asyncio.sleep(time512 * 4)
                 if(self.text_decode.no80_cmd == BmsCmdType.DOWNLOAD_BUFFER  and self.text_decode.cmd_ack == 0x00):
                     break
                 else:
@@ -451,21 +469,19 @@ class BluetoothTool(QWidget):
                 else:
                     err_count = 0
                     while err_count < 5:
-                        time128 = int(self.test128.text()) / 1000
-                        time512 = int(self.test512.text()) / 1000
-                        await self.client.write_gatt_char("0000ffe1-0000-1000-8000-00805f9b34fb", data[0:128])
-                        await asyncio.sleep(time128)
-                        await self.client.write_gatt_char("0000ffe1-0000-1000-8000-00805f9b34fb", data[128:256])
-                        await asyncio.sleep(time128)
-                        await self.client.write_gatt_char("0000ffe1-0000-1000-8000-00805f9b34fb", data[256:])
-                        current_time = datetime.now().strftime("%H:%M:%S.%f")[:-3]
-                        self.receive_output.append(f"TX->数据包发送完成 - 时间: {current_time}")
-                        await asyncio.sleep(time512)  
-                        if(self.text_decode.no80_cmd == BmsCmdType.WRITE_FLASH  and self.text_decode.cmd_ack == 0x00):
-                            err_count = 0
-                            hex_packet += 1
-                            break
-                        else:
+                        try:
+                            await self.byte_send(time128,data)
+                            # current_time = datetime.now().strftime("%H:%M:%S.%f")[:-3]
+                            # self.receive_output.append(f"TX->数据包发送完成 - 时间: {current_time}")
+                            await asyncio.sleep(time512)  
+                            if(self.text_decode.no80_cmd == BmsCmdType.WRITE_FLASH  and self.text_decode.cmd_ack == 0x00):
+                                err_count = 0
+                                hex_packet += 1
+                                break
+                            else:
+                                err_count += 1
+                        except Exception as e:
+                            traceback.print_exc()
                             err_count += 1
                     else:
                         print(f"数据发送失败")
@@ -474,27 +490,26 @@ class BluetoothTool(QWidget):
             err_count = 0   
             while err_count < 5:
                 data = self.download_data.get_download_data(BmsCmdType.REC_TOTAL_CHECKSUM)
-                await self.client.write_gatt_char("0000ffe1-0000-1000-8000-00805f9b34fb", data)
-                await asyncio.sleep(0.5)
+                await self.byte_send(time128,data)
+                await asyncio.sleep(time512 * 2)
                 if(self.text_decode.no80_cmd == BmsCmdType.REC_TOTAL_CHECKSUM  and self.text_decode.cmd_ack == 0x00):
                     break
                 else:
                     err_count += 1
             self.receive_output.append("烧录完成")
-            await asyncio.sleep(2)
-            
+            await asyncio.sleep(6)
+
             err_count = 0
             if self.text_decode.no80_cmd == BmsCmdType.BMS_MCU_OPEN  and self.text_decode.cmd_ack == 0x00:
                 self.receive_output.append("电池重启")
                 while err_count < 5:
                     data = self.download_data.get_download_data(BmsCmdType.READ_IC_INF)
-                    await self.client.write_gatt_char("0000ffe1-0000-1000-8000-00805f9b34fb", data)
-                    await asyncio.sleep(0.5)
+                    await self.byte_send(time128,data)
+                    await asyncio.sleep(time512)
                     if(self.text_decode.no80_cmd == BmsCmdType.READ_IC_INF  and self.text_decode.cmd_ack == 0x00):
                         break
                     else:
                         err_count += 1
-            QMessageBox.information(self, '成功', '烧录完成')
             
         except Exception as e:
             traceback.print_exc()
