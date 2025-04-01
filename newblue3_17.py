@@ -505,7 +505,7 @@ class BluetoothTool(QWidget):
                 while err_count < 5:
                     data = self.download_data.get_download_data(BmsCmdType.READ_IC_INF)
                     await self.byte_send(time128,data)
-                    await asyncio.sleep(time512)
+                    await asyncio.sleep(time512 * 2)
                     if(self.text_decode.no80_cmd == BmsCmdType.READ_IC_INF  and self.text_decode.cmd_ack == 0x00):
                         break
                     else:

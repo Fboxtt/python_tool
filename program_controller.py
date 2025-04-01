@@ -5,107 +5,6 @@ from enum import IntEnum
 from typing import List, Optional
 from datetime import datetime
 
-
-class ProgramController(QObject):
-    # 定义信号
-    progress_updated = pyqtSignal(int)
-    status_updated = pyqtSignal(str)
-    program_completed = pyqtSignal(bool)
-
-    def __init__(self):
-        super().__init__()
-        # self.serial_controller = serial_controller
-        # self.hex_model = hex_model
-        self.is_programming = False
-
-    # def start_programming(self):
-    #     """开始烧录过程"""
-    #     if not self.hex_model.hex_data or not self.serial_controller.model.is_connected:
-    #         self.status_updated.emit("请先选择HEX文件并连接串口")
-    #         return False
-
-    #     self.is_programming = True
-    #     try:
-    #         # 获取数据
-    #         data = self.hex_model.get_data()
-    #         total_size = len(data)
-    #         sent_size = 0
-
-    #         # 发送开始烧录命令
-    #         self.serial_controller.send_data_bytes(b'\xAA\x55\x01')  # 示例命令
-    #         response = self._wait_for_response()
-    #         if not response or response[0] != 0xAA:  # 检查响应
-    #             raise Exception("设备未就绪")
-
-    #         # 分包发送数据
-    #         packet_size = 256  # 每包256字节
-    #         while sent_size < total_size and self.is_programming:
-    #             # 准备数据包
-    #             packet = data[sent_size:sent_size + packet_size]
-    #             packet_header = bytes([0xAA, 0x55, 0x02, len(packet)])
-                
-    #             # 发送数据包
-    #             self.serial_controller.send_data_bytes(packet_header + packet)
-                
-    #             # 等待响应
-    #             response = self._wait_for_response()
-    #             if not response or response[0] != 0xAA:
-    #                 raise Exception(f"数据包 {sent_size//packet_size} 发送失败")
-
-    #             # 更新进度
-    #             sent_size += len(packet)
-    #             progress = int(sent_size * 100 / total_size)
-    #             self.progress_updated.emit(progress)
-                
-    #             # 短暂延时，避免发送过快
-    #             time.sleep(0.01)
-
-    #         # 发送结束命令
-    #         self.serial_controller.send_data_bytes(b'\xAA\x55\x03')
-    #         response = self._wait_for_response()
-    #         if not response or response[0] != 0xAA:
-    #             raise Exception("烧录完成确认失败")
-
-    #         self.status_updated.emit("烧录完成")
-    #         self.program_completed.emit(True)
-    #         return True
-
-    #     except Exception as e:
-    #         self.status_updated.emit(f"烧录失败: {str(e)}")
-    #         traceback.print_exc()
-    #         self.program_completed.emit(False)
-    #         return False
-    #     finally:
-    #         self.is_programming = False
-
-    def stop_programming(self):
-        """停止烧录过程"""
-        self.is_programming = False
-        self.status_updated.emit("烧录已停止")
-
-    # def _wait_for_response(self, timeout=1.0) -> bytes:
-    #     """等待设备响应"""
-    #     try:
-    #         start_time = time.time()
-    #         response = b''
-            
-    #         while time.time() - start_time < timeout:
-    #             data = self.serial_controller.model.read_data()
-    #             if data:
-    #                 response += data
-    #                 if len(response) >= 2:  # 假设响应至少2字节
-    #                     return response
-    #             time.sleep(0.01)
-            
-    #         return b''
-    #     except Exception as e:
-    #         print(f"等待响应失败: {e}")
-    #         traceback.print_exc()
-    #         return b'' 
-
-
-
-
 # 定义错误常量
 ERR_NO = 0
 ERR_ALL_CHECK = 1
@@ -156,58 +55,44 @@ PC_SET_DOWNLOAD_BACKUP = 0x7C
 class DownloadController:
     NO_DATA_TYPE_LENGTH = 4
     n00data_array = bytearray()
-    # def __init__(self, serial_controller, hex_model):
     def __init__(self):
         super().__init__()
-        # self.serial_controller = serial_controller
-        # self.hex_model = hex_model
-        self.is_programming = False
+        # self.is_programming = False  # 未使用
 
         # HexDecode 的属性
-        self.exist = False
+        # self.exist = False  # 未使用
         self.hex_length = 0
-        self.address = 0
-        self.extend_linear_address = 0
-        self.data_type = 0
-        self.erase_flag = False
-        self.begin_download_state = False
-        self.begin_erase_state = False
+        # self.address = 0  # 未使用
+        # self.extend_linear_address = 0  # 未使用
+        # self.data_type = 0  # 未使用
+        # self.erase_flag = False  # 未使用
+        # self.begin_download_state = False  # 未使用
+        # self.begin_erase_state = False  # 未使用
         self.packet_id = 0
         self.packet_size = 372
         self.packet_num = 0
-        self.shake_success_time = 0
-        self.download_backup_flag = False
-        self.shake_backup_succ_time = 0
-        self.write_success_time = 0
-        self.hex_packet_ok: List[bool] = []
+        # self.shake_success_time = 0  # 未使用
+        # self.download_backup_flag = False  # 未使用
+        # self.shake_backup_succ_time = 0  # 未使用
+        # self.write_success_time = 0  # 未使用
+        # self.hex_packet_ok: List[bool] = []  # 未使用
         
-        self.packet_num_l_err = 0
-        self.bms_nack = 0
-        self.cmd_type_err = 0
+        # self.packet_num_l_err = 0  # 未使用
+        # self.bms_nack = 0  # 未使用
+        # self.cmd_type_err = 0  # 未使用
         
-        self.write_flash_cmd = 0
-        self.download_start_time = datetime.now()
+        # self.download_start_time = datetime.now()  # 未使用
         
-        # bytes 数据
-        # self.n00data_array = bytearray()
-        # self.n01end_array = bytearray()
-        # self.n02extend_array = bytearray()
-        # self.n03start_array = bytearray()
-        # self.n04extend_linear_array = bytearray()
-        # self.n05start_linear_array = bytearray()
-        # self.data_all = bytearray()
-        # self.merge_hex_ok = False
-        # self.hex_array: List[int] = []
         self.total_checksum_array = bytearray(2)
         
         # TestObject 的属性
-        self.com_status = ComStatus.NO_START
-        self.step = 0
-        self.testing_key = ""
-        self.status = None
-        self.tested = None
-        self.report_log = ""
-        self.dcode0 = None
+        # self.com_status = ComStatus.NO_START  # 未使用
+        # self.step = 0  # 未使用
+        # self.testing_key = ""  # 未使用
+        # self.status = None  # 未使用
+        # self.tested = None  # 未使用
+        # self.report_log = ""  # 未使用
+        # self.dcode0 = None  # 未使用
         self.dcode0 = TextDecode()  # 创建一个 TextDecode 实例
     def hex_init(self, hex_data:bytearray):
         self.n00data_array = bytearray(hex_data)
@@ -270,93 +155,9 @@ class DownloadController:
         # print(f"Hex: {send_data_array.hex()}") 
         return send_data_array
 
-    def start_download(self, received_data):
-        self.dcode0.split_data(received_data)
-        # if not self.hex_model.hex_data or not self.serial_controller.model.is_connected:
-        #     # self.status_updated.emit("请先选择HEX文件并连接串口")
-        #     print("请先选择HEX文件并连接串口")
-        #     return False
-        write_str = ""
-        
-        if self.com_status == ComStatus.RECEIVING:
-            if self.step == 3:
-                if self.dcode0.cmd_ack == ERR_NO and self.dcode0.have_hex and self.dcode0.data_hex[0] == 0x00:
-                    self.com_status = ComStatus.SENDING
-                else:
-                    self.com_status = ComStatus.FAILED
-                    
-            elif self.step == 4:
-                if (self.dcode0.cmd_ack == ERR_NO and self.dcode0.have_hex and 
-                    self.packet_num + 1 == self.dcode0.cmd_packet_num):
-                    if self.packet_num + 1 < self.packet_num:
-                        self.packet_num += 1
-                    self.com_status = ComStatus.SENDING
-                else:
-                    self.com_status = ComStatus.FAILED
-                    
-            elif self.step == 5:
-                if self.dcode0.cmd_ack == ERR_ALL_CHECK and self.dcode0.have_hex:
-                    self.com_status = ComStatus.FAILED
-                else:
-                    self.com_status = ComStatus.SENDING
-                    
-            else:
-                if self.dcode0.cmd_ack == ERR_NO and self.dcode0.have_hex:
-                    self.com_status = ComStatus.SENDING
-                else:
-                    self.com_status = ComStatus.FAILED
-                    
-            if self.com_status == ComStatus.SENDING:
-                if self.packet_num == 0 or self.packet_num + 1 == self.packet_num:
-                    self.step += 1
-                self.dcode0.have_hex = False
-                
-            elif self.com_status == ComStatus.FAILED:
-                print(f"{self.testing_key} 测试失败 第{self.step}步失败")
-                self.status = self.tested
-                self.report_log = f"{self.testing_key}测试失败{self.step}步失败"
-                return
-                
-        elif self.com_status == ComStatus.NO_START:
-            self.com_status = ComStatus.SENDING
-            self.step = 0
-            
-        # 处理不同步骤
-        if self.step == 0:
-            self.packet_num = 0
-            write_str = self.packet_to_send_string(BmsCmdType.ENTER_BOOTMODE)
-        elif self.step in [1, 2]:
-            write_str = self.packet_to_send_string(BmsCmdType.ENTER_BOOTMODE)
-        elif self.step == 3:
-            write_str = self.packet_to_send_string(BmsCmdType.DOWNLOAD_BUFFER)
-        elif self.step == 4:
-            write_str = self.packet_to_send_string(BmsCmdType.WRITE_FLASH, self.packet_num)
-        elif self.step == 5:
-            write_str = self.packet_to_send_string(BmsCmdType.REC_TOTAL_CHECKSUM)
-        elif self.step == 6:
-            self.step = 0
-            self.status = self.tested
-            self.report_log = f"{self.testing_key}测试成功"
-            return write_str
-            
-        self.com_status = ComStatus.RECEIVING
     def stop_download(self):
         self.com_status = ComStatus.NO_START
         pass
-
-    # def process_download(self):
-    #     """处理下载流程：先读取数据，再开始下载"""
-    #     try:
-    #         # 1. 读取串口数据
-    #         data = self.serial_controller.read_data()
-    #         if data:
-    #             # 3. 开始下载流程
-    #             return self.start_download(data)
-    #         return None
-    #     except Exception as e:
-    #         print(f"处理下载流程失败: {e}")
-    #         traceback.print_exc()
-    #         return None
 
 class TextDecode:
     def __init__(self):
