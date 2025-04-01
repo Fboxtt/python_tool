@@ -234,7 +234,6 @@ class BluetoothTool(QWidget):
                 # 开始监听数据
                 if self.client and self.client.is_connected:
                     await self.client.start_notify("0000ffe1-0000-1000-8000-00805f9b34fb", self.on_data_received)
-                # asyncio.create_task(self.receive_data())
             except Exception as e:
                 QMessageBox.critical(self, '连接失败', str(e))
         else:
@@ -343,15 +342,6 @@ class BluetoothTool(QWidget):
             await asyncio.sleep(time_interval)
             await self.client.write_gatt_char("0000ffe1-0000-1000-8000-00805f9b34fb", data[256:])
         
-    # async def receive_data(self):
-    #     """异步方法，接收蓝牙设备发送的数据"""
-    #     if self.client and self.client.is_connected:
-    #         try:
-    #             # 假设设备的通知特征 UUID 是 "0000ffe1-0000-1000-8000-00805f9b34fb"
-    #             await self.client.start_notify("0000ffe1-0000-1000-8000-00805f9b34fb", self.on_data_received)
-    #         except Exception as e:
-    #             QMessageBox.critical(self, '接收失败', str(e))
-
     def on_data_received(self, sender, data):
         """回调函数，处理接收到的数据"""
         if not hasattr(self, 'received_data_buffer'):
