@@ -4,12 +4,12 @@ import traceback
 import time
 from datetime import datetime
 
-from PyQt6.QtCore import QTimer  # 导入 QTimer
+from PyQt6.QtCore import QTimer, Qt, QPropertyAnimation, QRectF, QSize, pyqtProperty
 from PyQt6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QPushButton, QListWidget, QLabel, QMessageBox, QTextEdit, QLineEdit, QHBoxLayout,
-    QCheckBox, QFileDialog, QComboBox, QGridLayout
+    QCheckBox, QFileDialog, QComboBox, QGridLayout, QAbstractButton, QSizePolicy
 )
-from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QPainter, QColor, QPen
 from bleak import BleakScanner, BleakClient
 from qasync import QEventLoop, asyncSlot
 from hex_model import HexFileModel
@@ -17,6 +17,93 @@ from OTA_controller import OtaController
 from OTA_controller import TextDecode
 from OTA_controller import ReceveDataStatus,BmsCmdType,ComStatus,DownloadErr
 import serial.tools.list_ports
+
+
+class ToggleSwitch(QAbstractButton):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setCheckable(True)
+        self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+        
+        # 初始化属性
+        self._offset = 0
+        
+        # 颜色设置
+        self._track_color_on = QColor(76, 217, 100)  # 绿色(开)
+        self._track_color_off = QColor(190, 190, 190)  # 灰色(关)
+        self._thumb_color = QColor(255, 255, 255)  # 白色滑块
+        self._track_opacity = 1.0
+        
+        # 动画
+        self._animation = QPropertyAnimation(self, b"offset", self)
+        self._animation.setDuration(120)  # 动画持续时间(毫秒)
+        
+    def sizeHint(self):
+        return QSize(50, 30)  # 开关大小
+
+    def setOffset(self, value):
+        self._offset = value
+        self.update()
+
+    def offset(self):
+        return self._offset
+
+    # 使用pyqtProperty定义动画属性
+    offset = pyqtProperty(float, offset, setOffset)
+
+    def paintEvent(self, event):
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        
+        # 计算尺寸
+        rect = self.rect()
+        width = rect.width()
+        height = rect.height()
+        margin = 2
+        
+        # 绘制轨道
+        track_color = self._track_color_on if self.isChecked() else self._track_color_off
+        p.setBrush(track_color)
+        p.setOpacity(self._track_opacity)
+        p.setPen(Qt.PenStyle.NoPen)
+        track_rect = QRectF(margin, margin, width - 2*margin, height - 2*margin)
+        p.drawRoundedRect(track_rect, height/2, height/2)
+        
+        # 绘制滑块
+        p.setOpacity(1.0)
+        p.setBrush(self._thumb_color)
+        p.setPen(QPen(QColor(220, 220, 220), 1))
+        
+        # 计算滑块位置
+        thumb_size = height - 2*margin - 2  # 滑块尺寸比轨道小一点
+        thumb_x = margin + 1 + self._offset * (width - thumb_size - 2*margin - 2)
+        p.drawEllipse(QRectF(thumb_x, margin+1, thumb_size, thumb_size))
+
+    def mouseReleaseEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.setChecked(not self.isChecked())
+            self._start_animation()
+        super().mouseReleaseEvent(event)
+
+    def enterEvent(self, event):
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        super().enterEvent(event)
+    
+    def _start_animation(self):
+        # 根据当前状态设置动画
+        if self.isChecked():
+            self._animation.setStartValue(0)
+            self._animation.setEndValue(1)
+        else:
+            self._animation.setStartValue(1)
+            self._animation.setEndValue(0)
+        self._animation.start()
+
+    def setChecked(self, checked):
+        super().setChecked(checked)
+        # 立即更新offset以匹配当前状态
+        self._offset = 1 if checked else 0
+        self.update()
 
 
 class BluetoothTool(QWidget):
@@ -210,6 +297,19 @@ class BluetoothTool(QWidget):
         
         # 初始化时刷新串口列表
         self.refresh_serial_ports()
+
+        # 在底部添加一个iOS风格的开关
+        bottom_layout = QHBoxLayout()
+        
+        self.auto_mode_label = QLabel("自动模式:")
+        self.toggle_switch = ToggleSwitch()
+        self.toggle_switch.toggled.connect(self.on_toggle_switch_changed)
+        
+        bottom_layout.addWidget(self.auto_mode_label)
+        bottom_layout.addWidget(self.toggle_switch)
+        bottom_layout.addStretch(1)  # 添加弹性空间，让控件靠左对齐
+        
+        layout.addLayout(bottom_layout)
 
         self.setLayout(layout)
 
@@ -726,6 +826,15 @@ class BluetoothTool(QWidget):
             # 恢复按钮状态
             self.program_button.setEnabled(True)
             self.program_button.setText('开始烧录')
+
+    def on_toggle_switch_changed(self, checked):
+        """处理开关状态变化"""
+        if checked:
+            self.receive_output.append("自动模式已开启")
+            # 这里添加开启自动模式的代码
+        else:
+            self.receive_output.append("自动模式已关闭")
+            # 这里添加关闭自动模式的代码
 
 
 if __name__ == '__main__':
