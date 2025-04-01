@@ -205,9 +205,12 @@ class BluetoothTool(QWidget):
 
         devices = await BleakScanner.discover()
         self.device_list.clear()
+        
         for device in devices:
-            if device.rssi > rssi_threshold:  # 筛选信号强度大于阈值的设备
+            # 只显示有名字且信号强度符合要求的设备
+            if device.name and device.rssi > rssi_threshold:
                 self.device_list.addItem(f"{device.name} - {device.address} (RSSI: {device.rssi})")
+        
         self.label.setText('发现的蓝牙设备:')
 
     async def connect_device(self):
