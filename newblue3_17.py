@@ -13,9 +13,9 @@ from PyQt6.QtCore import Qt
 from bleak import BleakScanner, BleakClient
 from qasync import QEventLoop, asyncSlot
 from hex_model import HexFileModel
-from program_controller import DownloadController
-from program_controller import TextDecode
-from program_controller import ReceveDataStatus,BmsCmdType,ComStatus,DownloadErr
+from OTA_controller import OtaController
+from OTA_controller import TextDecode
+from OTA_controller import ReceveDataStatus,BmsCmdType,ComStatus,DownloadErr
 
 
 class BluetoothTool(QWidget):
@@ -27,7 +27,7 @@ class BluetoothTool(QWidget):
         self.initUI()
         self.hex_model = HexFileModel()
         self.text_decode = TextDecode()
-        self.download_data = DownloadController()
+        self.download_data = OtaController()
         # asyncio.create_task(self.scan_devices())
         QTimer.singleShot(0, self.on_scan_devices_clicked)
     def initUI(self):

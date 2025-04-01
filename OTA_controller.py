@@ -4,20 +4,21 @@ import traceback
 from enum import IntEnum
 from typing import List, Optional
 from datetime import datetime
+# from OTA_controller import OtaController  # 更新导入语句
 
 # 定义错误常量
 ERR_NO = 0
 ERR_ALL_CHECK = 1
 
 class BmsCmdType(IntEnum):
-    # READ_IC_INF = 0x71  # 未使用
+    READ_IC_INF = 0x71
     DOWNLOAD_BUFFER = 0x75
     ENTER_BOOTMODE = 0x76
     WRITE_FLASH = 0x77
     REC_TOTAL_CHECKSUM = 0x78
     # READ_FLASH = 0x79  # 未使用
     # ENTER_APP = 0x7A  # 未使用
-    # BMS_MCU_OPEN = 0x7B  # 未使用
+    BMS_MCU_OPEN = 0x7B
     # DOWNLOAD_BACKUP = 0x7C  # 未使用
     # RESTORE_BACKUP = 0x7D  # 未使用
 
@@ -52,48 +53,17 @@ PC_SET_ALL_CHECKSUM = 0x78
 PC_SET_DOWNLOAD_BUFFER = 0x75
 PC_SET_DOWNLOAD_BACKUP = 0x7C
 
-class DownloadController:
+class OtaController:
     NO_DATA_TYPE_LENGTH = 4
     n00data_array = bytearray()
     def __init__(self):
         super().__init__()
-        # self.is_programming = False  # 未使用
-
-        # HexDecode 的属性
-        # self.exist = False  # 未使用
         self.hex_length = 0
-        # self.address = 0  # 未使用
-        # self.extend_linear_address = 0  # 未使用
-        # self.data_type = 0  # 未使用
-        # self.erase_flag = False  # 未使用
-        # self.begin_download_state = False  # 未使用
-        # self.begin_erase_state = False  # 未使用
         self.packet_id = 0
         self.packet_size = 372
         self.packet_num = 0
-        # self.shake_success_time = 0  # 未使用
-        # self.download_backup_flag = False  # 未使用
-        # self.shake_backup_succ_time = 0  # 未使用
-        # self.write_success_time = 0  # 未使用
-        # self.hex_packet_ok: List[bool] = []  # 未使用
-        
-        # self.packet_num_l_err = 0  # 未使用
-        # self.bms_nack = 0  # 未使用
-        # self.cmd_type_err = 0  # 未使用
-        
-        # self.download_start_time = datetime.now()  # 未使用
-        
         self.total_checksum_array = bytearray(2)
         
-        # TestObject 的属性
-        # self.com_status = ComStatus.NO_START  # 未使用
-        # self.step = 0  # 未使用
-        # self.testing_key = ""  # 未使用
-        # self.status = None  # 未使用
-        # self.tested = None  # 未使用
-        # self.report_log = ""  # 未使用
-        # self.dcode0 = None  # 未使用
-        self.dcode0 = TextDecode()  # 创建一个 TextDecode 实例
     def hex_init(self, hex_data:bytearray):
         """初始化hex文件数据
         
@@ -302,7 +272,7 @@ if __name__ == "__main__":
     # print(f"bms_type = 0x{dcode0.bms_type:02x}")
     # print(f"data_len = {dcode0.data_len}")
 
-    download_controller = DownloadController()
+    download_controller = OtaController()
     # download_controller.start_download(dcode0)
     hex_data = bytearray(1000)
     download_controller.hex_init(hex_data)
