@@ -198,18 +198,18 @@ class BluetoothTool(QWidget):
         except ValueError:
             rssi_threshold = -100  # 默认值，显示所有设备
 
-        # 记录开始时间
-        start_time = datetime.now()
-        self.receive_output.append(f"开始扫描时间: {start_time.strftime('%H:%M:%S.%f')[:-3]}")
+        # # 记录开始时间
+        # start_time = datetime.now()
+        # self.receive_output.append(f"开始扫描时间: {start_time.strftime('%H:%M:%S.%f')[:-3]}")
 
         # 设置扫描时间为3秒
         devices = await BleakScanner.discover(timeout=2.0)  # 单位是秒
         
-        # 记录结束时间并计算用时
-        end_time = datetime.now()
-        scan_duration = end_time - start_time
-        self.receive_output.append(f"结束扫描时间: {end_time.strftime('%H:%M:%S.%f')[:-3]}")
-        self.receive_output.append(f"扫描用时: {scan_duration.total_seconds():.3f} 秒")
+        # # 记录结束时间并计算用时
+        # end_time = datetime.now()
+        # scan_duration = end_time - start_time
+        # self.receive_output.append(f"结束扫描时间: {end_time.strftime('%H:%M:%S.%f')[:-3]}")
+        # self.receive_output.append(f"扫描用时: {scan_duration.total_seconds():.3f} 秒")
 
         self.device_list.clear()
         for device in devices:
