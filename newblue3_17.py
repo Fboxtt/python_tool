@@ -281,22 +281,13 @@ class BluetoothTool(QWidget):
     async def test_send_data(self):
         """异步方法，发送测试数据"""
         data = bytes(128)
-        time128 = int(self.test128.text()) / 1000
-        time512 = int(self.test512.text()) / 1000
         self.send_count = 0
-        # print(data,f"size(data) = {len(data)}")
         while 1:
-            time128 = int(self.test128.text()) / 1000
             time512 = int(self.test512.text()) / 1000
             if self.client and self.client.is_connected:
                 try:
                     # 假设设备的写特征 UUID 是 "0000ffe1-0000-1000-8000-00805f9b34fb"
-                    await self.client.write_gatt_char("0000ffe1-0000-1000-8000-00805f9b34fb", data)
-                    time.sleep(time128)
-                    await self.client.write_gatt_char("0000ffe1-0000-1000-8000-00805f9b34fb", data)
-                    time.sleep(time128)
-                    # await self.client.write_gatt_char("0000ffe1-0000-1000-8000-00805f9b34fb", data)
-                    # time.sleep(time128)
+                    self.byte_send(data)
                     await self.client.write_gatt_char("0000ffe1-0000-1000-8000-00805f9b34fb", data)
                     time.sleep(time512)
                     self.send_count += 1
@@ -308,7 +299,6 @@ class BluetoothTool(QWidget):
                         cursor.deleteChar()  # 删除换行符
                     current_time = datetime.now().strftime("%d %H:%M:%S")[:18]  # 格式化并限制长度到毫秒
                     self.receive_output.append(f"成功发送次数 = {self.send_count} 发送时间 = {current_time}")
-                    # self.receive_output.append(f"发送: {data}")
                 except Exception as e:
                     traceback.print_exc()
                     self.receive_output.append(f"蓝牙发送失败 {str(e)}")
@@ -317,11 +307,13 @@ class BluetoothTool(QWidget):
             else:
                 # QMessageBox.warning(self, '警告', '未连接到设备')
                 break
-    async def byte_send(self,time_interval,data:bytes):
+
+    async def byte_send(self,data:bytes):
         if(len(data) == 0):
             return
         if(not self.client or not self.client.is_connected):
             QMessageBox.warning(self, '警告', '未连接到设备')
+        time_interval = int(self.test128.text()) / 1000
 
         self.text_decode.legality = ReceveDataStatus.ERR_NOTHING
         """异步方法，发送字节数据"""
@@ -338,8 +330,6 @@ class BluetoothTool(QWidget):
             await asyncio.sleep(time_interval)
             await self.client.write_gatt_char("0000ffe1-0000-1000-8000-00805f9b34fb", data[256:])
         
-
-
     async def receive_data(self):
         """异步方法，接收蓝牙设备发送的数据"""
         if self.client and self.client.is_connected:
@@ -401,7 +391,7 @@ class BluetoothTool(QWidget):
             err_count = 0  
             while err_count < 4:
                 data = self.download_data.get_download_data(BmsCmdType.DOWNLOAD_BUFFER)
-                await self.byte_send(time128,data)
+                await self.byte_send(data)
                 # await self.client.write_gatt_char("0000ffe1-0000-1000-8000-00805f9b34fb", data)
                 self.receive_output.append("75发送")
                 await asyncio.sleep(time512)
@@ -419,7 +409,7 @@ class BluetoothTool(QWidget):
                 err_count = 0
                 while err_count < 3:
                     data = bytearray([0x00,0x00,0x04,0x01,0x76,0x55,0xaa,0x7a])
-                    await self.byte_send(time128,data)
+                    await self.byte_send(data)
                     # self.receive_output.append("76发送")
                     await asyncio.sleep(time512)
                     if(self.text_decode.is_download_cmd):
@@ -439,7 +429,7 @@ class BluetoothTool(QWidget):
             err_count = 0  
             while err_count < 1:
                 data = self.download_data.get_download_data(BmsCmdType.DOWNLOAD_BUFFER)
-                await self.byte_send(time128,data)
+                await self.byte_send(data)
                 # self.receive_output.append("75发送")
                 await asyncio.sleep(time512)
                 if self.text_decode.legality == ReceveDataStatus.ERR_NOTHING:
@@ -470,7 +460,7 @@ class BluetoothTool(QWidget):
                     err_count = 0
                     while err_count < 5:
                         try:
-                            await self.byte_send(time128,data)
+                            await self.byte_send(data)
                             # current_time = datetime.now().strftime("%H:%M:%S.%f")[:-3]
                             # self.receive_output.append(f"TX->数据包发送完成 - 时间: {current_time}")
                             await asyncio.sleep(time512)  
@@ -490,7 +480,7 @@ class BluetoothTool(QWidget):
             err_count = 0   
             while err_count < 5:
                 data = self.download_data.get_download_data(BmsCmdType.REC_TOTAL_CHECKSUM)
-                await self.byte_send(time128,data)
+                await self.byte_send(data)
                 await asyncio.sleep(time512 * 2)
                 if(self.text_decode.no80_cmd == BmsCmdType.REC_TOTAL_CHECKSUM  and self.text_decode.cmd_ack == 0x00):
                     break
@@ -504,7 +494,7 @@ class BluetoothTool(QWidget):
                 self.receive_output.append("电池重启")
                 while err_count < 5:
                     data = self.download_data.get_download_data(BmsCmdType.READ_IC_INF)
-                    await self.byte_send(time128,data)
+                    await self.byte_send(data)
                     await asyncio.sleep(time512 * 2)
                     if(self.text_decode.no80_cmd == BmsCmdType.READ_IC_INF  and self.text_decode.cmd_ack == 0x00):
                         break
