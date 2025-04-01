@@ -10,16 +10,16 @@ ERR_NO = 0
 ERR_ALL_CHECK = 1
 
 class BmsCmdType(IntEnum):
-    READ_IC_INF = 0x71
+    # READ_IC_INF = 0x71  # 未使用
     DOWNLOAD_BUFFER = 0x75
     ENTER_BOOTMODE = 0x76
     WRITE_FLASH = 0x77
     REC_TOTAL_CHECKSUM = 0x78
-    READ_FLASH = 0x79
-    ENTER_APP = 0x7A
-    BMS_MCU_OPEN = 0x7B
-    DOWNLOAD_BACKUP = 0x7C
-    RESTORE_BACKUP = 0x7D
+    # READ_FLASH = 0x79  # 未使用
+    # ENTER_APP = 0x7A  # 未使用
+    # BMS_MCU_OPEN = 0x7B  # 未使用
+    # DOWNLOAD_BACKUP = 0x7C  # 未使用
+    # RESTORE_BACKUP = 0x7D  # 未使用
 
 class DownloadErr(IntEnum):
     DOWNLOAD_OK = True
@@ -95,6 +95,17 @@ class DownloadController:
         # self.dcode0 = None  # 未使用
         self.dcode0 = TextDecode()  # 创建一个 TextDecode 实例
     def hex_init(self, hex_data:bytearray):
+        """初始化hex文件数据
+        
+        将输入的hex数据进行处理，包括:
+        1. 存储hex数据到n00data_array
+        2. 计算数据包数量packet_num
+        3. 如果数据长度不是packet_size的整数倍,用0xFF填充
+        4. 计算总校验和存入total_checksum_array
+        
+        Args:
+            hex_data: 输入的hex文件数据
+        """
         self.n00data_array = bytearray(hex_data)
         self.hex_length = len(hex_data)
         print( "type hex_length = ", type(self.hex_length))
@@ -113,6 +124,22 @@ class DownloadController:
         self.total_checksum_array[1] = (check_sum & 0xff00) // 0x100
         
     def get_download_data(self, cmd_type: BmsCmdType, packet_id: int = 0) -> bytes:
+        """获取下载数据包
+        
+        根据命令类型和包ID生成下载数据包:
+        1. WRITE_FLASH命令: 生成包含包ID、总包数和数据的数据包
+        2. REC_TOTAL_CHECKSUM命令: 生成包含总校验和的数据包
+        
+        数据包格式:
+        [0x00][长度高字节][长度低字节][单板类型][命令类型][0x55][0xAA][数据][校验和]
+        
+        Args:
+            cmd_type: 命令类型(WRITE_FLASH或REC_TOTAL_CHECKSUM)
+            packet_id: 数据包ID,默认为0
+            
+        Returns:
+            生成的数据包字节数组,如果packet_id超出范围则返回None
+        """
         send_data_array = bytearray()
         data_array = bytearray()
         
