@@ -232,7 +232,9 @@ class BluetoothTool(QWidget):
                 self.disconnect_button.setEnabled(True)
                 self.send_button.setEnabled(True)
                 # 开始监听数据
-                asyncio.create_task(self.receive_data())
+                if self.client and self.client.is_connected:
+                    await self.client.start_notify("0000ffe1-0000-1000-8000-00805f9b34fb", self.on_data_received)
+                # asyncio.create_task(self.receive_data())
             except Exception as e:
                 QMessageBox.critical(self, '连接失败', str(e))
         else:
@@ -300,6 +302,7 @@ class BluetoothTool(QWidget):
                     await self.client.write_gatt_char("0000ffe1-0000-1000-8000-00805f9b34fb", data)
                     time.sleep(time512)
                     self.send_count += 1
+                    # 如果收到数据过长，清楚部分开头数据，提升软件性能
                     if self.send_count > 10:                        
                         cursor = self.receive_output.textCursor()  # 获取 QTextCursor
                         cursor.movePosition(cursor.MoveOperation.Start)  # 移动到文档开头
@@ -340,14 +343,14 @@ class BluetoothTool(QWidget):
             await asyncio.sleep(time_interval)
             await self.client.write_gatt_char("0000ffe1-0000-1000-8000-00805f9b34fb", data[256:])
         
-    async def receive_data(self):
-        """异步方法，接收蓝牙设备发送的数据"""
-        if self.client and self.client.is_connected:
-            try:
-                # 假设设备的通知特征 UUID 是 "0000ffe1-0000-1000-8000-00805f9b34fb"
-                await self.client.start_notify("0000ffe1-0000-1000-8000-00805f9b34fb", self.on_data_received)
-            except Exception as e:
-                QMessageBox.critical(self, '接收失败', str(e))
+    # async def receive_data(self):
+    #     """异步方法，接收蓝牙设备发送的数据"""
+    #     if self.client and self.client.is_connected:
+    #         try:
+    #             # 假设设备的通知特征 UUID 是 "0000ffe1-0000-1000-8000-00805f9b34fb"
+    #             await self.client.start_notify("0000ffe1-0000-1000-8000-00805f9b34fb", self.on_data_received)
+    #         except Exception as e:
+    #             QMessageBox.critical(self, '接收失败', str(e))
 
     def on_data_received(self, sender, data):
         """回调函数，处理接收到的数据"""
