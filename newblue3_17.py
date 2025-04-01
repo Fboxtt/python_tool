@@ -16,6 +16,7 @@ from hex_model import HexFileModel
 from OTA_controller import OtaController
 from OTA_controller import TextDecode
 from OTA_controller import ReceveDataStatus,BmsCmdType,ComStatus,DownloadErr
+import serial.tools.list_ports
 
 
 class BluetoothTool(QWidget):
@@ -25,6 +26,9 @@ class BluetoothTool(QWidget):
         super().__init__()
         self.client = None  # 当前连接的蓝牙设备
         self.connection_type = None  # 用于存储连接类型
+        self.serial_port = None  # 串口对象
+        self.is_serial_connected = False
+        self.serial_receive_task = None
         self.initUI()
         self.hex_model = HexFileModel()
         self.text_decode = TextDecode()
@@ -153,6 +157,7 @@ class BluetoothTool(QWidget):
         
         # 串口参数设置
         param_layout = QGridLayout()
+        
         # 串口选择
         self.port_label = QLabel('串口:')
         self.port_combo = QComboBox()
@@ -170,6 +175,29 @@ class BluetoothTool(QWidget):
         param_layout.addWidget(self.baud_label, 1, 0)
         param_layout.addWidget(self.baud_combo, 1, 1)
         
+        # 数据位
+        self.data_bits_label = QLabel('数据位:')
+        self.data_bits_combo = QComboBox()
+        self.data_bits_combo.addItems(['5', '6', '7', '8'])
+        self.data_bits_combo.setCurrentText('8')
+        param_layout.addWidget(self.data_bits_label, 2, 0)
+        param_layout.addWidget(self.data_bits_combo, 2, 1)
+        
+        # 停止位
+        self.stop_bits_label = QLabel('停止位:')
+        self.stop_bits_combo = QComboBox()
+        self.stop_bits_combo.addItems(['1', '1.5', '2'])
+        self.stop_bits_combo.setCurrentText('1')
+        param_layout.addWidget(self.stop_bits_label, 3, 0)
+        param_layout.addWidget(self.stop_bits_combo, 3, 1)
+        
+        # 校验位
+        self.parity_label = QLabel('校验位:')
+        self.parity_combo = QComboBox()
+        self.parity_combo.addItems(['无', '奇校验', '偶校验'])
+        param_layout.addWidget(self.parity_label, 4, 0)
+        param_layout.addWidget(self.parity_combo, 4, 1)
+        
         serial_layout.addLayout(param_layout)
         
         # 串口连接按钮
@@ -179,7 +207,9 @@ class BluetoothTool(QWidget):
         
         self.serial_group.setLayout(serial_layout)
         layout.addWidget(self.serial_group)
-        self.serial_group.hide()  # 初始隐藏
+        
+        # 初始化时刷新串口列表
+        self.refresh_serial_ports()
 
         self.setLayout(layout)
 
@@ -199,23 +229,128 @@ class BluetoothTool(QWidget):
 
     def refresh_serial_ports(self):
         """刷新可用串口列表"""
-        import serial.tools.list_ports
         self.port_combo.clear()
         ports = [port.device for port in serial.tools.list_ports.comports()]
-        self.port_combo.addItems(ports)
+        if ports:
+            self.port_combo.addItems(ports)
+            self.serial_connect_button.setEnabled(True)
+        else:
+            self.serial_connect_button.setEnabled(False)
+            self.receive_output.append("未发现可用串口")
 
     def on_serial_connect_clicked(self):
-        """处理串口连接"""
-        if not self.port_combo.currentText():
-            QMessageBox.warning(self, '警告', '请选择串口')
-            return
+        """处理串口连接/断开"""
+        if not self.is_serial_connected:
+            try:
+                # 获取串口参数
+                port = self.port_combo.currentText()
+                baud_rate = int(self.baud_combo.currentText())
+                data_bits = int(self.data_bits_combo.currentText())
+                stop_bits = float(self.stop_bits_combo.currentText())
+                parity = {'无': 'N', '奇校验': 'O', '偶校验': 'E'}[self.parity_combo.currentText()]
+
+                # 创建串口对象
+                self.serial_port = serial.Serial(
+                    port=port,
+                    baudrate=baud_rate,
+                    bytesize=data_bits,
+                    stopbits=stop_bits,
+                    parity=parity,
+                    timeout=0.1
+                )
+
+                if self.serial_port.is_open:
+                    self.is_serial_connected = True
+                    self.serial_connect_button.setText('断开串口')
+                    self.receive_output.append(f"串口 {port} 连接成功")
+                    # 禁用参数设置
+                    self.disable_serial_settings(True)
+                    # 启动接收任务
+                    self.serial_receive_task = asyncio.create_task(self.serial_receive_loop())
+            except Exception as e:
+                QMessageBox.critical(self, '错误', f'串口连接失败: {str(e)}')
+                self.receive_output.append(f"串口连接失败: {str(e)}")
+        else:
+            # 断开连接
+            asyncio.create_task(self.disconnect_serial())
+
+    async def disconnect_serial(self):
+        """断开串口连接"""
+        if self.serial_receive_task:
+            self.serial_receive_task.cancel()
+            self.serial_receive_task = None
         
-        # 在这里添加串口连接的代码
-        try:
-            # 串口连接逻辑
-            pass
-        except Exception as e:
-            QMessageBox.critical(self, '错误', f'串口连接失败: {str(e)}')
+        if self.serial_port and self.serial_port.is_open:
+            self.serial_port.close()
+        
+        self.is_serial_connected = False
+        self.serial_connect_button.setText('连接串口')
+        self.disable_serial_settings(False)
+        self.receive_output.append("串口已断开")
+
+    def disable_serial_settings(self, disabled: bool):
+        """禁用/启用串口设置控件"""
+        self.port_combo.setEnabled(not disabled)
+        self.baud_combo.setEnabled(not disabled)
+        self.data_bits_combo.setEnabled(not disabled)
+        self.stop_bits_combo.setEnabled(not disabled)
+        self.parity_combo.setEnabled(not disabled)
+        self.refresh_button.setEnabled(not disabled)
+
+    async def serial_receive_loop(self):
+        """串口数据接收循环"""
+        while self.is_serial_connected:
+            try:
+                if self.serial_port.in_waiting:
+                    data = self.serial_port.read(self.serial_port.in_waiting)
+                    if data:
+                        # 使用与蓝牙相同的显示逻辑
+                        if self.hex_display_checkbox.isChecked():
+                            hex_data = ' '.join([f'{b:02X}' for b in data])
+                            self.receive_output.append(f"接收: {hex_data}")
+                        else:
+                            try:
+                                text_data = data.decode('utf-8')
+                                self.receive_output.append(f"接收: {text_data}")
+                            except UnicodeDecodeError:
+                                hex_data = ' '.join([f'{b:02X}' for b in data])
+                                self.receive_output.append(f"接收(HEX): {hex_data}")
+                await asyncio.sleep(0.01)
+            except Exception as e:
+                self.receive_output.append(f"接收数据错误: {str(e)}")
+                await self.disconnect_serial()
+                break
+
+    async def send_data(self, data: str):
+        """发送数据（兼容蓝牙和串口模式）"""
+        if self.connection_type == 'serial' and self.is_serial_connected:
+            try:
+                if self.hex_send_checkbox.isChecked():
+                    # 16进制发送
+                    try:
+                        hex_data = data.replace(" ", "")
+                        if not all(c in '0123456789ABCDEFabcdef' for c in hex_data):
+                            raise ValueError("Invalid hex string")
+                        data_bytes = bytes.fromhex(hex_data)
+                    except ValueError as e:
+                        QMessageBox.warning(self, '警告', '无效的16进制数据')
+                        return
+                else:
+                    # 文本发送
+                    data_bytes = data.encode()
+
+                self.serial_port.write(data_bytes)
+                # 显示发送的数据
+                if self.hex_send_checkbox.isChecked():
+                    hex_data = ' '.join([f'{b:02X}' for b in data_bytes])
+                    self.receive_output.append(f"发送: {hex_data}")
+                else:
+                    self.receive_output.append(f"发送: {data}")
+            except Exception as e:
+                QMessageBox.critical(self, '发送失败', str(e))
+        elif self.connection_type == 'bluetooth':
+            # 原有的蓝牙发送逻辑
+            await self.bluetooth_send_data(data)
 
     def on_hex_display_changed(self, state):
         """当16进制显示选项改变时，重新显示接收到的数据"""
@@ -286,19 +421,9 @@ class BluetoothTool(QWidget):
         except ValueError:
             rssi_threshold = -100  # 默认值，显示所有设备
 
-        # # 记录开始时间
-        # start_time = datetime.now()
-        # self.receive_output.append(f"开始扫描时间: {start_time.strftime('%H:%M:%S.%f')[:-3]}")
-
         # 设置扫描时间为3秒
         devices = await BleakScanner.discover(timeout=2.0)  # 单位是秒
         
-        # # 记录结束时间并计算用时
-        # end_time = datetime.now()
-        # scan_duration = end_time - start_time
-        # self.receive_output.append(f"结束扫描时间: {end_time.strftime('%H:%M:%S.%f')[:-3]}")
-        # self.receive_output.append(f"扫描用时: {scan_duration.total_seconds():.3f} 秒")
-
         self.device_list.clear()
         for device in devices:
             # 只显示有名字且信号强度符合要求的设备
@@ -342,7 +467,7 @@ class BluetoothTool(QWidget):
         else:
             QMessageBox.warning(self, '警告', '未连接到设备')
     
-    async def send_data(self, data:str):
+    async def bluetooth_send_data(self, data:str):
         """异步方法，发送数据到蓝牙设备"""
         if self.client and self.client.is_connected:
             try:
