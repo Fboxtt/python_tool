@@ -18,6 +18,7 @@ from OTA_controller import OtaController
 from OTA_controller import TextDecode
 from OTA_controller import ReceveDataStatus,BmsCmdType,ComStatus,DownloadErr
 import serial.tools.list_ports
+from PyQt6 import uic
 
 
 class MainWindow(QMainWindow):
@@ -859,6 +860,40 @@ class BluetoothTool(QWidget):
 #         self.setLayout(layout)
 
 
+# 方法1: 加载UI到QWidget类
+class DynamicUiWidget(QWidget):
+    def __init__(self):
+        super().__init__()
+        try:
+            # 直接加载UI文件到当前Widget
+            uic.loadUi('untitled.ui', self)
+            print("UI文件加载成功 (Widget)")
+        except Exception as e:
+            print(f"加载UI文件失败: {e}")
+            QMessageBox.critical(self, '错误', f'加载UI文件失败: {e}')
+
+# 方法2: 加载UI到QMainWindow类
+class DynamicUiMainWindow(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        try:
+            # 直接加载UI文件到当前MainWindow
+            uic.loadUi('untitled.ui', self)
+            print("UI文件加载成功 (MainWindow)")
+        except Exception as e:
+            print(f"加载UI文件失败: {e}")
+            QMessageBox.critical(self, '错误', f'加载UI文件失败: {e}')
+
+# 方法3: 通用方法，检测UI类型并加载
+def load_ui_dynamically(ui_file):
+    try:
+        # 尝试直接加载UI文件并返回实例
+        return uic.loadUi(ui_file)
+    except Exception as e:
+        print(f"加载UI文件失败: {e}")
+        return None
+
+# 程序入口
 if __name__ == '__main__':
     app = QApplication(sys.argv)
     
@@ -869,10 +904,28 @@ if __name__ == '__main__':
     # 设置事件循环
     loop = QEventLoop(app)
     asyncio.set_event_loop(loop)
+    # # 延迟启动主窗口
+    # main_window = MainWindow()
+    # QTimer.singleShot(500, lambda: (splash.finish(main_window), main_window.show()))
     
-    # 延迟启动主窗口
-    main_window = MainWindow()
-    QTimer.singleShot(500, lambda: (splash.finish(main_window), main_window.show()))
+    # 选择加载UI的方法（取消注释你想使用的方法）
     
+    # 方法1: 加载到Widget
+    # window = DynamicUiWidget()
+    
+    # 方法2: 加载到MainWindow
+    # window = DynamicUiMainWindow()
+    
+    # 方法3: 动态加载（推荐）
+    window = load_ui_dynamically('untitled.ui')
+    
+    if window:
+        window.show()
+    else:
+        # 加载失败时显示错误消息
+        QMessageBox.critical(None, '错误', 'UI文件加载失败')
+        sys.exit(1)
+    
+    # 运行事件循环
     with loop:
         loop.run_forever()
