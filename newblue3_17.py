@@ -180,17 +180,12 @@ class BluetoothTool(QWidget):
             QMessageBox.warning(self, '警告', '请输入要发送的数据')
     def on_test_send_buttoned(self):
         """同步方法,用于测试"""
-        # data = self.send_input.text()
-        # if data:
-        
-        if self.task_flag == 1:
+        if self.task_flag == True:
             self.task.cancel()
-            self.task_flag = 0
+            self.task_flag = False
             return
-        self.task_flag = 1
+        self.task_flag = True
         self.task = asyncio.create_task(self.test_send_data())
-        # else:
-        #     QMessageBox.warning(self, '警告', '请输入要发送的数据')
 
     async def scan_devices(self):
         """异步方法，扫描蓝牙设备"""
@@ -310,6 +305,7 @@ class BluetoothTool(QWidget):
             else:
                 # QMessageBox.warning(self, '警告', '未连接到设备')
                 break
+        self.task_flag = False
 
     async def byte_send(self,data:bytes):
         if(len(data) == 0):
