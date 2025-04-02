@@ -202,8 +202,8 @@ class BluetoothTool(QWidget):
         self.rssi_threshold_layout.addWidget(self.rssi_threshold_input)
         bluetooth_layout.addLayout(self.rssi_threshold_layout)
 
-        self.scan_button = QPushButton('扫描设备')
-        self.scan_button.clicked.connect(self.on_scan_devices_clicked)
+        self.scan_button = QPushButton('扫描设备和刷新串口')
+        self.scan_button.clicked.connect(self.on_scan_all_clicked)
         bluetooth_layout.addWidget(self.scan_button)
 
         # 设备连接和断开部分
@@ -233,11 +233,8 @@ class BluetoothTool(QWidget):
         # 串口选择
         self.port_label = QLabel('串口:')
         self.port_combo = QComboBox()
-        self.refresh_button = QPushButton('刷新')
-        self.refresh_button.clicked.connect(self.refresh_serial_ports)
         param_layout.addWidget(self.port_label, 0, 0)
         param_layout.addWidget(self.port_combo, 0, 1)
-        param_layout.addWidget(self.refresh_button, 0, 2)
         
         # 波特率设置
         self.baud_label = QLabel('波特率:')
@@ -334,11 +331,11 @@ class BluetoothTool(QWidget):
         layout.addWidget(self.hex_display_checkbox)
 
         # 初始化时刷新串口列表
-        self.refresh_serial_ports()
+        # self.refresh_serial_ports()
         
         self.setLayout(layout)
 
-    def refresh_serial_ports(self):
+    async def refresh_serial_ports(self):
         """刷新可用串口列表"""
         self.port_combo.clear()
         ports = [port.device for port in serial.tools.list_ports.comports()]
@@ -406,7 +403,6 @@ class BluetoothTool(QWidget):
         self.data_bits_combo.setEnabled(not disabled)
         self.stop_bits_combo.setEnabled(not disabled)
         self.parity_combo.setEnabled(not disabled)
-        self.refresh_button.setEnabled(not disabled)
 
     async def serial_receive_loop(self):
         """串口数据接收循环"""
@@ -839,6 +835,16 @@ class BluetoothTool(QWidget):
             self.program_button.setEnabled(True)
             self.program_button.setText('开始烧录')
 
+    def on_scan_all_clicked(self):
+        """同步方法，用于触发异步扫描蓝牙和刷新串口"""
+        # 显示扫描开始信息
+        self.receive_output.append("开始扫描蓝牙设备和刷新串口...")
+        
+        # 刷新串口列表
+        asyncio.create_task(self.refresh_serial_ports())
+        
+        # 扫描蓝牙设备
+        asyncio.create_task(self.scan_devices())
 
 # class SerialTool(QWidget):
 #     def __init__(self):
@@ -884,11 +890,15 @@ class load_ui_dynamically(QMainWindow):
         try:
             # 尝试直接加载UI文件并返回实例
             uic.loadUi(ui_file, self)
-            self.main_window = MainWindow()
-            self.pushButton.clicked.connect(self.main_window.open_bluetooth_tool)
+
+            # 初始化连接窗口
+            self.bluetooth_tool = BluetoothTool()
+            self.bluetooth_tool.setWindowModality(Qt.WindowModality.ApplicationModal)
+            self.pushButton.clicked.connect(self.bluetooth_tool.show)
+
             # self.pushButton_2.clicked.connect()
             print(f"UI文件 {ui_file} 加载成功")
-            # return ui_instance
+
         except Exception as e:
             print(f"加载UI文件失败: {e}")
             traceback.print_exc()
