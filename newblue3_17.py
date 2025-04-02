@@ -96,7 +96,7 @@ class MainWindow(QMainWindow):
         """打开蓝牙工具窗口"""
         if self.bluetooth_tool is None:
             self.bluetooth_tool = BluetoothTool()
-            self.bluetooth_tool.setWindowModality(Qt.WindowModality.NonModal)
+            self.bluetooth_tool.setWindowModality(Qt.WindowModality.ApplicationModal)
         self.bluetooth_tool.show()
         
     # def open_serial_tool(self):
@@ -884,22 +884,30 @@ class DynamicUiMainWindow(QMainWindow):
             print(f"加载UI文件失败: {e}")
             QMessageBox.critical(self, '错误', f'加载UI文件失败: {e}')
 
-# 方法3: 通用方法，检测UI类型并加载
-def load_ui_dynamically(ui_file):
-    try:
-        # 尝试直接加载UI文件并返回实例
-        return uic.loadUi(ui_file)
-    except Exception as e:
-        print(f"加载UI文件失败: {e}")
-        return None
+# 修正后的函数 - 注意这是一个函数，不是类
+class load_ui_dynamically(QMainWindow):
+    def __init__(self, ui_file):
+        super().__init__()
+        try:
+            # 尝试直接加载UI文件并返回实例
+            uic.loadUi(ui_file, self)
+            self.main_window = MainWindow()
+            self.pushButton.clicked.connect(self.main_window.open_bluetooth_tool)
+            # self.pushButton_2.clicked.connect()
+            print(f"UI文件 {ui_file} 加载成功")
+            # return ui_instance
+        except Exception as e:
+            print(f"加载UI文件失败: {e}")
+            traceback.print_exc()
+            return None
 
 # 程序入口
 if __name__ == '__main__':
     app = QApplication(sys.argv)
     
     # 创建并显示启动画面
-    splash = SplashScreen()
-    splash.show()
+    # splash = SplashScreen()
+    # splash.show()
     
     # 设置事件循环
     loop = QEventLoop(app)
@@ -924,6 +932,7 @@ if __name__ == '__main__':
     else:
         # 加载失败时显示错误消息
         QMessageBox.critical(None, '错误', 'UI文件加载失败')
+        traceback.print_exc()
         sys.exit(1)
     
     # 运行事件循环
