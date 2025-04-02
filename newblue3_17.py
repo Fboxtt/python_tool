@@ -185,7 +185,7 @@ class BluetoothTool(QWidget):
         bluetooth_title = QLabel('蓝牙连接')
         bluetooth_title.setFont(QFont('Arial', 12, QFont.Weight.Bold))
         bluetooth_layout.addWidget(bluetooth_title)
-        
+
         # 设备扫描部分
         self.label = QLabel('发现的蓝牙设备:')
         self.device_list = QListWidget()
@@ -332,7 +332,7 @@ class BluetoothTool(QWidget):
 
         # 初始化时刷新串口列表
         # self.refresh_serial_ports()
-        
+
         self.setLayout(layout)
 
     async def refresh_serial_ports(self):
@@ -483,11 +483,11 @@ class BluetoothTool(QWidget):
                 hex_data = ' '.join([f'{b:02X}' for b in data])
                 self.receive_output.append(f"RX-> {current_time} 接收(HEX): {hex_data}")
 
-    def closeEvent(self, event):
-        """重写关闭事件，退出时断开蓝牙连接"""
-        if self.client and self.client.is_connected:
-            asyncio.create_task(self.disconnect_device())
-        event.accept()
+    # def closeEvent(self, event):
+    #     """重写关闭事件，退出时断开蓝牙连接"""
+    #     if self.client and self.client.is_connected:
+    #         asyncio.create_task(self.disconnect_device())
+    #     event.accept()
 
     def on_scan_devices_clicked(self):
         """同步方法，用于触发异步扫描"""
@@ -564,16 +564,17 @@ class BluetoothTool(QWidget):
         if self.client and self.client.is_connected:
             try:
                 await self.client.disconnect()
-                QMessageBox.information(self, '断开成功', '设备已断开')
+                # QMessageBox.information(self, '断开成功', '设备已断开')
                 # 禁用断开按钮和发送按钮
                 self.disconnect_button.setEnabled(False)
                 self.send_button.setEnabled(False)
                 self.client = None
+                print("蓝牙断开成功")
             except Exception as e:
                 QMessageBox.critical(self, '断开失败', str(e))
-        else:
-            QMessageBox.warning(self, '警告', '未连接到设备')
-    
+        # else:
+        #     QMessageBox.warning(self, '警告', '未连接到设备')
+
     async def bluetooth_send_data(self, data:str):
         """异步方法，发送数据到蓝牙设备"""
         if self.client and self.client.is_connected:
@@ -661,7 +662,7 @@ class BluetoothTool(QWidget):
             await self.client.write_gatt_char("0000ffe1-0000-1000-8000-00805f9b34fb", data[128:256])
             await asyncio.sleep(time_interval)
             await self.client.write_gatt_char("0000ffe1-0000-1000-8000-00805f9b34fb", data[256:])
-        
+
     def on_data_received(self, sender, data):
         """回调函数，处理接收到的数据"""
         if not hasattr(self, 'received_data_buffer'):
@@ -895,19 +896,60 @@ class load_ui_dynamically(QMainWindow):
             self.bluetooth_tool = BluetoothTool()
             self.bluetooth_tool.setWindowModality(Qt.WindowModality.ApplicationModal)
             self.pushButton.clicked.connect(self.bluetooth_tool.show)
-
+            self.pushButton_6.clicked.connect(self.bluetooth_tool.disconnect_device)
             # self.pushButton_2.clicked.connect()
             print(f"UI文件 {ui_file} 加载成功")
 
         except Exception as e:
             print(f"加载UI文件失败: {e}")
             traceback.print_exc()
-            return None
+            # return None
+    def closeEvent(self, event):
+        """重写关闭事件，在关闭前断开连接"""
+        self.hide()
+        has_connection = False
+        
+        # 检查是否有连接需要断开
+        if self.bluetooth_tool.client and self.bluetooth_tool.client.is_connected:
+            has_connection = True
+        if hasattr(self.bluetooth_tool, 'serial_port') and self.bluetooth_tool.serial_port and self.bluetooth_tool.serial_port.is_open:
+            has_connection = True
+        
+        if has_connection:
+            # 延迟关闭逻辑
+            event.ignore()  # 先忽略关闭事件
+            
+            # 创建断开连接的函数
+            async def disconnect_and_close():
+                try:
+                    # 断开蓝牙连接
+                    if self.bluetooth_tool.client and self.bluetooth_tool.client.is_connected:
+                        await self.bluetooth_tool.disconnect_device()
+                        print("蓝牙已断开连接")
+                    
+                    # 断开串口连接
+                    if hasattr(self.bluetooth_tool, 'serial_port') and self.bluetooth_tool.serial_port and self.bluetooth_tool.serial_port.is_open:
+                        self.bluetooth_tool.serial_port.close()
+                        print("串口已断开")
+                    
+                    # 使用QTimer在下一帧尝试再次关闭（在主线程中）
+                    QTimer.singleShot(100, lambda: self.close())
+                except Exception as e:
+                    print(f"断开连接时出错: {e}")
+                    # 即使出错也尝试关闭
+                    QTimer.singleShot(100, lambda: self.close())
+            
+            # 启动异步任务
+            asyncio.create_task(disconnect_and_close())
+            return
+        
+        # 如果没有连接，直接接受关闭事件
+        event.accept()
 
 # 程序入口
 if __name__ == '__main__':
     app = QApplication(sys.argv)
-    
+
     # 创建并显示启动画面
     # splash = SplashScreen()
     # splash.show()
