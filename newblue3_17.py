@@ -155,26 +155,11 @@ class BluetoothTool(QWidget):
         # asyncio.create_task(self.scan_devices())
         QTimer.singleShot(0, self.on_scan_devices_clicked)
     def initUI(self):
-        self.setWindowTitle('蓝牙连接工具')
+        self.setWindowTitle('蓝牙和串口连接工具')
 
+        # 创建主布局
         layout = QVBoxLayout()
 
-        # 连接方式选择部分
-        self.connection_group = QWidget()
-        connection_layout = QHBoxLayout()
-        self.bluetooth_button = QPushButton('蓝牙连接')
-        self.serial_button = QPushButton('串口连接')
-        self.bluetooth_button.clicked.connect(lambda: self.switch_connection_mode('bluetooth'))
-        self.serial_button.clicked.connect(lambda: self.switch_connection_mode('serial'))
-        connection_layout.addWidget(self.bluetooth_button)
-        connection_layout.addWidget(self.serial_button)
-        self.connection_group.setLayout(connection_layout)
-        layout.addWidget(self.connection_group)
-
-        # 蓝牙连接部分
-        self.bluetooth_group = QWidget()
-        bluetooth_layout = QVBoxLayout()
-        
         # HEX文件解析部分
         self.hex_layout = QHBoxLayout()
         self.hex_file_label = QLabel('HEX文件：未选择')
@@ -182,12 +167,25 @@ class BluetoothTool(QWidget):
         self.hex_file_button.clicked.connect(self.on_select_hex_file)
         self.hex_layout.addWidget(self.hex_file_label)
         self.hex_layout.addWidget(self.hex_file_button)
-        bluetooth_layout.addLayout(self.hex_layout)
+        layout.addLayout(self.hex_layout)
 
         # HEX文件信息显示
         self.hex_info_label = QLabel('文件大小：0 字节')
-        bluetooth_layout.addWidget(self.hex_info_label)
+        layout.addWidget(self.hex_info_label)
 
+        # 创建水平分割的两个区域
+        connection_layout = QHBoxLayout()
+        
+        # ========== 左侧：蓝牙连接部分 ==========
+        bluetooth_layout = QVBoxLayout()
+        bluetooth_frame = QWidget()
+        bluetooth_frame.setLayout(bluetooth_layout)
+        
+        # 蓝牙标题
+        bluetooth_title = QLabel('蓝牙连接')
+        bluetooth_title.setFont(QFont('Arial', 12, QFont.Weight.Bold))
+        bluetooth_layout.addWidget(bluetooth_title)
+        
         # 设备扫描部分
         self.label = QLabel('发现的蓝牙设备:')
         self.device_list = QListWidget()
@@ -210,69 +208,24 @@ class BluetoothTool(QWidget):
 
         # 设备连接和断开部分
         self.connect_layout = QHBoxLayout()
-        self.connect_button = QPushButton('连接设备')
+        self.connect_button = QPushButton('连接蓝牙设备')
         self.connect_button.clicked.connect(self.on_connect_device_clicked)
-        self.disconnect_button = QPushButton('断开设备')
+        self.disconnect_button = QPushButton('断开蓝牙设备')
         self.disconnect_button.clicked.connect(self.on_disconnect_device_clicked)
         self.disconnect_button.setEnabled(False)  # 初始状态下断开按钮不可用
         self.connect_layout.addWidget(self.connect_button)
         self.connect_layout.addWidget(self.disconnect_button)
         bluetooth_layout.addLayout(self.connect_layout)
-
-        # 数据发送部分
-        self.send_layout = QHBoxLayout()
-        self.send_input = QLineEdit()
-        self.send_input.setPlaceholderText('输入要发送的数据')
-        self.hex_send_checkbox = QCheckBox('16进制发送')
-        self.hex_send_checkbox.setChecked(True)
-        self.send_button = QPushButton('发送数据')
-        self.send_button.clicked.connect(self.on_send_data_clicked)
-        self.send_button.setEnabled(False)  # 初始状态下发送按钮不可用
-        self.send_layout.addWidget(self.send_input)
-        self.send_layout.addWidget(self.hex_send_checkbox)
-        self.send_layout.addWidget(self.send_button)
-        bluetooth_layout.addLayout(self.send_layout)
-
-        # 测试数据发送部分
-
-        self.test_layout = QHBoxLayout()
-        self.test_send_button = QPushButton('连续发送')
-        self.test128 = QLineEdit('0')
-        self.test512 = QLineEdit('300')
-        self.test_layout.addWidget(self.test128)
-        self.test_layout.addWidget(self.test512)
-        self.test_layout.addWidget(self.test_send_button)
-        self.test_send_button.clicked.connect(self.on_test_send_buttoned)
-        bluetooth_layout.addLayout(self.test_layout)
-
-        # 烧录控制部分
-        self.program_layout = QHBoxLayout()
-        self.program_button = QPushButton('开始烧录')
-        self.program_button.clicked.connect(self.on_program_clicked)
-        self.program_layout.addWidget(self.program_button)
-        bluetooth_layout.addLayout(self.program_layout)
-
-        # 数据接收部分
-        self.receive_label = QLabel('接收到的数据:')
-        bluetooth_layout.addWidget(self.receive_label)
-
-        self.receive_output = QTextEdit()
-        self.receive_output.setReadOnly(True)
-        bluetooth_layout.addWidget(self.receive_output)
-
-        # 16进制显示选项
-        self.hex_display_checkbox = QCheckBox('16进制显示')
-        self.hex_display_checkbox.setChecked(True)
-        self.hex_display_checkbox.stateChanged.connect(self.on_hex_display_changed)
-        bluetooth_layout.addWidget(self.hex_display_checkbox)
-
-        self.bluetooth_group.setLayout(bluetooth_layout)
-        layout.addWidget(self.bluetooth_group)
-        self.bluetooth_group.hide()  # 初始隐藏
-
-        # 串口连接部分
-        self.serial_group = QWidget()
+        
+        # ========== 右侧：串口连接部分 ==========
         serial_layout = QVBoxLayout()
+        serial_frame = QWidget()
+        serial_frame.setLayout(serial_layout)
+        
+        # 串口标题
+        serial_title = QLabel('串口连接')
+        serial_title.setFont(QFont('Arial', 12, QFont.Weight.Bold))
+        serial_layout.addWidget(serial_title)
         
         # 串口参数设置
         param_layout = QGridLayout()
@@ -324,27 +277,66 @@ class BluetoothTool(QWidget):
         self.serial_connect_button.clicked.connect(self.on_serial_connect_clicked)
         serial_layout.addWidget(self.serial_connect_button)
         
-        self.serial_group.setLayout(serial_layout)
-        layout.addWidget(self.serial_group)
+        serial_layout.addStretch(1)  # 添加弹性空间
         
+        # 将两个区域添加到水平布局
+        connection_layout.addWidget(bluetooth_frame, 1)  # 1是拉伸系数
+        connection_layout.addWidget(serial_frame, 1)
+        
+        # 将连接区域添加到主布局
+        layout.addLayout(connection_layout)
+        
+        # 共用的数据收发部分
+        # 数据发送部分
+        self.send_layout = QHBoxLayout()
+        self.send_input = QLineEdit()
+        self.send_input.setPlaceholderText('输入要发送的数据')
+        self.hex_send_checkbox = QCheckBox('16进制发送')
+        self.hex_send_checkbox.setChecked(True)
+        self.send_button = QPushButton('发送数据')
+        self.send_button.clicked.connect(self.on_send_data_clicked)
+        self.send_button.setEnabled(False)  # 初始状态下发送按钮不可用
+        self.send_layout.addWidget(self.send_input)
+        self.send_layout.addWidget(self.hex_send_checkbox)
+        self.send_layout.addWidget(self.send_button)
+        layout.addLayout(self.send_layout)
+
+        # 测试数据发送部分
+        self.test_layout = QHBoxLayout()
+        self.test_send_button = QPushButton('连续发送')
+        self.test128 = QLineEdit('0')
+        self.test512 = QLineEdit('300')
+        self.test_layout.addWidget(self.test128)
+        self.test_layout.addWidget(self.test512)
+        self.test_layout.addWidget(self.test_send_button)
+        self.test_send_button.clicked.connect(self.on_test_send_buttoned)
+        layout.addLayout(self.test_layout)
+
+        # 烧录控制部分
+        self.program_layout = QHBoxLayout()
+        self.program_button = QPushButton('开始烧录')
+        self.program_button.clicked.connect(self.on_program_clicked)
+        self.program_layout.addWidget(self.program_button)
+        layout.addLayout(self.program_layout)
+
+        # 数据接收部分
+        self.receive_label = QLabel('接收到的数据:')
+        layout.addWidget(self.receive_label)
+
+        self.receive_output = QTextEdit()
+        self.receive_output.setReadOnly(True)
+        layout.addWidget(self.receive_output)
+
+        # 16进制显示选项
+        self.hex_display_checkbox = QCheckBox('16进制显示')
+        self.hex_display_checkbox.setChecked(True)
+        self.hex_display_checkbox.stateChanged.connect(self.on_hex_display_changed)
+        layout.addWidget(self.hex_display_checkbox)
+
         # 初始化时刷新串口列表
         self.refresh_serial_ports()
-
+        
         self.setLayout(layout)
-
-    def switch_connection_mode(self, mode):
-        """切换连接模式"""
-        self.connection_type = mode
-        if mode == 'bluetooth':
-            self.bluetooth_group.show()
-            self.serial_group.hide()
-            self.bluetooth_button.setEnabled(False)
-            self.serial_button.setEnabled(True)
-        else:
-            self.bluetooth_group.hide()
-            self.serial_group.show()
-            self.bluetooth_button.setEnabled(True)
-            self.serial_button.setEnabled(False)
 
     def refresh_serial_ports(self):
         """刷新可用串口列表"""
@@ -770,6 +762,7 @@ class BluetoothTool(QWidget):
                 if self.text_decode.legality == ReceveDataStatus.ERR_NOTHING:
                     await asyncio.sleep(time512 * 4)
                 if(self.text_decode.no80_cmd == BmsCmdType.DOWNLOAD_BUFFER  and self.text_decode.cmd_ack == 0x00):
+                    print(f"擦除命令发送失败")
                     break
                 else:
                     err_count += 1
