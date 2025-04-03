@@ -481,16 +481,24 @@ class BluetoothTool(QWidget):
         if self.client and self.client.is_connected:
             try:
                 await self.client.disconnect()
-                # QMessageBox.information(self, '断开成功', '设备已断开')
+                
+                # 创建消息框
+                msg_box = QMessageBox(QMessageBox.Icon.Information, '断开成功', '设备已断开')
+                
+                # 设置定时器自动关闭 (3秒后)
+                QTimer.singleShot(1000, msg_box.close)
+                
+                # 显示消息框
+                msg_box.exec()
+                
                 # 禁用断开按钮和发送按钮
                 self.disconnect_button.setEnabled(False)
                 self.send_button.setEnabled(False)
                 self.client = None
-                print("蓝牙断开成功")
             except Exception as e:
                 QMessageBox.critical(self, '断开失败', str(e))
-        # else:
-        #     QMessageBox.warning(self, '警告', '未连接到设备')
+        else:
+            QMessageBox.warning(self, '警告', '未连接到设备')
 
     async def bluetooth_send_data(self, data:str):
         """异步方法，发送数据到蓝牙设备"""
