@@ -801,7 +801,9 @@ class load_ui_dynamically(QMainWindow):
             # return None
     def closeEvent(self, event):
         """重写关闭事件，在关闭前断开连接"""
+        # 先隐藏窗口，给用户一个即时反馈
         self.hide()
+        
         has_connection = False
         
         # 检查是否有连接需要断开
@@ -811,9 +813,6 @@ class load_ui_dynamically(QMainWindow):
             has_connection = True
         
         if has_connection:
-            # 延迟关闭逻辑
-            event.ignore()  # 先忽略关闭事件
-            
             # 创建断开连接的函数
             async def disconnect_and_close():
                 try:
@@ -827,18 +826,22 @@ class load_ui_dynamically(QMainWindow):
                         self.bluetooth_tool.serial_port.close()
                         print("串口已断开")
                     
-                    # 使用QTimer在下一帧尝试再次关闭（在主线程中）
-                    QTimer.singleShot(100, lambda: self.close())
                 except Exception as e:
                     print(f"断开连接时出错: {e}")
-                    # 即使出错也尝试关闭
-                    QTimer.singleShot(100, lambda: self.close())
+                
+                # 最后强制退出应用程序
+                # 使用QTimer确保这个调用发生在主事件循环中
+                QApplication.instance().quit()
+                # QTimer.singleShot(100, lambda: QApplication.instance().quit())
             
             # 启动异步任务
             asyncio.create_task(disconnect_and_close())
+            
+            # 忽略关闭事件，我们会在异步任务完成后手动退出
+            event.ignore()
             return
         
-        # 如果没有连接，直接接受关闭事件
+        # 如果没有连接需要断开，接受事件并正常关闭
         event.accept()
 
 # 程序入口
