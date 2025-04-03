@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>605</width>
+    <width>619</width>
     <height>438</height>
    </rect>
   </property>
@@ -18,7 +18,7 @@
     <rect>
      <x>20</x>
      <y>20</y>
-     <width>75</width>
+     <width>51</width>
      <height>24</height>
     </rect>
    </property>
@@ -29,7 +29,7 @@
   <widget class="QCheckBox" name="checkBox">
    <property name="geometry">
     <rect>
-     <x>110</x>
+     <x>70</x>
      <y>50</y>
      <width>77</width>
      <height>20</height>
@@ -56,7 +56,7 @@
    <property name="geometry">
     <rect>
      <x>20</x>
-     <y>260</y>
+     <y>190</y>
      <width>75</width>
      <height>24</height>
     </rect>
@@ -82,7 +82,7 @@
    <property name="geometry">
     <rect>
      <x>20</x>
-     <y>310</y>
+     <y>220</y>
      <width>75</width>
      <height>24</height>
     </rect>
@@ -94,8 +94,8 @@
   <widget class="QGroupBox" name="groupBox">
    <property name="geometry">
     <rect>
-     <x>460</x>
-     <y>20</y>
+     <x>10</x>
+     <y>260</y>
      <width>120</width>
      <height>80</height>
     </rect>
@@ -107,7 +107,7 @@
   <widget class="QLabel" name="label">
    <property name="geometry">
     <rect>
-     <x>40</x>
+     <x>30</x>
      <y>50</y>
      <width>54</width>
      <height>16</height>
@@ -120,20 +120,20 @@
   <widget class="QPushButton" name="pushButton_6">
    <property name="geometry">
     <rect>
-     <x>100</x>
+     <x>70</x>
      <y>20</y>
-     <width>75</width>
+     <width>41</width>
      <height>24</height>
     </rect>
    </property>
    <property name="text">
-    <string>PushButton</string>
+    <string>断开</string>
    </property>
   </widget>
   <widget class="QLabel" name="label_2">
    <property name="geometry">
     <rect>
-     <x>30</x>
+     <x>20</x>
      <y>80</y>
      <width>54</width>
      <height>16</height>
@@ -146,7 +146,7 @@
   <widget class="QLabel" name="label_3">
    <property name="geometry">
     <rect>
-     <x>110</x>
+     <x>80</x>
      <y>80</y>
      <width>54</width>
      <height>16</height>
@@ -154,6 +154,16 @@
    </property>
    <property name="text">
     <string>TextLabel</string>
+   </property>
+  </widget>
+  <widget class="QTextEdit" name="mainWindowTextEdit">
+   <property name="geometry">
+    <rect>
+     <x>150</x>
+     <y>10</y>
+     <width>451</width>
+     <height>241</height>
+    </rect>
    </property>
   </widget>
  </widget>

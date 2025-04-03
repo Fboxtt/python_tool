@@ -772,20 +772,6 @@ class BluetoothTool(QWidget):
         # 扫描蓝牙设备
         asyncio.create_task(self.scan_devices())
 
-# class SerialTool(QWidget):
-#     def __init__(self):
-#         super().__init__()
-#         self.setWindowTitle('串口连接工具')
-#         self.initUI()
-    
-#     def initUI(self):
-#         # 串口连接界面的UI代码
-#         layout = QVBoxLayout()
-#         layout.addWidget(QLabel('串口连接工具正在开发中...'))
-#         self.setLayout(layout)
-
-
-
 
 # 修正后的函数 - 注意这是一个函数，不是类
 class load_ui_dynamically(QMainWindow):
@@ -801,6 +787,8 @@ class load_ui_dynamically(QMainWindow):
             self.pushButton.clicked.connect(self.bluetooth_tool.show)
             self.pushButton_6.clicked.connect(self.bluetooth_tool.disconnect_device)
             # self.pushButton_2.clicked.connect()
+
+            self.mainWindowTextEdit.clear()
             print(f"UI文件 {ui_file} 加载成功")
 
         except Exception as e:
