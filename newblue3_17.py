@@ -25,94 +25,11 @@ class MainWindow(QMainWindow):
     """主窗口（一级窗口）"""
     def __init__(self):
         super().__init__()
-        self.bluetooth_tool = None  # 蓝牙工具窗口
-        self.serial_tool = None     # 串口工具窗口
         self.initUI()
+        pass
         
     def initUI(self):
-        self.setWindowTitle('固件更新工具')
-        self.setGeometry(100, 100, 600, 400)  # 设置窗口位置和大小
-        
-        # 创建中央部件
-        central_widget = QWidget()
-        self.setCentralWidget(central_widget)
-        
-        # 创建布局
-        layout = QVBoxLayout(central_widget)
-        
-        # 添加标题
-        title_label = QLabel('固件更新工具')
-        title_label.setFont(QFont('Arial', 20, QFont.Weight.Bold))
-        title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addSpacing(30)
-        layout.addWidget(title_label)
-        layout.addSpacing(50)
-        
-        # 添加按钮网格布局
-        button_grid = QGridLayout()
-        
-        # 蓝牙连接按钮
-        self.bluetooth_button = QPushButton('连接')
-        self.bluetooth_button.setMinimumSize(200, 80)
-        self.bluetooth_button.setFont(QFont('Arial', 12))
-        self.bluetooth_button.clicked.connect(self.open_bluetooth_tool)
-        button_grid.addWidget(self.bluetooth_button, 0, 0)
-        
-        # # 串口连接按钮
-        # self.serial_button = QPushButton('串口连接')
-        # self.serial_button.setMinimumSize(200, 80)
-        # self.serial_button.setFont(QFont('Arial', 12))
-        # self.serial_button.clicked.connect(self.open_serial_tool)
-        # button_grid.addWidget(self.serial_button, 0, 1)
-        
-        # 将按钮网格添加到主布局
-        layout.addLayout(button_grid)
-        layout.addStretch(1)
-        
-        # 添加版本信息
-        version_label = QLabel('版本 1.0.0')
-        version_label.setAlignment(Qt.AlignmentFlag.AlignRight)
-        layout.addWidget(version_label)
-        
-        # 设置样式
-        self.setStyleSheet("""
-            QPushButton {
-                background-color: #4CAF50;
-                color: white;
-                border-radius: 10px;
-                border: 2px solid #4CAF50;
-            }
-            QPushButton:hover {
-                background-color: #45a049;
-                border: 2px solid #45a049;
-            }
-            QPushButton:pressed {
-                background-color: #3e8e41;
-                border: 2px solid #3e8e41;
-            }
-        """)
-        
-    def open_bluetooth_tool(self):
-        """打开蓝牙工具窗口"""
-        if self.bluetooth_tool is None:
-            self.bluetooth_tool = BluetoothTool()
-            self.bluetooth_tool.setWindowModality(Qt.WindowModality.ApplicationModal)
-        self.bluetooth_tool.show()
-        
-    # def open_serial_tool(self):
-    #     """打开串口工具窗口"""
-    #     if self.serial_tool is None:
-    #         self.serial_tool = SerialTool()
-    #         self.serial_tool.setWindowModality(Qt.WindowModality.NonModal)
-    #     self.serial_tool.show()
-        
-    def closeEvent(self, event):
-        """关闭所有窗口"""
-        if self.bluetooth_tool is not None:
-            self.bluetooth_tool.close()
-        # if self.serial_tool is not None:
-        #     self.serial_tool.close()
-        event.accept()
+        pass
 
 # 添加启动画面
 class SplashScreen(QSplashScreen):
@@ -860,29 +777,7 @@ class BluetoothTool(QWidget):
 #         self.setLayout(layout)
 
 
-# 方法1: 加载UI到QWidget类
-class DynamicUiWidget(QWidget):
-    def __init__(self):
-        super().__init__()
-        try:
-            # 直接加载UI文件到当前Widget
-            uic.loadUi('untitled.ui', self)
-            print("UI文件加载成功 (Widget)")
-        except Exception as e:
-            print(f"加载UI文件失败: {e}")
-            QMessageBox.critical(self, '错误', f'加载UI文件失败: {e}')
 
-# 方法2: 加载UI到QMainWindow类
-class DynamicUiMainWindow(QMainWindow):
-    def __init__(self):
-        super().__init__()
-        try:
-            # 直接加载UI文件到当前MainWindow
-            uic.loadUi('untitled.ui', self)
-            print("UI文件加载成功 (MainWindow)")
-        except Exception as e:
-            print(f"加载UI文件失败: {e}")
-            QMessageBox.critical(self, '错误', f'加载UI文件失败: {e}')
 
 # 修正后的函数 - 注意这是一个函数，不是类
 class load_ui_dynamically(QMainWindow):
@@ -951,29 +846,20 @@ if __name__ == '__main__':
     app = QApplication(sys.argv)
 
     # 创建并显示启动画面
-    # splash = SplashScreen()
-    # splash.show()
+    splash = SplashScreen()
+    splash.show()
     
     # 设置事件循环
     loop = QEventLoop(app)
     asyncio.set_event_loop(loop)
     # # 延迟启动主窗口
-    # main_window = MainWindow()
-    # QTimer.singleShot(500, lambda: (splash.finish(main_window), main_window.show()))
-    
-    # 选择加载UI的方法（取消注释你想使用的方法）
-    
-    # 方法1: 加载到Widget
-    # window = DynamicUiWidget()
-    
-    # 方法2: 加载到MainWindow
-    # window = DynamicUiMainWindow()
-    
+
     # 方法3: 动态加载（推荐）
     window = load_ui_dynamically('untitled.ui')
     
     if window:
-        window.show()
+        QTimer.singleShot(500, lambda: (splash.finish(window), window.show()))
+        # window.show()
     else:
         # 加载失败时显示错误消息
         QMessageBox.critical(None, '错误', 'UI文件加载失败')
