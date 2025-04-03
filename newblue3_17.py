@@ -20,17 +20,29 @@ from OTA_controller import TextDecode
 from OTA_controller import ReceveDataStatus,BmsCmdType,ComStatus,DownloadErr
 import serial.tools.list_ports
 from PyQt6 import uic
+from log_controller import LogManager
 
 
-class MainWindow(QMainWindow):
-    """主窗口（一级窗口）"""
-    def __init__(self):
-        super().__init__()
-        self.initUI()
-        pass
+# class MainWindow(QMainWindow):
+#     """主窗口（一级窗口）"""
+#     def __init__(self):
+#         super().__init__()
+#         self.logger = LogManager.get_instance()  # 获取日志管理器实例
+#         self.logger.write_log("主窗口已初始化")
+#         self.initUI()
+#         pass
         
-    def initUI(self):
-        pass
+#     def initUI(self):
+#         pass
+
+#     def closeEvent(self, event):
+#         """重写关闭事件，关闭日志文件并断开连接"""
+#         # 关闭日志文件
+#         self.logger.close_log()
+        
+#         # ... 处理蓝牙和串口断开连接 ...
+        
+#         event.accept()
 
 # 添加启动画面
 class SplashScreen(QSplashScreen):
@@ -832,9 +844,8 @@ class load_ui_dynamically(QMainWindow):
     def __init__(self, ui_file):
         super().__init__()
         try:
-            # 尝试直接加载UI文件并返回实例
+            # 加载UI文件
             uic.loadUi(ui_file, self)
-
             # 初始化连接窗口
             self.bluetooth_tool = BluetoothTool()
             self.bluetooth_tool.setWindowModality(Qt.WindowModality.ApplicationModal)
@@ -843,8 +854,14 @@ class load_ui_dynamically(QMainWindow):
             # self.pushButton_2.clicked.connect()
 
             self.mainWindowTextEdit.clear()
+            
+            # 初始化日志管理器
+            self.logger = LogManager.get_instance()
+            self.logger.write_log("UI文件加载成功")
+            
+            # 连接按钮信号
+            # self.pushButton.clicked.connect(self.close)  # 假设 pushButton 是一个关闭按钮
             print(f"UI文件 {ui_file} 加载成功")
-
         except Exception as e:
             print(f"加载UI文件失败: {e}")
             traceback.print_exc()
