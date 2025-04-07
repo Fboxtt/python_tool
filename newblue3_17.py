@@ -810,6 +810,8 @@ class load_ui_dynamically(QMainWindow):
             # self.pushButton_2.clicked.connect()
 
             self.mainWindowTextEdit.clear()
+            self.mainWindowTextEdit.setReadOnly(True)
+            self.mainWindowTextEdit.setFontFamily("Courier New")  # 使用等宽字体
             
             # 初始化日志管理器
             self.logger = LogManager.get_instance()
