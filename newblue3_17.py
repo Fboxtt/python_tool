@@ -389,9 +389,11 @@ class BluetoothTool(QWidget):
                     self.blue_write_log(f"发送: {data}")
             except Exception as e:
                 QMessageBox.critical(self, '发送失败', str(e))
-        elif self.connection_type == 'bluetooth':
+        # elif self.connection_type == 'bluetooth':
+        elif self.client and self.client.is_connected:
             # 原有的蓝牙发送逻辑
             await self.bluetooth_send_data(data)
+            self.display_send_data(data)
 
     def on_hex_display_changed(self, state):
         """当16进制显示选项改变时，重新显示接收到的数据"""
@@ -416,7 +418,22 @@ class BluetoothTool(QWidget):
                 # 如果无法解码为文本，则显示16进制
                 hex_data = ' '.join([f'{b:02X}' for b in data])
                 self.blue_write_log(f"RX-> {current_time} 接收(HEX): {hex_data}")
-
+    def display_send_data(self, data):
+        """显示接收到的数据，根据16进制显示选项决定显示格式"""
+        current_time = datetime.now().strftime("%H:%M:%S.%f")[:-3]
+        if self.hex_display_checkbox.isChecked():
+            # 16进制显示
+            hex_data = ' '.join([f'{b:02X}' for b in data])
+            self.blue_write_log(f"TX-> {current_time} 接收: {hex_data}")
+        else:
+            # 文本显示
+            try:
+                text_data = data.decode('utf-8')
+                self.blue_write_log(f"TX-> {current_time} 接收: {text_data}")
+            except UnicodeDecodeError:
+                # 如果无法解码为文本，则显示16进制
+                hex_data = ' '.join([f'{b:02X}' for b in data])
+                self.blue_write_log(f"TX-> {current_time} 接收(HEX): {hex_data}")
     # def closeEvent(self, event):
     #     """重写关闭事件，退出时断开蓝牙连接"""
     #     if self.client and self.client.is_connected:
