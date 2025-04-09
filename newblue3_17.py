@@ -260,6 +260,22 @@ class BluetoothTool(QWidget):
         self.hex_display_checkbox.stateChanged.connect(self.on_hex_display_changed)
         layout.addWidget(self.hex_display_checkbox)
 
+        # 添加放电控制部分
+        discharge_layout = QHBoxLayout()
+        
+        # 打开放电按钮
+        self.open_discharge_button = QPushButton('打开放电')
+        self.open_discharge_button.clicked.connect(self.on_open_discharge_clicked)
+        discharge_layout.addWidget(self.open_discharge_button)
+        
+        # 关闭放电按钮
+        self.close_discharge_button = QPushButton('关闭放电')
+        self.close_discharge_button.clicked.connect(self.on_close_discharge_clicked)
+        discharge_layout.addWidget(self.close_discharge_button)
+        
+        # 将放电控制部分添加到主布局
+        layout.addLayout(discharge_layout)
+
         # 初始化时刷新串口列表
         # self.refresh_serial_ports()
 
@@ -811,6 +827,27 @@ class BluetoothTool(QWidget):
         # 扫描蓝牙设备
         asyncio.create_task(self.scan_devices())
 
+    def on_open_discharge_clicked(self):
+        """处理打开放电按钮点击事件"""
+        # 发送打开放电的指令数据
+        bytedata = bytes([0x00,0x00,0x04,0x01,0x0c,0x55,0xaa,0x10])
+        self.send_command(bytedata)
+
+    def on_close_discharge_clicked(self):
+        """处理关闭放电按钮点击事件"""
+        # 发送关闭放电的指令数据
+        bytedata = bytes([0x00,0x00,0x04,0x01,0x0D,0x55,0xaa,0x11])
+        self.send_command(bytedata)
+
+    def send_command(self, command):
+        """发送指令数据"""
+        if self.client and self.client.is_connected:
+            asyncio.create_task(self.byte_send(command))
+            self.display_send_data(command)
+        elif self.connection_type == 'serial' and self.is_serial_connected:
+            asyncio.create_task(self.send_data(command))
+        else:
+            QMessageBox.warning(self, '警告', '未连接到设备')
 
 # 修正后的函数 - 注意这是一个函数，不是类
 class load_ui_dynamically(QMainWindow):
