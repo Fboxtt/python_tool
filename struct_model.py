@@ -250,7 +250,65 @@ class HexParserApp(QMainWindow):
                 self.text_edit.append(f"解析 {struct_name} 失败: {str(e)}")
         
         return parsed_data
+    def decode_cmd_hex_data(self, ih):
+        """
+        严格按字节解析的增强版本
+        """
+        parsed_data = {}
+        for struct_name, address in STRUCT_ADDRESSES.items():
+            fmt = STRUCT_FORMATS[struct_name]
+            size = struct.calcsize(fmt)
+            
+            try:
+                # 读取原始字节
+                data_bytes = ih.tobinstr(start=address, size=size)
+                # 解析为元组
+                values = struct.unpack(fmt, data_bytes)
+                # 转换为十六进制字符串
+                hex_values = [f"0x{b:02X}" for b in data_bytes]
+                print(struct_name, data_bytes)
+                print(type(hex_values))
+                print(type(hex_values[0]))
+                print(type(data_bytes))
+                hex_byte_array = []
 
+                # 处理有符号值
+                dec_values = []
+                for i, (var_name, value) in enumerate(zip(STRUCT_VARIABLES[struct_name], values)):
+                    # 根据格式字符判断符号
+                    fmt_char = fmt[1:][i]  # 跳过字节序字符
+                    byte_len = struct.calcsize(fmt_char)
+                    if byte_len == 1:
+                        hex_byte_array.append(f"0x{value:02X}")
+                    elif byte_len == 2:
+                        hex_byte_array.append(f"0x{value:04X}")
+                    elif byte_len == 4:
+                        hex_byte_array.append(f"0x{value:08X}")
+                        pass
+                    if fmt_char in ('h', 'l'):
+                        dec_values.append(str(value))  # 保留符号
+                    else:
+                        dec_values.append(str(value & 0xFFFF_FFFF))  # 无符号显示
+                
+                # 按字节对齐显示
+                display_data = []
+                byte_offset = 0
+                i = 0
+                for var_name, dec_val in zip(STRUCT_VARIABLES[struct_name], dec_values):
+                    byte_len = struct.calcsize(fmt[1:][i])  # 计算变量字节长度
+                    display_data.append((
+                        var_name,
+                        ''.join(hex_byte_array[i]),
+                        dec_val
+                    ))
+                    byte_offset += byte_len
+                    i += 1
+                parsed_data[struct_name] = display_data
+                
+            except Exception as e:
+                self.text_edit.append(f"解析 {struct_name} 失败: {str(e)}")
+        
+        return parsed_data
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
