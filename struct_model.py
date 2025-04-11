@@ -61,14 +61,74 @@ STRUCT_ADDRESSES = {
     "TLIFE": 0x500402
 }
 
+COMMANDS = {
+    "NONE": 0x00,
+    "PC_LOGIN": 0x01,
+    "PC_LOGOUT": 0x02,
+    "PC_GET_OLDSBS": 0x03,
+    "PC_GET_SBS": 0x13,
+    "PC_GET_ADC": 0x04,
+    "PC_GET_IO": 0x05,
+    "PC_GET_OLDVER": 0x06,
+    "PC_GET_VER": 0x16,
+    "PC_GET_KB": 0x07,
+    "PC_SET_KB": 0x08,
+    "PC_SET_BMS": 0x09,
+    "PC_GET_BMS": 0x15,
+    "PC_OPEN_CHG": 0x0A,
+    "PC_CLOSE_CHG": 0x0B,
+    "PC_OPEN_DIS": 0x0C,
+    "PC_CLOSE_DIS": 0x0D,
+    "PC_GET_SERIALNUM": 0x10,
+    "PC_SET_SERIALNUM": 0x11,
+    "PC_A_PRINT": 0x14,
+    "PC_SET_HEATERMODE": 0x17,
+    "PC_SET_FORCEDDISMODE": 0x18,
+    "PC_SET_PWSFUNCTION": 0x19,
+    "PC_SET_SYSTIME": 0x20,
+    "PC_GET_SYSTIME": 0x29,
+    "PC_Buzzer_ON": 0x23,
+    "PC_Buzzer_OFF": 0x24,
+    "PC_GET_OCP_DELAYTIME": 0x25,
+    "PC_SET_OCP_DELAYTIME": 0x26,
+    "PC_OPEN_CHGLIMIT": 0x27,
+    "PC_CLOSE_CHGLIMIT": 0x28,
+    "PC_GET_CLUSTER_SBS": 0x30,
+    "PC_SET_LIFE_PARA": 0x40,
+    "PC_GET_LIFE_PARA": 0x41,
+    "PC_SET_CELL_CAP_PARA": 0x42,
+    "PC_GET_CELL_CAP_PARA": 0x43,
+    "PC_GET_RUN_DATA": 0x44,
+    "PC_CLEAR_RUN_DATA": 0x45,
+    "PC_SET_WAIT_TIMEOUT": 0x46,
+    "PC_FACTORY_CLEAER": 0x47,
+    "PC_GET_CLUSTER_STATUS": 0x49,
+    "PC_GET_DEBUG_DATA": 0x4C,
+    "PC_GET_CLUSTER_MINRCD": 0x50,
+    "PC_CLEAR_CLUSTER_MINRCD": 0x51,
+    "PC_GET_SELF_MINRCD": 0x54,
+    "PC_CLEAR_SELF_MINRCD": 0x55,
+    "PC_GET_SELF_DAYRCD": 0x56,
+    "PC_CLEAR_SELF_DAYRCD": 0x57,
+    "PC_GET_SELF_ALMRCD": 0x58,
+    "PC_CLEAR_SELF_ALMRCD": 0x59,
+    "PC_SET_SHUTDOWN": 0x60,
+    "PC_GET_FUSESTATE": 0x61,
+    "PC_SET_FUSESTATE": 0x62,
+    "PC_SET_BALANCE": 0x63,
+    "PC_SET_SLEEP": 0x64,
+    "PC_GET_MOSHTDATA": 0x65,
+    "PC_SET_MOSHTDATA": 0x66,
+    "MCU_A_PRINT": 0x94,
+}
+
 STRUCT_GET_CMD = {
-    "TBMS": bytes([0x15]),
-    "TKB": bytes([0x07]),
-    "TDelayTimePara": bytes([0x25]),
-    "TCAP": bytes([0x43]),
-    "TMOSHTDATA": bytes([0x62]),
-    # "UNNAMED_362": 0x500362,
-    "TLIFE": bytes([0x40])
+    "TBMS": bytes([COMMANDS["PC_GET_BMS"]]),
+    "TKB": bytes([COMMANDS["PC_GET_KB"]]),
+    "TDelayTimePara": bytes([COMMANDS["PC_GET_OCP_DELAYTIME"]]),
+    "TCAP": bytes([COMMANDS["PC_GET_CELL_CAP_PARA"]]),
+    "TMOSHTDATA": bytes([COMMANDS["PC_GET_MOSHTDATA"]]),
+    "TLIFE": bytes([COMMANDS["PC_GET_LIFE_PARA"]])
 }
 
 STRUCT_GET_CMD_NAME = {
@@ -76,21 +136,26 @@ STRUCT_GET_CMD_NAME = {
     "TKB": "PC_GET_KB",
     "TDelayTimePara": "PC_GET_OCP_DELAYTIME",
     "TCAP": "PC_GET_CELL_CAP_PARA",
-    "TMOSHTDATA": "PC_SET_LIFE_PARA",
+    "TMOSHTDATA": "PC_GET_MOSHTDATA",
 }
 
 STRUCT_SET_CMD = {
-    "TBMS": bytes([0x9]),
-    "TKB": bytes([0x08]),
-    "TDelayTimePara": bytes([0x26]),
-    "TCAP": bytes([0x43]),
-    "TMOSHTDATA": bytes([0x63]),
-    # "UNNAMED_362": 0x500362,
-    "TLIFE": bytes([0x41])
+    "TBMS": bytes([COMMANDS["PC_SET_BMS"]]),
+    "TKB": bytes([COMMANDS["PC_SET_KB"]]),
+    "TDelayTimePara": bytes([COMMANDS["PC_SET_OCP_DELAYTIME"]]),
+    "TCAP": bytes([COMMANDS["PC_SET_CELL_CAP_PARA"]]),
+    "TMOSHTDATA": bytes([COMMANDS["PC_SET_MOSHTDATA"]]),
+    "TLIFE": bytes([COMMANDS["PC_SET_LIFE_PARA"]])
 }
 
-
-
+STRUCT_SET_CMD_NAME = {
+    "TBMS": "PC_SET_BMS",
+    "TKB": "PC_SET_KB",
+    "TDelayTimePara": "PC_SET_OCP_DELAYTIME",
+    "TCAP": "PC_SET_CELL_CAP_PARA",
+    "TMOSHTDATA": "PC_SET_MOSHTDATA",
+    "TLIFE": "PC_SET_LIFE_PARA",
+}
 
 STRUCT_VARIABLES = {
     "TBMS": [
@@ -340,6 +405,8 @@ class HexParserApp(QMainWindow):
                 self.text_edit.append(f"解析 {struct_name} 失败: {str(e)}")
         
         return parsed_data
+
+
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
