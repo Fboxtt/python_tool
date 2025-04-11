@@ -61,6 +61,84 @@ STRUCT_ADDRESSES = {
     "TLIFE": 0x500402
 }
 
+
+STRUCT_VARIABLES = {
+    "TBMS": [
+        # ULONG x12
+        "ulCHG_SwitchV", "ulSwitch_PB_DiffV", 
+        "ulCHG_Bls_StartV", "ulCHG_Bls_StopV",
+        "ulPack_OVA_Threshold", "ulPack_OVA_Resume",
+        "ulPack_OVP_Threshold", "ulPack_OVP_Resume",
+        "ulBatt_OVA_Threshold", "ulBatt_OVA_Resume",
+        "ulBatt_OVP_Threshold", "ulBatt_OVP_Resume", #---------------------
+        
+        # USHORT x8
+        "usCell_OVA_Threshold", "usCell_OVA_Resume",
+        "usCell_OVP_Threshold", "usCell_OVP_Resume",
+
+
+        
+        # ULONG x8
+        "ulBatt_UVA_Threshold", "ulBatt_UVA_Resume",
+        "ulBatt_UVP_Threshold", "ulBatt_UVP_Resume",
+
+
+        "usCell_UVA_Threshold", "usCell_UVA_Resume",  # 注意：原始定义中这部分应为ULONG，根据实际需求调整
+        "usCell_UVP_Threshold", "usCell_UVP_Resume",#-----------------------
+        
+
+        
+        # LONG x6
+        "lCHG_OCA_Threshold", "lCHG_OCA_Resume", "lCHG_OCP_Threshold",
+        "lDIS_OCA_Threshold", "lDIS_OCA_Resume", "lDIS_OCP_Threshold",
+        
+        # SHORT x24
+        "sCHG_OTA_Threshold", "sCHG_OTA_Resume", "sCHG_OTP_Threshold", "sCHG_OTP_Resume",
+        "sDIS_OTA_Threshold", "sDIS_OTA_Resume", "sDIS_OTP_Threshold", "sDIS_OTP_Resume",
+        "sCHG_UTA_Threshold", "sCHG_UTA_Resume", "sCHG_UTP_Threshold", "sCHG_UTP_Resume",
+        "sDIS_UTA_Threshold", "sDIS_UTA_Resume", "sDIS_UTP_Threshold", "sDIS_UTP_Resume",
+        "sHEATER_START_T", "sHEATER_STOP_T",
+    ],
+    
+    "TKB": [
+        "usPackVK", "usBattVK",
+        # usCellVK[16]
+        *[f"usCellVK[{i}]" for i in range(16)],
+        # 电流相关参数
+        "usChgCurrK", "sChgCurrB",
+        "usDisCurrK", "sDisCurrB",
+        "usChgCurrSK", "sChgCurrSB",
+        "usDisCurrSK", "sDisCurrSB",
+        "usChgCurrSSK", "sChgCurrSSB",
+        "usDisCurrSSK", "sDisCurrSSB",
+        # usTempK[16]
+        *[f"usTempK[{i}]" for i in range(5)]
+    ],
+    
+    "TDelayTimePara": [
+        "ChgDelayCount_1C", "ChgDelayCount_2C",
+        "DisDelayCount_1C", "DisDelayCount_2C"
+    ],
+    
+    "TCAP": [
+        "ulModuleDesignCap", "ulModuleFactoryCap"
+    ],
+    
+    "TMOSHTDATA": [
+        "sAlarm", "sAlarmRe", "sProtect", "sProtectRe"
+    ],
+    
+    # "UNNAMED_362": [
+    #     f"char_{i}" for i in range(20)  # 20字节无名数组
+    # ],
+    
+    "TLIFE": [
+        "usSOC_Percent", "reserved", "ulSOH_Percent",
+        "ulRemainPointmAs", "lSingleDis_Ah"
+    ]
+}
+
+
 COMMANDS = {
     "NONE": 0x00,
     "PC_LOGIN": 0x01,
@@ -137,6 +215,7 @@ STRUCT_GET_CMD_NAME = {
     "TDelayTimePara": "PC_GET_OCP_DELAYTIME",
     "TCAP": "PC_GET_CELL_CAP_PARA",
     "TMOSHTDATA": "PC_GET_MOSHTDATA",
+    "TLIFE": "PC_GET_LIFE_PARA",
 }
 
 STRUCT_SET_CMD = {
@@ -155,82 +234,6 @@ STRUCT_SET_CMD_NAME = {
     "TCAP": "PC_SET_CELL_CAP_PARA",
     "TMOSHTDATA": "PC_SET_MOSHTDATA",
     "TLIFE": "PC_SET_LIFE_PARA",
-}
-
-STRUCT_VARIABLES = {
-    "TBMS": [
-        # ULONG x12
-        "ulCHG_SwitchV", "ulSwitch_PB_DiffV", 
-        "ulCHG_Bls_StartV", "ulCHG_Bls_StopV",
-        "ulPack_OVA_Threshold", "ulPack_OVA_Resume",
-        "ulPack_OVP_Threshold", "ulPack_OVP_Resume",
-        "ulBatt_OVA_Threshold", "ulBatt_OVA_Resume",
-        "ulBatt_OVP_Threshold", "ulBatt_OVP_Resume", #---------------------
-        
-        # USHORT x8
-        "usCell_OVA_Threshold", "usCell_OVA_Resume",
-        "usCell_OVP_Threshold", "usCell_OVP_Resume",
-
-
-        
-        # ULONG x8
-        "ulBatt_UVA_Threshold", "ulBatt_UVA_Resume",
-        "ulBatt_UVP_Threshold", "ulBatt_UVP_Resume",
-
-
-        "usCell_UVA_Threshold", "usCell_UVA_Resume",  # 注意：原始定义中这部分应为ULONG，根据实际需求调整
-        "usCell_UVP_Threshold", "usCell_UVP_Resume",#-----------------------
-        
-
-        
-        # LONG x6
-        "lCHG_OCA_Threshold", "lCHG_OCA_Resume", "lCHG_OCP_Threshold",
-        "lDIS_OCA_Threshold", "lDIS_OCA_Resume", "lDIS_OCP_Threshold",
-        
-        # SHORT x24
-        "sCHG_OTA_Threshold", "sCHG_OTA_Resume", "sCHG_OTP_Threshold", "sCHG_OTP_Resume",
-        "sDIS_OTA_Threshold", "sDIS_OTA_Resume", "sDIS_OTP_Threshold", "sDIS_OTP_Resume",
-        "sCHG_UTA_Threshold", "sCHG_UTA_Resume", "sCHG_UTP_Threshold", "sCHG_UTP_Resume",
-        "sDIS_UTA_Threshold", "sDIS_UTA_Resume", "sDIS_UTP_Threshold", "sDIS_UTP_Resume",
-        "sHEATER_START_T", "sHEATER_STOP_T",
-    ],
-    
-    "TKB": [
-        "usPackVK", "usBattVK",
-        # usCellVK[16]
-        *[f"usCellVK[{i}]" for i in range(16)],
-        # 电流相关参数
-        "usChgCurrK", "sChgCurrB",
-        "usDisCurrK", "sDisCurrB",
-        "usChgCurrSK", "sChgCurrSB",
-        "usDisCurrSK", "sDisCurrSB",
-        "usChgCurrSSK", "sChgCurrSSB",
-        "usDisCurrSSK", "sDisCurrSSB",
-        # usTempK[16]
-        *[f"usTempK[{i}]" for i in range(5)]
-    ],
-    
-    "TDelayTimePara": [
-        "ChgDelayCount_1C", "ChgDelayCount_2C",
-        "DisDelayCount_1C", "DisDelayCount_2C"
-    ],
-    
-    "TCAP": [
-        "ulModuleDesignCap", "ulModuleFactoryCap"
-    ],
-    
-    "TMOSHTDATA": [
-        "sAlarm", "sAlarmRe", "sProtect", "sProtectRe"
-    ],
-    
-    # "UNNAMED_362": [
-    #     f"char_{i}" for i in range(20)  # 20字节无名数组
-    # ],
-    
-    "TLIFE": [
-        "usSOC_Percent", "reserved", "ulSOH_Percent",
-        "ulRemainPointmAs", "lSingleDis_Ah"
-    ]
 }
 
 class HexParserApp(QMainWindow):
