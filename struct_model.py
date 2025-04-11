@@ -61,6 +61,37 @@ STRUCT_ADDRESSES = {
     "TLIFE": 0x500402
 }
 
+STRUCT_GET_CMD = {
+    "TBMS": bytes([0x15]),
+    "TKB": bytes([0x07]),
+    "TDelayTimePara": bytes([0x25]),
+    "TCAP": bytes([0x43]),
+    "TMOSHTDATA": bytes([0x62]),
+    # "UNNAMED_362": 0x500362,
+    "TLIFE": bytes([0x40])
+}
+
+STRUCT_GET_CMD_NAME = {
+    "TBMS": "PC_GET_BMS",
+    "TKB": "PC_GET_KB",
+    "TDelayTimePara": "PC_GET_OCP_DELAYTIME",
+    "TCAP": "PC_GET_CELL_CAP_PARA",
+    "TMOSHTDATA": "PC_SET_LIFE_PARA",
+}
+
+STRUCT_SET_CMD = {
+    "TBMS": bytes([0x9]),
+    "TKB": bytes([0x08]),
+    "TDelayTimePara": bytes([0x26]),
+    "TCAP": bytes([0x43]),
+    "TMOSHTDATA": bytes([0x63]),
+    # "UNNAMED_362": 0x500362,
+    "TLIFE": bytes([0x41])
+}
+
+
+
+
 STRUCT_VARIABLES = {
     "TBMS": [
         # ULONG x12
@@ -250,7 +281,7 @@ class HexParserApp(QMainWindow):
                 self.text_edit.append(f"解析 {struct_name} 失败: {str(e)}")
         
         return parsed_data
-    def decode_cmd_hex_data(self, ih):
+    def decode_cmd_hex_data(self, cmd:bytes, data_bytes:bytearray):
         """
         严格按字节解析的增强版本
         """
@@ -261,7 +292,7 @@ class HexParserApp(QMainWindow):
             
             try:
                 # 读取原始字节
-                data_bytes = ih.tobinstr(start=address, size=size)
+                # data_bytes = ih.tobinstr(start=address, size=size)
                 # 解析为元组
                 values = struct.unpack(fmt, data_bytes)
                 # 转换为十六进制字符串
