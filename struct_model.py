@@ -7,137 +7,82 @@ from intelhex import IntelHex
 # ---------------------------- 结构体定义 ----------------------------
 # 注意：所有格式字符串均已展开为具体字符，确保顺序严格匹配
 STRUCT_FORMATS = {
-    # 地址 0x500202 - TBMS 结构体 (共 1536 字节)
-    "TBMS": "<"
-        # ULONG x12
+    "PC_GET_BMS": "<"
         "LLLLLLLLLLLL"  # ulCHG_SwitchV(4) ~ ulBatt_OVP_Resume(4)
-        # USHORT x8
         "HHHH"
-        # ULONG x4    这里减了4个UL
         "LLLL"
-        # USHORT x8
         "HHHH"
-        # LONG x6
         "llllll"
-        # SHORT x24
         "hhhhhhhhhhhhhhhh"
-        # SHORT x2
         "hh",
-
-    # 地址 0x5002C2 - TKB 结构体
-    "TKB": "<"
-        # USHORT x2
+    "PC_GET_KB": "<"
         "HH"
-        # USHORT x16 (CELL_COUNT=16)
         "HHHHHHHHHHHHHHHH"
-        # 混合类型 x16 (USHORT/SHORT交替)
         "HhHhHhHhHhHh"
-        # USHORT x16 (TEMP_DEF=16)
         "HHHHH",
-
-    # 地址 0x500322 - TDelayTimePara
-    "TDelayTimePara": "<HHHH",  # USHORT x4
-
-    # 地址 0x500332 - TCAP
-    "TCAP": "<LL",             # ULONG x2
-
-    # 地址 0x500342 - TMOSHTDATA
-    "TMOSHTDATA": "<HHHH",     # USHORT x4
-
-    # 地址 0x500362 - 未命名结构体 (char[20])
-    # "UNNAMED_362": "<20B",     # 字节数组
-
-    # 地址 0x500402 - TLIFE
-    "TLIFE": "<HHLLL"           # USHORT + ULONG x3
+    "PC_GET_OCP_DELAYTIME": "<HHHH",
+    "PC_GET_CELL_CAP_PARA": "<LL",
+    "PC_GET_MOSHTDATA": "<HHHH",
+    "PC_GET_LIFE_PARA": "<HHLLL"
 }
 
 STRUCT_ADDRESSES = {
-    "TBMS": 0x500202,
-    "TKB": 0x5002C2,
-    "TDelayTimePara": 0x500322,
-    "TCAP": 0x500332,
-    "TMOSHTDATA": 0x500342,
-    # "UNNAMED_362": 0x500362,
-    "TLIFE": 0x500402
+    "PC_GET_BMS": 0x500202,
+    "PC_GET_KB": 0x5002C2,
+    "PC_GET_OCP_DELAYTIME": 0x500322,
+    "PC_GET_CELL_CAP_PARA": 0x500332,
+    "PC_GET_MOSHTDATA": 0x500342,
+    "PC_GET_LIFE_PARA": 0x500402
 }
 
-
 STRUCT_VARIABLES = {
-    "TBMS": [
-        # ULONG x12
+    "PC_GET_BMS": [
         "ulCHG_SwitchV", "ulSwitch_PB_DiffV", 
         "ulCHG_Bls_StartV", "ulCHG_Bls_StopV",
         "ulPack_OVA_Threshold", "ulPack_OVA_Resume",
         "ulPack_OVP_Threshold", "ulPack_OVP_Resume",
         "ulBatt_OVA_Threshold", "ulBatt_OVA_Resume",
-        "ulBatt_OVP_Threshold", "ulBatt_OVP_Resume", #---------------------
-        
-        # USHORT x8
+        "ulBatt_OVP_Threshold", "ulBatt_OVP_Resume",
         "usCell_OVA_Threshold", "usCell_OVA_Resume",
         "usCell_OVP_Threshold", "usCell_OVP_Resume",
-
-
-        
-        # ULONG x8
         "ulBatt_UVA_Threshold", "ulBatt_UVA_Resume",
         "ulBatt_UVP_Threshold", "ulBatt_UVP_Resume",
-
-
-        "usCell_UVA_Threshold", "usCell_UVA_Resume",  # 注意：原始定义中这部分应为ULONG，根据实际需求调整
-        "usCell_UVP_Threshold", "usCell_UVP_Resume",#-----------------------
-        
-
-        
-        # LONG x6
+        "usCell_UVA_Threshold", "usCell_UVA_Resume",
+        "usCell_UVP_Threshold", "usCell_UVP_Resume",
         "lCHG_OCA_Threshold", "lCHG_OCA_Resume", "lCHG_OCP_Threshold",
         "lDIS_OCA_Threshold", "lDIS_OCA_Resume", "lDIS_OCP_Threshold",
-        
-        # SHORT x24
         "sCHG_OTA_Threshold", "sCHG_OTA_Resume", "sCHG_OTP_Threshold", "sCHG_OTP_Resume",
         "sDIS_OTA_Threshold", "sDIS_OTA_Resume", "sDIS_OTP_Threshold", "sDIS_OTP_Resume",
         "sCHG_UTA_Threshold", "sCHG_UTA_Resume", "sCHG_UTP_Threshold", "sCHG_UTP_Resume",
         "sDIS_UTA_Threshold", "sDIS_UTA_Resume", "sDIS_UTP_Threshold", "sDIS_UTP_Resume",
         "sHEATER_START_T", "sHEATER_STOP_T",
     ],
-    
-    "TKB": [
+    "PC_GET_KB": [
         "usPackVK", "usBattVK",
-        # usCellVK[16]
         *[f"usCellVK[{i}]" for i in range(16)],
-        # 电流相关参数
         "usChgCurrK", "sChgCurrB",
         "usDisCurrK", "sDisCurrB",
         "usChgCurrSK", "sChgCurrSB",
         "usDisCurrSK", "sDisCurrSB",
         "usChgCurrSSK", "sChgCurrSSB",
         "usDisCurrSSK", "sDisCurrSSB",
-        # usTempK[16]
         *[f"usTempK[{i}]" for i in range(5)]
     ],
-    
-    "TDelayTimePara": [
+    "PC_GET_OCP_DELAYTIME": [
         "ChgDelayCount_1C", "ChgDelayCount_2C",
         "DisDelayCount_1C", "DisDelayCount_2C"
     ],
-    
-    "TCAP": [
+    "PC_GET_CELL_CAP_PARA": [
         "ulModuleDesignCap", "ulModuleFactoryCap"
     ],
-    
-    "TMOSHTDATA": [
+    "PC_GET_MOSHTDATA": [
         "sAlarm", "sAlarmRe", "sProtect", "sProtectRe"
     ],
-    
-    # "UNNAMED_362": [
-    #     f"char_{i}" for i in range(20)  # 20字节无名数组
-    # ],
-    
-    "TLIFE": [
+    "PC_GET_LIFE_PARA": [
         "usSOC_Percent", "reserved", "ulSOH_Percent",
         "ulRemainPointmAs", "lSingleDis_Ah"
     ]
 }
-
 
 STRUCT_COMMANDS = {
     "NONE": 0x00,
@@ -201,39 +146,39 @@ STRUCT_COMMANDS = {
 }
 
 STRUCT_GET_CMD = {
-    "TBMS": bytes([COMMANDS["PC_GET_BMS"]]),
-    "TKB": bytes([COMMANDS["PC_GET_KB"]]),
-    "TDelayTimePara": bytes([COMMANDS["PC_GET_OCP_DELAYTIME"]]),
-    "TCAP": bytes([COMMANDS["PC_GET_CELL_CAP_PARA"]]),
-    "TMOSHTDATA": bytes([COMMANDS["PC_GET_MOSHTDATA"]]),
-    "TLIFE": bytes([COMMANDS["PC_GET_LIFE_PARA"]])
+    "PC_GET_BMS": bytes([STRUCT_COMMANDS["PC_GET_BMS"]]),
+    "PC_GET_KB": bytes([STRUCT_COMMANDS["PC_GET_KB"]]),
+    "PC_GET_OCP_DELAYTIME": bytes([STRUCT_COMMANDS["PC_GET_OCP_DELAYTIME"]]),
+    "PC_GET_CELL_CAP_PARA": bytes([STRUCT_COMMANDS["PC_GET_CELL_CAP_PARA"]]),
+    "PC_GET_MOSHTDATA": bytes([STRUCT_COMMANDS["PC_GET_MOSHTDATA"]]),
+    "PC_GET_LIFE_PARA": bytes([STRUCT_COMMANDS["PC_GET_LIFE_PARA"]])
 }
 
 STRUCT_GET_CMD_NAME = {
-    "TBMS": "PC_GET_BMS",
-    "TKB": "PC_GET_KB",
-    "TDelayTimePara": "PC_GET_OCP_DELAYTIME",
-    "TCAP": "PC_GET_CELL_CAP_PARA",
-    "TMOSHTDATA": "PC_GET_MOSHTDATA",
-    "TLIFE": "PC_GET_LIFE_PARA",
+    "PC_GET_BMS": "PC_GET_BMS",
+    "PC_GET_KB": "PC_GET_KB",
+    "PC_GET_OCP_DELAYTIME": "PC_GET_OCP_DELAYTIME",
+    "PC_GET_CELL_CAP_PARA": "PC_GET_CELL_CAP_PARA",
+    "PC_GET_MOSHTDATA": "PC_GET_MOSHTDATA",
+    "PC_GET_LIFE_PARA": "PC_GET_LIFE_PARA",
 }
 
 STRUCT_SET_CMD = {
-    "TBMS": bytes([COMMANDS["PC_SET_BMS"]]),
-    "TKB": bytes([COMMANDS["PC_SET_KB"]]),
-    "TDelayTimePara": bytes([COMMANDS["PC_SET_OCP_DELAYTIME"]]),
-    "TCAP": bytes([COMMANDS["PC_SET_CELL_CAP_PARA"]]),
-    "TMOSHTDATA": bytes([COMMANDS["PC_SET_MOSHTDATA"]]),
-    "TLIFE": bytes([COMMANDS["PC_SET_LIFE_PARA"]])
+    "PC_GET_BMS": bytes([STRUCT_COMMANDS["PC_SET_BMS"]]),
+    "PC_GET_KB": bytes([STRUCT_COMMANDS["PC_SET_KB"]]),
+    "PC_GET_OCP_DELAYTIME": bytes([STRUCT_COMMANDS["PC_SET_OCP_DELAYTIME"]]),
+    "PC_GET_CELL_CAP_PARA": bytes([STRUCT_COMMANDS["PC_SET_CELL_CAP_PARA"]]),
+    "PC_GET_MOSHTDATA": bytes([STRUCT_COMMANDS["PC_SET_MOSHTDATA"]]),
+    "PC_GET_LIFE_PARA": bytes([STRUCT_COMMANDS["PC_SET_LIFE_PARA"]])
 }
 
 STRUCT_SET_CMD_NAME = {
-    "TBMS": "PC_SET_BMS",
-    "TKB": "PC_SET_KB",
-    "TDelayTimePara": "PC_SET_OCP_DELAYTIME",
-    "TCAP": "PC_SET_CELL_CAP_PARA",
-    "TMOSHTDATA": "PC_SET_MOSHTDATA",
-    "TLIFE": "PC_SET_LIFE_PARA",
+    "PC_GET_BMS": "PC_SET_BMS",
+    "PC_GET_KB": "PC_SET_KB",
+    "PC_GET_OCP_DELAYTIME": "PC_SET_OCP_DELAYTIME",
+    "PC_GET_CELL_CAP_PARA": "PC_SET_CELL_CAP_PARA",
+    "PC_GET_MOSHTDATA": "PC_SET_MOSHTDATA",
+    "PC_GET_LIFE_PARA": "PC_SET_LIFE_PARA",
 }
 
 class HexParserApp(QMainWindow):
