@@ -139,7 +139,7 @@ STRUCT_VARIABLES = {
 }
 
 
-COMMANDS = {
+STRUCT_COMMANDS = {
     "NONE": 0x00,
     "PC_LOGIN": 0x01,
     "PC_LOGOUT": 0x02,
@@ -354,11 +354,23 @@ class HexParserApp(QMainWindow):
         严格按字节解析的增强版本
         """
         parsed_data = {}
-        for struct_name, address in STRUCT_ADDRESSES.items():
-            fmt = STRUCT_FORMATS[struct_name]
-            size = struct.calcsize(fmt)
-            
+        if cmd in STRUCT_COMMANDS.values():
+            pass
+        else:
+            return None
+        if STRUCT_COMMANDS[cmd] in STRUCT_GET_CMD.values():
+            pass
+        elif STRUCT_COMMANDS[cmd] in STRUCT_SET_CMD.values():
+            return None
+
+        for struct_name, cmd_num in STRUCT_COMMANDS.items():
             try:
+                if cmd_num == cmd:
+                    fmt = STRUCT_FORMATS[struct_name]
+                    size = struct.calcsize(fmt)
+                else:
+                    continue
+            
                 # 读取原始字节
                 # data_bytes = ih.tobinstr(start=address, size=size)
                 # 解析为元组
