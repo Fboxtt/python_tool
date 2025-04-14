@@ -4,6 +4,7 @@ from PyQt6.QtCore import Qt
 import struct
 from intelhex import IntelHex
 from log_controller import LogManager
+import traceback
 # ---------------------------- 结构体定义 ----------------------------
 # 注意：所有格式字符串均已展开为具体字符，确保顺序严格匹配
 STRUCT_FORMATS = {
@@ -297,16 +298,16 @@ class HexParserApp(QMainWindow):
     def decode_cmd_hex_data(self, cmd:bytes, data_bytes:bytearray):
         """
         严格按字节解析的增强版本
-        """
+        """            
         parsed_data = {}
         if cmd in STRUCT_COMMANDS.values():
-            struct_name = STRUCT_COMMANDS[cmd]
-            pass
+            for key, value in STRUCT_COMMANDS.items():
+                if value == cmd:
+                    struct_name = key
+                    break
         else:
             return None
-
         try:
-            
             fmt = STRUCT_FORMATS[struct_name]
             size = struct.calcsize(fmt)
             if size != len(data_bytes):
@@ -320,9 +321,9 @@ class HexParserApp(QMainWindow):
             # 转换为十六进制字符串
             hex_values = [f"0x{b:02X}" for b in data_bytes]
             print(struct_name, data_bytes)
-            print(type(hex_values))
-            print(type(hex_values[0]))
-            print(type(data_bytes))
+            # print(type(hex_values))
+            # print(type(hex_values[0]))
+            # print(type(data_bytes))
             hex_byte_array = []
 
             # 处理有符号值
@@ -359,8 +360,10 @@ class HexParserApp(QMainWindow):
             parsed_data[struct_name] = display_data
             
         except Exception as e:
-            self.text_edit.append(f"解析 {struct_name} 失败: {str(e)}")
-        
+            print(f"解析  失败: {str(e)}")
+            traceback.print_exc()
+            # self.text_edit.append(f"解析 {struct_name} 失败: {str(e)}")
+            pass
         return parsed_data
 
 
@@ -368,5 +371,7 @@ class HexParserApp(QMainWindow):
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     window = HexParserApp()
-    window.show()
+    print(window.decode_cmd_hex_data(0x41,bytearray([0x01,0x02,0x03,0x04,0x05,0x06,0x07,0x08,0x09,0x0A,0x0B,0x0C,0x0D,0x0E,0x0F,0x10])))
+    # window.show()
+    window.close()
     sys.exit(app.exec())
