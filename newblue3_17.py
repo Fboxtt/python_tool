@@ -953,7 +953,7 @@ if __name__ == '__main__':
     # # 延迟启动主窗口
 
     # 方法3: 动态加载（推荐）
-    window = load_ui_dynamically('untitled.ui')
+    window = load_ui_dynamically('测试上位机.ui')
     
     if window:
         QTimer.singleShot(500, lambda: (splash.finish(window), window.show()))

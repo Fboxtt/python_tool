@@ -37,3 +37,6 @@ Thumbs.db
 *.exe
 Scripts
 *.cfg
+
+*.log
+*.spec
