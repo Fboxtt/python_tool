@@ -850,9 +850,16 @@ class BluetoothTool(QWidget):
             asyncio.create_task(self.send_data(command))
         else:
             QMessageBox.warning(self, '警告', '未连接到设备')
+            raise Exception("未连接到设备")
+    def send_life_time(self):
+        """发送生命周期命令"""
+        self.send_command(self.text_decode.send_hex_fill(0x41))
+
 
 # 修正后的函数 - 注意这是一个函数，不是类
 class load_ui_dynamically(QMainWindow):
+    receive_data_signal = pyqtSignal(str)
+
     def __init__(self, ui_file):
         super().__init__()
         try:
@@ -866,9 +873,8 @@ class load_ui_dynamically(QMainWindow):
             # self.pushButton_2.clicked.connect()
 
             # 分配监控按钮
-            # self.pushButton_6.clicked.connect(lambda: asyncio.create_task(self.bluetooth_tool.show()))
-            receive_data_signal = pyqtSignal(str)
-            receive_data_signal.connect(self.display_log)
+            self.pushButton_4.clicked.connect(lambda: asyncio.create_task(self.get_data_from_device(1)))
+            self.receive_data_signal.connect(self.display_log)
 
 
             self.mainWindowTextEdit.clear()
@@ -895,12 +901,23 @@ class load_ui_dynamically(QMainWindow):
         self.mainWindowTextEdit.append(message)
         self.logger.write_log(message)
 
-    async def get_data_from_device(self, time_interval:int):
+    async def get_data_from_device(self, time_interval:int = 1):
         """异步方法，从设备获取数据"""
+        print(f"进入发送0x41命令函数")
         while 1:
-            await asyncio.sleep(time_interval)
-            #发送0x41命令
-            self.bluetooth_tool.send_command(bytes([0x00,0x00,0x04,0x01,0x0c,0x55,0xaa,0x10]))
+            print(f"发送0x41命令")
+            try:
+                await asyncio.sleep(time_interval)
+                #发送0x41命令
+                self.bluetooth_tool.send_life_time()
+            except Exception as e:
+                if str(e) == "未连接到设备":
+                    self.bluetooth_tool.blue_write_log(f"获取数据失败: {e}")
+                    traceback.print_exc()
+                    break
+                else:
+                    self.bluetooth_tool.blue_write_log(f"获取数据失败: {e}")
+                    traceback.print_exc()
         #方法1 bluetool 函数发送发射信号- 主窗口类接收信号 - 当前函数处理 - 调用数据解析模块 - 返回嵌套字典
         #方法1。1 bluetool 发射信号- 主窗口类接收信号 - 当前函数处理 - 调用数据解析模块 - 返回嵌套字典 - 打印字典
 
