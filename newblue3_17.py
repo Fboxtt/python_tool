@@ -14,15 +14,17 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QPixmap, QFont
 from bleak import BleakScanner, BleakClient
 from qasync import QEventLoop, asyncSlot
+import serial.tools.list_ports
+from PyQt6 import uic
+from log_controller import LogManager
+from PyQt6.QtCore import pyqtSignal
+
+
 from hex_model import HexFileModel
 from OTA_controller import OtaController
 from OTA_controller import TextDecode
 from OTA_controller import ReceveDataStatus,BmsCmdType,ComStatus,DownloadErr
-import serial.tools.list_ports
-from PyQt6 import uic
-from log_controller import LogManager
-
-
+from struct_model import HexParserApp
 # class MainWindow(QMainWindow):
 #     """主窗口（一级窗口）"""
 #     def __init__(self):
@@ -863,10 +865,19 @@ class load_ui_dynamically(QMainWindow):
             self.pushButton_6.clicked.connect(self.bluetooth_tool.disconnect_device)
             # self.pushButton_2.clicked.connect()
 
+            # 分配监控按钮
+            # self.pushButton_6.clicked.connect(lambda: asyncio.create_task(self.bluetooth_tool.show()))
+            receive_data_signal = pyqtSignal(str)
+            receive_data_signal.connect(self.display_log)
+
+
             self.mainWindowTextEdit.clear()
             self.mainWindowTextEdit.setReadOnly(True)
             self.mainWindowTextEdit.setFontFamily("Courier New")  # 使用等宽字体
-            
+            # 初始化数据解析模块  
+            self.download_data = HexParserApp()
+
+
             # 初始化日志管理器
             self.logger = LogManager.get_instance()
             self.logger.write_log("UI文件加载成功")
@@ -878,8 +889,18 @@ class load_ui_dynamically(QMainWindow):
             print(f"加载UI文件失败: {e}")
             traceback.print_exc()
             # return None
-    def get_data_from_device(self):
-        """同步方法，从设备获取数据"""
+    def display_log(self, message):
+        """显示日志"""
+        self.mainWindowTextEdit.clear()
+        self.mainWindowTextEdit.append(message)
+        self.logger.write_log(message)
+
+    async def get_data_from_device(self, time_interval:int):
+        """异步方法，从设备获取数据"""
+        while 1:
+            await asyncio.sleep(time_interval)
+            #发送0x41命令
+            self.bluetooth_tool.send_command(bytes([0x00,0x00,0x04,0x01,0x0c,0x55,0xaa,0x10]))
         #方法1 bluetool 函数发送发射信号- 主窗口类接收信号 - 当前函数处理 - 调用数据解析模块 - 返回嵌套字典
         #方法1。1 bluetool 发射信号- 主窗口类接收信号 - 当前函数处理 - 调用数据解析模块 - 返回嵌套字典 - 打印字典
 

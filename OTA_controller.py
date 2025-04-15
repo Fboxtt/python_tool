@@ -258,7 +258,48 @@ class TextDecode:
         if self.legality == ERR_NO:
             print(f"cmd = 0x{self.cmd:02x} cmd_ack = 0x{self.cmd_ack:02x} cmd_data_len = {self.data_len}")
         return
-    
+    def send_hex_fill(self, cmd_type, data_array = bytearray()) -> bytearray:
+        """获取下载数据包
+        
+        根据命令类型和包ID生成下载数据包:
+        1. WRITE_FLASH命令: 生成包含包ID、总包数和数据的数据包
+        2. REC_TOTAL_CHECKSUM命令: 生成包含总校验和的数据包
+        
+        数据包格式:
+        [0x00][长度高字节][长度低字节][单板类型][命令类型][0x55][0xAA][数据][校验和]
+        
+        Args:
+            cmd_type: 命令类型(WRITE_FLASH或REC_TOTAL_CHECKSUM)
+            packet_id: 数据包ID,默认为0
+            
+        Returns:
+            生成的数据包字节数组,如果packet_id超出范围则返回None
+        """
+        send_data_array = bytearray()
+        data_array = bytearray()
+        
+        # 构建头部
+            
+        data_array_length = len(data_array)
+        
+        # 构建头部
+        send_data_array.extend([0x00])
+        send_data_array.extend([(data_array_length >> 8) & 0xFF])
+        send_data_array.extend([data_array_length & 0xFF])
+        send_data_array.extend([0x01])  # 单板类型
+        send_data_array.extend([cmd_type & 0xFF])
+        send_data_array.extend([0x55])
+        send_data_array.extend([0xAA])
+        send_data_array.extend(data_array)
+        
+        # 计算校验和
+        check_sum = ((data_array_length >> 8) & 0xFF) + (data_array_length & 0xFF) + 0x01 + (cmd_type & 0xFF) + 0x55 + 0xAA
+        for byte in data_array:
+            check_sum += byte
+        
+        send_data_array.extend(bytearray([check_sum & 0xFF]))
+        # print(f"Hex: {send_data_array.hex()}") 
+        return send_data_array
 
 if __name__ == "__main__":
     # cmd = bytearray([0x00,0x00, 0x07, 0x01, 0xf7, 0x55 , 0xaa, 0x8a, 0x00, 0x88])
@@ -273,7 +314,11 @@ if __name__ == "__main__":
     # print(f"data_len = {dcode0.data_len}")
 
     download_controller = OtaController()
+    filedata = TextDecode()
     # download_controller.start_download(dcode0)
+    print(filedata.send_hex_fill(0x41))
+    while 1:
+        time.sleep(0.01)    
     hex_data = bytearray(1000)
     download_controller.hex_init(hex_data)
     print(f"packet num = ", download_controller.packet_num)
