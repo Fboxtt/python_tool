@@ -52,6 +52,7 @@ class LogManager:
         if hasattr(self, 'log_file') and self.log_file:
             try:
                 # 获取当前时间
+                print(message)
                 current_time = datetime.datetime.now().strftime("%H:%M:%S.%f")[:-3]
                 
                 # 写入日志

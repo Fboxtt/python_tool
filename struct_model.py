@@ -146,15 +146,6 @@ STRUCT_COMMANDS = {
     "MCU_A_PRINT": 0x94,
 }
 
-STRUCT_GET_CMD = {
-    "PC_GET_BMS": bytes([STRUCT_COMMANDS["PC_GET_BMS"]]),
-    "PC_GET_KB": bytes([STRUCT_COMMANDS["PC_GET_KB"]]),
-    "PC_GET_OCP_DELAYTIME": bytes([STRUCT_COMMANDS["PC_GET_OCP_DELAYTIME"]]),
-    "PC_GET_CELL_CAP_PARA": bytes([STRUCT_COMMANDS["PC_GET_CELL_CAP_PARA"]]),
-    "PC_GET_MOSHTDATA": bytes([STRUCT_COMMANDS["PC_GET_MOSHTDATA"]]),
-    "PC_GET_LIFE_PARA": bytes([STRUCT_COMMANDS["PC_GET_LIFE_PARA"]])
-}
-
 STRUCT_GET_CMD_NAME = {
     "PC_GET_BMS": "PC_GET_BMS",
     "PC_GET_KB": "PC_GET_KB",
@@ -164,23 +155,6 @@ STRUCT_GET_CMD_NAME = {
     "PC_GET_LIFE_PARA": "PC_GET_LIFE_PARA",
 }
 
-STRUCT_SET_CMD = {
-    "PC_GET_BMS": bytes([STRUCT_COMMANDS["PC_SET_BMS"]]),
-    "PC_GET_KB": bytes([STRUCT_COMMANDS["PC_SET_KB"]]),
-    "PC_GET_OCP_DELAYTIME": bytes([STRUCT_COMMANDS["PC_SET_OCP_DELAYTIME"]]),
-    "PC_GET_CELL_CAP_PARA": bytes([STRUCT_COMMANDS["PC_SET_CELL_CAP_PARA"]]),
-    "PC_GET_MOSHTDATA": bytes([STRUCT_COMMANDS["PC_SET_MOSHTDATA"]]),
-    "PC_GET_LIFE_PARA": bytes([STRUCT_COMMANDS["PC_SET_LIFE_PARA"]])
-}
-
-STRUCT_SET_CMD_NAME = {
-    "PC_GET_BMS": "PC_SET_BMS",
-    "PC_GET_KB": "PC_SET_KB",
-    "PC_GET_OCP_DELAYTIME": "PC_SET_OCP_DELAYTIME",
-    "PC_GET_CELL_CAP_PARA": "PC_SET_CELL_CAP_PARA",
-    "PC_GET_MOSHTDATA": "PC_SET_MOSHTDATA",
-    "PC_GET_LIFE_PARA": "PC_SET_LIFE_PARA",
-}
 
 class HexParserApp(QMainWindow):
     def __init__(self):
@@ -306,6 +280,7 @@ class HexParserApp(QMainWindow):
                     struct_name = key
                     break
         else:
+            LogManager.get_instance().write_log(f"解析 {struct_name} 失败: 无当前命令")
             return None
         try:
             fmt = STRUCT_FORMATS[struct_name]
@@ -360,9 +335,8 @@ class HexParserApp(QMainWindow):
             parsed_data[struct_name] = display_data
             
         except Exception as e:
-            print(f"解析  失败: {str(e)}")
             traceback.print_exc()
-            # self.text_edit.append(f"解析 {struct_name} 失败: {str(e)}")
+            LogManager.get_instance().write_log(f"解析 {struct_name} 失败: {str(e)}")
             pass
         return parsed_data
 
