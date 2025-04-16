@@ -230,12 +230,12 @@ class TextDecode:
                 else:
                     self.data_hex = self.actual_hex[8:8 + self.data_len]
 
-            # 检查特殊命令的数据长度
-            if (self.no80_cmd not in [PC_SET_WRITE_FLASH, PC_SET_ALL_CHECKSUM, 
-                                    PC_SET_DOWNLOAD_BUFFER, PC_SET_DOWNLOAD_BACKUP]):
-                if self.actual_len != 9:
-                    self.legality = ERR_CMD_LEN
-                    raise Exception("命令长度错误")
+            # # 检查特殊命令的数据长度
+            # if (self.no80_cmd not in [PC_SET_WRITE_FLASH, PC_SET_ALL_CHECKSUM, 
+            #                         PC_SET_DOWNLOAD_BUFFER, PC_SET_DOWNLOAD_BACKUP]):
+            #     if self.actual_len != 9:
+            #         self.legality = ERR_CMD_LEN
+            #         raise Exception("命令长度错误")
 
             # 校验和检查
             if (self.check_sum & 0xFF) != (self.actual_hex[self.actual_len - 1] & 0xFF):
@@ -280,7 +280,7 @@ class TextDecode:
         
         # 构建头部
             
-        data_array_length = len(data_array)
+        data_array_length = len(data_array) + 4
         
         # 构建头部
         send_data_array.extend([0x00])
