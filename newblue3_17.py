@@ -18,7 +18,7 @@ import serial.tools.list_ports
 from PyQt6 import uic
 from log_controller import LogManager
 from PyQt6.QtCore import pyqtSignal
-
+from bleak.exc import BleakError
 
 from hex_model import HexFileModel
 from OTA_controller import OtaController
@@ -442,16 +442,16 @@ class BluetoothTool(QWidget):
         if self.hex_display_checkbox.isChecked():
             # 16进制显示
             hex_data = ' '.join([f'{b:02X}' for b in data])
-            self.blue_write_log(f"TX-> {current_time} 接收: {hex_data}")
+            self.blue_write_log(f"TX-> {current_time} 发送: {hex_data}")
         else:
             # 文本显示
             try:
                 text_data = data.decode('utf-8')
-                self.blue_write_log(f"TX-> {current_time} 接收: {text_data}")
+                self.blue_write_log(f"TX-> {current_time} 发送: {text_data}")
             except UnicodeDecodeError:
                 # 如果无法解码为文本，则显示16进制
                 hex_data = ' '.join([f'{b:02X}' for b in data])
-                self.blue_write_log(f"TX-> {current_time} 接收(HEX): {hex_data}")
+                self.blue_write_log(f"TX-> {current_time} 发送(HEX): {hex_data}")
 
     def on_scan_devices_clicked(self):
         """同步方法，用于触发异步扫描"""
@@ -760,9 +760,11 @@ class BluetoothTool(QWidget):
                     print(f"数据发送完成")
                     break
                 else:
-                    err_count = 0
-                    while err_count < 5:
-                        try:
+                    try:
+                        err_count = 0
+                        while err_count < 5:
+                            self.display_send_data(data)
+                            print("开始发送----------------")
                             await self.byte_send(data)
                             # current_time = datetime.now().strftime("%H:%M:%S.%f")[:-3]
                             # self.blue_write_log(f"TX->数据包发送完成 - 时间: {current_time}")
@@ -773,13 +775,21 @@ class BluetoothTool(QWidget):
                                 break
                             else:
                                 err_count += 1
-                        except Exception as e:
-                            traceback.print_exc()
-                            err_count += 1
+                        else:
+                            print(f"数据发送失败")
+                            raise Exception("writeflash次数超限")
+
+                    except BleakError:
+                        print(f"蓝牙断开------------------")
+                        # traceback.print_exc()
+                        raise Exception("蓝牙断开")
+                    except Exception as e:
+                        print(f"有错误------------------")
+                        traceback.print_exc()
                     else:
-                        print(f"数据发送失败")
-                        raise Exception("数据发送失败")
-                        break
+                        print(f"没有错误-----------------")
+
+
             err_count = 0   
             while err_count < 5:
                 data = self.download_data.get_download_data(BmsCmdType.REC_TOTAL_CHECKSUM)
@@ -980,6 +990,8 @@ class load_ui_dynamically(QMainWindow):
         
         # 如果没有连接需要断开，接受事件并正常关闭
         event.accept()
+
+
 
 # 程序入口
 if __name__ == '__main__':
