@@ -452,11 +452,6 @@ class BluetoothTool(QWidget):
                 # 如果无法解码为文本，则显示16进制
                 hex_data = ' '.join([f'{b:02X}' for b in data])
                 self.blue_write_log(f"TX-> {current_time} 接收(HEX): {hex_data}")
-    # def closeEvent(self, event):
-    #     """重写关闭事件，退出时断开蓝牙连接"""
-    #     if self.client and self.client.is_connected:
-    #         asyncio.create_task(self.disconnect_device())
-    #     event.accept()
 
     def on_scan_devices_clicked(self):
         """同步方法，用于触发异步扫描"""
@@ -469,6 +464,7 @@ class BluetoothTool(QWidget):
     def on_disconnect_device_clicked(self):
         """同步方法，用于触发异步断开连接"""
         asyncio.create_task(self.disconnect_device())
+        asyncio.create_task(self.disconnect_serial())
 
     def on_send_data_clicked(self):
         """同步方法，用于触发异步发送数据"""
@@ -859,7 +855,7 @@ class BluetoothTool(QWidget):
 # 修正后的函数 - 注意这是一个函数，不是类
 class load_ui_dynamically(QMainWindow):
     receive_data_signal = pyqtSignal(str)
-
+    scan_task = None
     def __init__(self, ui_file):
         super().__init__()
         try:
@@ -869,11 +865,11 @@ class load_ui_dynamically(QMainWindow):
             self.bluetooth_tool = BluetoothTool()
             self.bluetooth_tool.setWindowModality(Qt.WindowModality.ApplicationModal)
             self.pushButton.clicked.connect(self.bluetooth_tool.show)
-            self.pushButton_6.clicked.connect(self.bluetooth_tool.disconnect_device)
+            self.pushButton_6.clicked.connect(self.disconnect_device)
             # self.pushButton_2.clicked.connect()
 
             # 分配监控按钮
-            self.pushButton_4.clicked.connect(lambda: asyncio.create_task(self.get_data_from_device(1)))
+            self.pushButton_4.clicked.connect(self.start_scan_task)
             self.receive_data_signal.connect(self.display_log)
 
 
@@ -895,12 +891,20 @@ class load_ui_dynamically(QMainWindow):
             print(f"加载UI文件失败: {e}")
             traceback.print_exc()
             # return None
+    def disconnect_device(self):
+        """断开连接"""
+        if self.scan_task:
+            self.scan_task.cancel()
+        self.bluetooth_tool.on_disconnect_device_clicked()
+
     def display_log(self, message):
         """显示日志"""
         self.mainWindowTextEdit.clear()
         self.mainWindowTextEdit.append(message)
         self.logger.write_log(message)
-
+    def start_scan_task(self):
+        """启动扫描任务"""
+        self.scan_task = asyncio.create_task(self.get_data_from_device(1))
     async def get_data_from_device(self, time_interval:int = 1):
         """异步方法，从设备获取数据"""
         print(f"进入发送0x41命令函数")
