@@ -904,7 +904,8 @@ class load_ui_dynamically(QMainWindow):
     def disconnect_device(self):
         """断开连接"""
         if self.scan_task:
-            self.scan_task.cancel()
+            self.start_scan_task() # 停止监控
+
         self.bluetooth_tool.on_disconnect_device_clicked()
 
     def display_log(self, message):
@@ -912,9 +913,18 @@ class load_ui_dynamically(QMainWindow):
         self.mainWindowTextEdit.clear()
         self.mainWindowTextEdit.append(message)
         self.logger.write_log(message)
+
     def start_scan_task(self):
         """启动扫描任务"""
-        self.scan_task = asyncio.create_task(self.get_data_from_device(1))
+        if not self.scan_task:
+            print("启动扫描任务")
+            self.pushButton_4.setText("停止监控")
+            self.scan_task = asyncio.create_task(self.get_data_from_device(1))
+        else:
+            self.scan_task.cancel()
+            self.pushButton_4.setText("开始监控")
+            self.scan_task = None
+
     async def get_data_from_device(self, time_interval:int = 1):
         """异步方法，从设备获取数据"""
         print(f"进入发送0x41命令函数")
@@ -927,6 +937,7 @@ class load_ui_dynamically(QMainWindow):
             except Exception as e:
                 if str(e) == "未连接到设备":
                     self.bluetooth_tool.blue_write_log(f"获取数据失败: {e}")
+                    self.pushButton_4.setText("开始监控")
                     traceback.print_exc()
                     break
                 else:
