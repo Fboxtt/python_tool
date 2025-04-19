@@ -17,6 +17,7 @@ from qasync import QEventLoop, asyncSlot
 import serial.tools.list_ports
 from PyQt6 import uic
 from log_controller import LogManager
+from log_controller import ComunManager
 from PyQt6.QtCore import pyqtSignal
 from bleak.exc import BleakError
 
@@ -284,6 +285,8 @@ class BluetoothTool(QWidget):
         self.setLayout(layout)
         
     def blue_write_log(self,text):
+        """写入日志"""
+        print(text)
         self.receive_output.append(text)
         LogManager.get_instance().write_log(text)
 
@@ -425,33 +428,32 @@ class BluetoothTool(QWidget):
         current_time = datetime.now().strftime("%H:%M:%S.%f")[:-3]
         if self.hex_display_checkbox.isChecked():
             # 16进制显示
-            hex_data = ' '.join([f'{b:02X}' for b in data])
-            self.blue_write_log(f"RX-> {current_time} 接收: {hex_data}")
+            reve_data = ' '.join([f'{b:02X}' for b in data])
         else:
             # 文本显示
             try:
-                text_data = data.decode('utf-8')
-                self.blue_write_log(f"RX-> {current_time} 接收: {text_data}")
+                reve_data = data.decode('utf-8')
             except UnicodeDecodeError:
                 # 如果无法解码为文本，则显示16进制
-                hex_data = ' '.join([f'{b:02X}' for b in data])
-                self.blue_write_log(f"RX-> {current_time} 接收(HEX): {hex_data}")
+                reve_data = ' '.join([f'{b:02X}' for b in data])
+        self.blue_write_log(f"RX-> {current_time} 接收(HEX): {reve_data}")
+        ComunManager.get_instance().write_log(f"RX-> {current_time} 接收(HEX): {reve_data}")
+
     def display_send_data(self, data):
         """显示接收到的数据，根据16进制显示选项决定显示格式"""
         current_time = datetime.now().strftime("%H:%M:%S.%f")[:-3]
         if self.hex_display_checkbox.isChecked():
             # 16进制显示
-            hex_data = ' '.join([f'{b:02X}' for b in data])
-            self.blue_write_log(f"TX-> {current_time} 发送: {hex_data}")
+            send_data = ' '.join([f'{b:02X}' for b in data])
         else:
             # 文本显示
             try:
-                text_data = data.decode('utf-8')
-                self.blue_write_log(f"TX-> {current_time} 发送: {text_data}")
+                send_data = data.decode('utf-8')
             except UnicodeDecodeError:
                 # 如果无法解码为文本，则显示16进制
-                hex_data = ' '.join([f'{b:02X}' for b in data])
-                self.blue_write_log(f"TX-> {current_time} 发送(HEX): {hex_data}")
+                send_data = ' '.join([f'{b:02X}' for b in data])
+        self.blue_write_log(f"TX-> {current_time} 发送(HEX): {send_data}")
+        ComunManager.get_instance().write_log(f"TX-> {current_time} 发送: {send_data}")
 
     def on_scan_devices_clicked(self):
         """同步方法，用于触发异步扫描"""
@@ -719,11 +721,11 @@ class BluetoothTool(QWidget):
                     err_count += 1
                 else:
                     if err_count == 3:
-                        print(f"握手命令发送失败")
+                        self.blue_write_log(f"握手命令发送失败")
                         # raise Exception("握手命令发送失败")
                 shake_count += 1
             else:
-                print(f"握手命令发送成功")
+                self.blue_write_log(f"握手命令发送成功")
             self.text_decode.legality = ReceveDataStatus.ERR_NOTHING
 
 
@@ -737,12 +739,12 @@ class BluetoothTool(QWidget):
                 if self.text_decode.legality == ReceveDataStatus.ERR_NOTHING:
                     await asyncio.sleep(time512 * 4)
                 if(self.text_decode.no80_cmd == BmsCmdType.DOWNLOAD_BUFFER  and self.text_decode.cmd_ack == 0x00):
-                    print(f"擦除命令发送失败")
+                    self.blue_write_log(f"擦除命令发送失败")
                     break
                 else:
                     err_count += 1
             else:
-                print(f"擦除命令发送失败")
+                self.blue_write_log(f"擦除命令发送失败")
                 
             # while 
             
@@ -757,14 +759,14 @@ class BluetoothTool(QWidget):
             while 1:
                 data = self.download_data.get_download_data(BmsCmdType.WRITE_FLASH,hex_packet)
                 if(data == None):
-                    print(f"数据发送完成")
+                    self.blue_write_log(f"数据发送完成")
                     break
                 else:
                     try:
                         err_count = 0
                         while err_count < 5:
                             self.display_send_data(data)
-                            print("开始发送----------------")
+                            self.blue_write_log("开始发送----------------")
                             await self.byte_send(data)
                             # current_time = datetime.now().strftime("%H:%M:%S.%f")[:-3]
                             # self.blue_write_log(f"TX->数据包发送完成 - 时间: {current_time}")
@@ -776,18 +778,18 @@ class BluetoothTool(QWidget):
                             else:
                                 err_count += 1
                         else:
-                            print(f"数据发送失败")
+                            self.blue_write_log(f"数据发送失败")
                             raise Exception("writeflash次数超限")
 
                     except BleakError:
-                        print(f"蓝牙断开------------------")
+                        self.blue_write_log(f"蓝牙断开------------------")
                         # traceback.print_exc()
                         raise Exception("蓝牙断开")
                     except Exception as e:
-                        print(f"有错误------------------")
+                        self.blue_write_log(f"有错误------------------")
                         traceback.print_exc()
                     else:
-                        print(f"没有错误-----------------")
+                        self.blue_write_log(f"没有错误-----------------")
 
 
             err_count = 0   
@@ -847,7 +849,7 @@ class BluetoothTool(QWidget):
         bytedata = bytes([0x00,0x00,0x04,0x01,0x0D,0x55,0xaa,0x11])
         self.send_command(bytedata)
 
-    def send_command(self, command):
+    def send_command(self, command:bytes):
         """发送指令数据"""
         if self.client and self.client.is_connected:
             asyncio.create_task(self.byte_send(command))
@@ -896,9 +898,9 @@ class load_ui_dynamically(QMainWindow):
             
             # 连接按钮信号
             # self.pushButton.clicked.connect(self.close)  # 假设 pushButton 是一个关闭按钮
-            print(f"UI文件 {ui_file} 加载成功")
+            self.bluetooth_tool.blue_write_log(f"UI文件 {ui_file} 加载成功")
         except Exception as e:
-            print(f"加载UI文件失败: {e}")
+            self.bluetooth_tool.blue_write_log(f"加载UI文件失败: {e}")
             traceback.print_exc()
             # return None
     def disconnect_device(self):
@@ -917,7 +919,7 @@ class load_ui_dynamically(QMainWindow):
     def start_scan_task(self):
         """启动扫描任务"""
         if not self.scan_task:
-            print("启动扫描任务")
+            self.bluetooth_tool.blue_write_log("启动扫描任务")
             self.pushButton_4.setText("停止监控")
             self.scan_task = asyncio.create_task(self.get_data_from_device(1))
         else:
@@ -927,9 +929,9 @@ class load_ui_dynamically(QMainWindow):
 
     async def get_data_from_device(self, time_interval:int = 1):
         """异步方法，从设备获取数据"""
-        print(f"进入发送0x41命令函数")
+        self.bluetooth_tool.blue_write_log(f"进入发送0x41命令函数")
         while 1:
-            print(f"发送0x41命令")
+            self.bluetooth_tool.blue_write_log(f"发送0x41命令")
             try:
                 await asyncio.sleep(time_interval)
                 #发送0x41命令
@@ -958,9 +960,9 @@ class load_ui_dynamically(QMainWindow):
             try:
                 self.bluetooth_tool.write_log("程序关闭")
                 self.bluetooth_tool.log_file.close()
-                print("日志文件已关闭")
+                self.bluetooth_tool.blue_write_log("日志文件已关闭")
             except Exception as e:
-                print(f"关闭日志文件失败: {e}")
+                self.bluetooth_tool.blue_write_log(f"关闭日志文件失败: {e}")
 
         has_connection = False
         
@@ -977,15 +979,15 @@ class load_ui_dynamically(QMainWindow):
                     # 断开蓝牙连接
                     if self.bluetooth_tool.client and self.bluetooth_tool.client.is_connected:
                         await self.bluetooth_tool.disconnect_device()
-                        print("蓝牙已断开连接")
+                        self.bluetooth_tool.blue_write_log("蓝牙已断开连接")
                     
                     # 断开串口连接
                     if hasattr(self.bluetooth_tool, 'serial_port') and self.bluetooth_tool.serial_port and self.bluetooth_tool.serial_port.is_open:
                         self.bluetooth_tool.serial_port.close()
-                        print("串口已断开")
+                        self.bluetooth_tool.blue_write_log("串口已断开")
                     
                 except Exception as e:
-                    print(f"断开连接时出错: {e}")
+                    self.bluetooth_tool.blue_write_log(f"断开连接时出错: {e}")
                 
                 # 最后强制退出应用程序
                 # 使用QTimer确保这个调用发生在主事件循环中
@@ -1007,7 +1009,6 @@ class load_ui_dynamically(QMainWindow):
 # 程序入口
 if __name__ == '__main__':
     app = QApplication(sys.argv)
-
     # 创建并显示启动画面
     splash = SplashScreen()
     splash.show()
