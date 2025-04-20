@@ -88,6 +88,13 @@ class BluetoothTool(QWidget):
         self.download_data = OtaController()
         # asyncio.create_task(self.scan_devices())
         QTimer.singleShot(0, self.on_scan_devices_clicked)
+        # 初始化定时器
+        self.data_timer = QTimer()
+        self.data_timer.setSingleShot(True)
+        self.data_timer.timeout.connect(self.process_complete_data)
+
+        # 用于存储接收到的数据
+        self.received_data_buffer = bytearray()
     def initUI(self):
         self.setWindowTitle('蓝牙和串口连接工具')
 
@@ -644,20 +651,30 @@ class BluetoothTool(QWidget):
             await asyncio.sleep(time_interval)
             await self.client.write_gatt_char("0000ffe1-0000-1000-8000-00805f9b34fb", data[256:])
 
-    def on_data_received(self, sender, data):
+    async def on_data_received(self, sender, data):
         """回调函数，处理接收到的数据"""
-        if not hasattr(self, 'received_data_buffer'):
-            self.received_data_buffer = []
-            
-        # current_time = datetime.now().strftime("%H:%M:%S.%f")[:-3]
-        # self.blue_write_log(f"RX->数据包receive完成 - 时间: {current_time}")
-        self.received_data_buffer.append(data)
-        self.text_decode.split_data(data)
+        # 将数据添加到缓冲区
+        self.received_data_buffer.extend(data)
+
+        # 重启定时器
+        self.data_timer.start(100)  # 100ms
+
+    def process_complete_data(self):
+        """处理完整的数据包"""
+        # 在这里处理完整的数据包
+        print("Received complete data packet:", self.received_data_buffer)
+
+
+
+        # 处理数据
+        self.text_decode.split_data(self.received_data_buffer)
         if self.text_decode.have_hex:
             self.blue_write_log(f"收到命令{self.text_decode.no80_cmd},收到数据{self.text_decode.data_hex}")
             self.blue_write_log(f"发送信号给数据解析模块")
             self.receive_ok_signal.emit(self.text_decode.no80_cmd,bytes(self.text_decode.data_hex))
-        self.display_received_data(data)
+        self.display_received_data(self.received_data_buffer)
+        # 清空缓冲区
+        self.received_data_buffer.clear()
 
     def on_select_hex_file(self):
         """选择HEX文件并解析"""
