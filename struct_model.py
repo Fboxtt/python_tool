@@ -4,6 +4,8 @@ from PyQt6.QtCore import Qt
 import struct
 from intelhex import IntelHex
 from log_controller import LogManager
+from PyQt6.QtCore import pyqtSignal
+
 import traceback
 # ---------------------------- 结构体定义 ----------------------------
 # 注意：所有格式字符串均已展开为具体字符，确保顺序严格匹配
@@ -157,10 +159,11 @@ STRUCT_GET_CMD_NAME = {
 
 
 class HexParserApp(QMainWindow):
+    decode_data_ok_signal = pyqtSignal(int,dict)
+
     def __init__(self):
         super().__init__()
         self.initUI()
-
     def initUI(self):
         self.setWindowTitle("HEX 文件解析器")
         self.setGeometry(100, 100, 800, 600)
@@ -269,7 +272,7 @@ class HexParserApp(QMainWindow):
                 self.text_edit.append(f"解析 {struct_name} 失败: {str(e)}")
         
         return parsed_data
-    def decode_cmd_hex_data(self, cmd:bytes, data_bytes:bytearray):
+    def decode_cmd_hex_data(self, cmd:int, data_bytes:bytes):
         """
         严格按字节解析的增强版本
         """            
@@ -280,7 +283,7 @@ class HexParserApp(QMainWindow):
                     struct_name = key
                     break
         else:
-            LogManager.get_instance().write_log(f"解析 {struct_name} 失败: 无当前命令")
+            LogManager.get_instance().write_log(f"解析 {cmd:02X} 失败: 无当前命令")
             return None
         try:
             fmt = STRUCT_FORMATS[struct_name]
@@ -338,6 +341,8 @@ class HexParserApp(QMainWindow):
             traceback.print_exc()
             LogManager.get_instance().write_log(f"解析 {struct_name} 失败: {str(e)}")
             pass
+        LogManager.get_instance().write_log("发射dic信号")
+        self.decode_data_ok_signal.emit(cmd,parsed_data)
         return parsed_data
 
 
