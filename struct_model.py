@@ -298,7 +298,7 @@ class HexParserApp(QMainWindow):
             values = struct.unpack(fmt, data_bytes)
             # 转换为十六进制字符串
             hex_values = [f"0x{b:02X}" for b in data_bytes]
-            print(struct_name, data_bytes)
+            # print(struct_name, data_bytes)
             # print(type(hex_values))
             # print(type(hex_values[0]))
             # print(type(data_bytes))

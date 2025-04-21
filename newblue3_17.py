@@ -88,9 +88,9 @@ class BluetoothTool(QWidget):
         self.download_data = OtaController()
         # asyncio.create_task(self.scan_devices())
         QTimer.singleShot(0, self.on_scan_devices_clicked)
-        # 初始化定时器
+        # 初始化定时器 
         self.data_timer = QTimer()
-        self.data_timer.setSingleShot(True)
+        self.data_timer.setSingleShot(True) #单次定时器可能会影响实际数据接收数量上限
         self.data_timer.timeout.connect(self.process_complete_data)
 
         # 用于存储接收到的数据
@@ -444,8 +444,9 @@ class BluetoothTool(QWidget):
             except UnicodeDecodeError:
                 # 如果无法解码为文本，则显示16进制
                 reve_data = ' '.join([f'{b:02X}' for b in data])
-        self.blue_write_log(f"RX-> {current_time} 接收(HEX): {reve_data}")
-        ComunManager.get_instance().write_log(f"RX-> {current_time} 接收(HEX): {reve_data}")
+        self.receive_output.append(f"RX-> {current_time} log接收(HEX): {reve_data}")
+        LogManager.get_instance().write_log(f"RX-> {current_time} log接收(HEX): {reve_data}")
+        ComunManager.get_instance().write_log(f"RX-> {current_time} com接收(HEX): {reve_data}")
 
     def display_send_data(self, data):
         """显示接收到的数据，根据16进制显示选项决定显示格式"""
@@ -460,8 +461,8 @@ class BluetoothTool(QWidget):
             except UnicodeDecodeError:
                 # 如果无法解码为文本，则显示16进制
                 send_data = ' '.join([f'{b:02X}' for b in data])
-        self.blue_write_log(f"TX-> {current_time} 发送(HEX): {send_data}")
-        ComunManager.get_instance().write_log(f"TX-> {current_time} 发送: {send_data}")
+        self.blue_write_log(f"TX-> {current_time} log发送(HEX): {send_data}")
+        ComunManager.get_instance().write_log(f"TX-> {current_time} com发送(HEX): {send_data}")
 
     def on_scan_devices_clicked(self):
         """同步方法，用于触发异步扫描"""
@@ -662,14 +663,12 @@ class BluetoothTool(QWidget):
     def process_complete_data(self):
         """处理完整的数据包"""
         # 在这里处理完整的数据包
-        print("Received complete data packet:", self.received_data_buffer)
-
-
-
+        # self.blue_write_log(f"Received complete data packet: {self.received_data_buffer}")
+    
         # 处理数据
         self.text_decode.split_data(self.received_data_buffer)
         if self.text_decode.have_hex:
-            self.blue_write_log(f"收到命令{self.text_decode.no80_cmd},收到数据{self.text_decode.data_hex}")
+            # self.blue_write_log(f"收到命令{self.text_decode.no80_cmd},收到数据{self.text_decode.data_hex}")
             self.blue_write_log(f"发送信号给数据解析模块")
             self.receive_ok_signal.emit(self.text_decode.no80_cmd,bytes(self.text_decode.data_hex))
         self.display_received_data(self.received_data_buffer)
