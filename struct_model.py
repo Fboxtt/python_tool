@@ -7,6 +7,10 @@ from log_controller import LogManager
 from PyQt6.QtCore import pyqtSignal
 
 import traceback
+# Define constants at the top of your file
+CELL_COUNT = 16  # Adjust this value as needed
+TEMP_COUNT = 5   # Adjust this value as needed
+
 # ---------------------------- 结构体定义 ----------------------------
 # 注意：所有格式字符串均已展开为具体字符，确保顺序严格匹配
 STRUCT_FORMATS = {
@@ -26,7 +30,15 @@ STRUCT_FORMATS = {
     "PC_GET_OCP_DELAYTIME": "<HHHH",
     "PC_GET_CELL_CAP_PARA": "<LL",
     "PC_GET_MOSHTDATA": "<HHHH",
-    "PC_GET_LIFE_PARA": "<HHLLL"
+    "PC_GET_LIFE_PARA": "<HHLLL",
+    "PC_GET_SBS": "<LL"  # ulPackV, ulBattV
+        "HHHHHHHHHHHHHHHH"  # usCellV[CELL_COUNT]
+        "l"  # lCurrent
+        "hhhhh"  # sTemp[TEMP_COUNT]
+        "HHH"  # usRemainAH, usFccAH, usBiaAH
+        "LLLLL"  # ulOtherInfo, ulAlarmStatus, ulProtectStatus, ulFaultStatus, ulBalanceStatus
+        "HH"  # usBattStatus, usSOC_Percent
+        "LLL"  # ulSOH_Percent, ulDisTimes, ulTotalDisAH
 }
 
 STRUCT_ADDRESSES = {
@@ -84,6 +96,16 @@ STRUCT_VARIABLES = {
     "PC_GET_LIFE_PARA": [
         "usSOC_Percent", "reserved", "ulSOH_Percent",
         "ulRemainPointmAs", "lSingleDis_Ah"
+    ],
+    "PC_GET_SBS": [
+        "ulPackV", "ulBattV",
+        *[f"usCellV[{i}]" for i in range(16)],
+        "lCurrent",
+        *[f"sTemp[{i}]" for i in range(6)],
+        "usRemainAH", "usFccAH", "usBiaAH",
+        "ulOtherInfo", "ulAlarmStatus", "ulProtectStatus", "ulFaultStatus", "ulBalanceStatus",
+        "usBattStatus", "usSOC_Percent",
+        "ulSOH_Percent", "ulDisTimes", "ulTotalDisAH"
     ]
 }
 
@@ -148,14 +170,6 @@ STRUCT_COMMANDS = {
     "MCU_A_PRINT": 0x94,
 }
 
-STRUCT_GET_CMD_NAME = {
-    "PC_GET_BMS": "PC_GET_BMS",
-    "PC_GET_KB": "PC_GET_KB",
-    "PC_GET_OCP_DELAYTIME": "PC_GET_OCP_DELAYTIME",
-    "PC_GET_CELL_CAP_PARA": "PC_GET_CELL_CAP_PARA",
-    "PC_GET_MOSHTDATA": "PC_GET_MOSHTDATA",
-    "PC_GET_LIFE_PARA": "PC_GET_LIFE_PARA",
-}
 
 
 class HexParserApp(QMainWindow):

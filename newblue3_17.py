@@ -880,6 +880,9 @@ class BluetoothTool(QWidget):
         else:
             QMessageBox.warning(self, '警告', '未连接到设备')
             raise Exception("未连接到设备")
+    def send_sbs_cmd(self):
+        """发送sbs查询电池数据"""
+        self.send_command(self.text_decode.send_hex_fill(0x13))
     def send_life_time(self):
         """发送生命周期命令"""
         self.send_command(self.text_decode.send_hex_fill(0x41))
@@ -949,7 +952,7 @@ class load_ui_dynamically(QMainWindow):
         if not self.scan_task:
             self.bluetooth_tool.blue_write_log("启动扫描任务")
             self.pushButton_4.setText("停止监控")
-            self.scan_task = asyncio.create_task(self.get_data_from_device(1))
+            self.scan_task = asyncio.create_task(self.get_data_from_device(0.5))
         else:
             self.scan_task.cancel()
             self.pushButton_4.setText("开始监控")
@@ -964,15 +967,15 @@ class load_ui_dynamically(QMainWindow):
         self.mainWindowTextEdit.append(str(dict_data))
         self.bluetooth_tool.blue_write_log(f"{dict_data}")
 
-    async def get_data_from_device(self, time_interval:int = 1):
+    async def get_data_from_device(self, time_interval = 1):
         """异步方法，从设备获取数据"""
-        self.bluetooth_tool.blue_write_log(f"进入发送0x41命令函数")
+        self.bluetooth_tool.blue_write_log(f"进入发送0x13命令函数")
         while 1:
-            self.bluetooth_tool.blue_write_log(f"发送0x41命令")
+            self.bluetooth_tool.blue_write_log(f"发送0x13命令")
             try:
                 await asyncio.sleep(time_interval)
-                #发送0x41命令
-                self.bluetooth_tool.send_life_time()
+                #发送0x13命令
+                self.bluetooth_tool.send_sbs_cmd()
             except Exception as e:
                 if str(e) == "未连接到设备":
                     self.bluetooth_tool.blue_write_log(f"获取数据失败: {e}")
