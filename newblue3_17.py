@@ -2,6 +2,7 @@ import sys
 import asyncio
 import traceback
 import time
+import json
 from datetime import datetime
 import os
 
@@ -964,7 +965,8 @@ class load_ui_dynamically(QMainWindow):
     def get_dict_from_struct_model(self, cmd:bytes, dict_data:dict):
         """从结构模型中获取字典"""
         self.mainWindowTextEdit.clear()
-        self.mainWindowTextEdit.append(str(dict_data))
+        json_str = json.dumps(dict_data, sort_keys= True)
+        self.mainWindowTextEdit.append(json_str)
         self.bluetooth_tool.blue_write_log(f"{dict_data}")
 
     async def get_data_from_device(self, time_interval = 1):
@@ -1048,28 +1050,36 @@ class load_ui_dynamically(QMainWindow):
 
 # 程序入口
 if __name__ == '__main__':
-    app = QApplication(sys.argv)
-    # 创建并显示启动画面
-    splash = SplashScreen()
-    splash.show()
-    
-    # 设置事件循环
-    loop = QEventLoop(app)
-    asyncio.set_event_loop(loop)
-    # # 延迟启动主窗口
+    try:
+        app = QApplication(sys.argv)
+        # 创建并显示启动画面
+        splash = SplashScreen()
+        splash.show()
+        
+        # 设置事件循环
+        loop = QEventLoop(app)
+        asyncio.set_event_loop(loop)
+        # # 延迟启动主窗口
 
-    # 方法3: 动态加载（推荐）
-    window = load_ui_dynamically('测试上位机.ui')
-    
-    if window:
-        QTimer.singleShot(500, lambda: (splash.finish(window), window.show()))
-        # window.show()
-    else:
-        # 加载失败时显示错误消息
-        QMessageBox.critical(None, '错误', 'UI文件加载失败')
+        # 方法3: 动态加载（推荐）
+        window = load_ui_dynamically('测试上位机.ui')
+        
+        if window:
+            QTimer.singleShot(500, lambda: (splash.finish(window), window.show()))
+            # window.show()
+        else:
+            # 加载失败时显示错误消息
+            QMessageBox.critical(None, '错误', 'UI文件加载失败')
+            traceback.print_exc()
+            sys.exit(1)
+        
+        # 运行事件循环
+        with loop:
+            loop.run_forever()
+    except Exception as e:
+        error_msg = traceback.format_exc()  # 获取 traceback 字符串\
+        LogManager.get_instance.write_log(str(e))
+        LogManager.get_instance.write_log(error_msg)
         traceback.print_exc()
         sys.exit(1)
-    
-    # 运行事件循环
-    with loop:
-        loop.run_forever()
+
