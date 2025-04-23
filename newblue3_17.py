@@ -436,7 +436,6 @@ class BluetoothTool(QWidget):
 
     def display_received_data(self, data):
         """显示接收到的数据，根据16进制显示选项决定显示格式"""
-        current_time = datetime.now().strftime("%H:%M:%S.%f")[:-3]
         if self.hex_display_checkbox.isChecked():
             # 16进制显示
             reve_data = ' '.join([f'{b:02X}' for b in data])
@@ -446,14 +445,10 @@ class BluetoothTool(QWidget):
                 reve_data = data.decode('utf-8')
             except UnicodeDecodeError:
                 # 如果无法解码为文本，则显示16进制
-                reve_data = ' '.join([f'{b:02X}' for b in data])
-        self.receive_output.append(f"RX-> {current_time} log接收(HEX): {reve_data}")
-        LogManager.get_instance().write_log(f"RX-> {current_time} log接收(HEX): {reve_data}")
-        # ComunManager.get_instance().write_log(f"RX-> {current_time} com接收(HEX): {reve_data}")
-
+                reve_data = ' '.join([f'{b:02X}' for b in data])  
+        self.blue_write_log(f"RX->,cmd,commu_type,device_name,{reve_data}")
     def display_send_data(self, data):
         """显示接收到的数据，根据16进制显示选项决定显示格式"""
-        current_time = datetime.now().strftime("%H:%M:%S.%f")[:-3]
         if self.hex_display_checkbox.isChecked():
             # 16进制显示
             send_data = ' '.join([f'{b:02X}' for b in data])
@@ -464,8 +459,7 @@ class BluetoothTool(QWidget):
             except UnicodeDecodeError:
                 # 如果无法解码为文本，则显示16进制
                 send_data = ' '.join([f'{b:02X}' for b in data])
-        self.blue_write_log(f"TX-> {current_time} log发送(HEX): {send_data}")
-        ComunManager.get_instance().write_log(f"TX-> {current_time} com发送(HEX): {send_data}")
+        self.blue_write_log(f"TX->,cmd,commu_type,device_address,{send_data}")
 
     def on_scan_devices_clicked(self):
         """同步方法，用于触发异步扫描"""
@@ -671,19 +665,21 @@ class BluetoothTool(QWidget):
         # 处理数据
         self.text_decode.split_data(self.received_data_buffer)
         if self.text_decode.have_hex:
-            # self.blue_write_log(f"收到命令{self.text_decode.no80_cmd},收到数据{self.text_decode.data_hex}")
             self.blue_write_log(f"发送信号给数据解析模块")
-            # self.receive_ok_signal.emit(self.text_decode.no80_cmd,bytes(self.text_decode.data_hex))
             struct_name,dict_data = self.hex_parser.decode_cmd_hex_data(self.text_decode.no80_cmd,bytes(self.text_decode.data_hex))
             if self.client:
-                commu_type = "蓝牙"
+                commu_type = "bluetooth"
             elif self.serial_port:
-                commu_type = "串口"
+                commu_type = "serial"
             else:
-                commu_type = "未知"
+                commu_type = "none"
             if dict_data:
-                header = f"TX,{struct_name},{commu_type},{self.client.address}"
+                header = f"RX->,{struct_name},{commu_type},{self.client.address}"
+                """csv记录监控数据"""
+                """外部窗口展示 监控数据 |字典数据|纯参数数据|"""
                 self.decode_data_ok_signal.emit(header,dict_data)
+        """log记录调试数据"""
+        """内部窗口展示 调试数据 |hex数据|字符串数据|"""
         self.display_received_data(self.received_data_buffer)
         # 清空缓冲区
         self.received_data_buffer.clear()
@@ -976,8 +972,15 @@ class load_ui_dynamically(QMainWindow):
         json_str = json.dumps(dict_data, sort_keys= True)
         self.mainWindowTextEdit.append(json_str)
         self.bluetooth_tool.blue_write_log(f"{header},{dict_data}")
-        ComunManager.get_instance().write_log(f"{header},{dict_data}")
-
+        csv_data_str = ""
+        try:
+            for list in dict_data.values():
+                for value in list:
+                    csv_data_str += value[2] + ","
+        except Exception as e:
+            self.bluetooth_tool.blue_write_log(f"写入日志失败: {e}")
+            traceback.print_exc()
+        ComunManager.get_instance().write_log(f"{header},{csv_data_str[:-1]}")
     async def get_data_from_device(self, time_interval = 1):
         """异步方法，从设备获取数据"""
         self.bluetooth_tool.blue_write_log(f"进入发送0x13命令函数")

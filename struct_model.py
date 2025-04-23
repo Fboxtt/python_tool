@@ -298,14 +298,14 @@ class HexParserApp(QMainWindow):
                     break
         else:
             LogManager.get_instance().write_log(f"解析 {cmd:02X} 失败: 无当前命令")
-            return None
+            return None,None
         try:
             fmt = STRUCT_FORMATS[struct_name]
             size = struct.calcsize(fmt)
             if size != len(data_bytes):
                 print(f"解析 {struct_name} 失败: 数据长度不匹配")
                 LogManager.get_instance().write_log(f"解析 {struct_name} 失败: 数据长度不匹配")
-                return None
+                return None,None
             # 读取原始字节
             # data_bytes = ih.tobinstr(start=address, size=size)
             # 解析为元组

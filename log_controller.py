@@ -109,9 +109,6 @@ class ComunManager:
             print(f"通讯数据文件已初始化: {log_file_path}")
             
             # 写入通讯数据头部信息
-            self.log_file.write(f"\n{'='*50}\n")
-            self.log_file.write(f"通讯数据开始时间: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
-            self.log_file.write(f"{'='*50}\n\n")
             self.log_file.flush()  # 立即写入文件
             
         except Exception as e:
