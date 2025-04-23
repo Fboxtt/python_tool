@@ -82,6 +82,7 @@ class BluetoothTool(QWidget):
         self.client = None  # 当前连接的蓝牙设备
         self.connection_type = None  # 用于存储连接类型
         self.serial_port = None  # 串口对象
+        self.comun_type = None
         self.is_serial_connected = False
         self.serial_receive_task = None
         self.initUI()
@@ -334,6 +335,7 @@ class BluetoothTool(QWidget):
                 )
 
                 if self.serial_port.is_open:
+                    self.comun_type = "serial"
                     self.is_serial_connected = True
                     self.serial_connect_button.setText('断开串口')
                     self.blue_write_log(f"串口 {port} 连接成功")
@@ -346,21 +348,24 @@ class BluetoothTool(QWidget):
                 self.blue_write_log(f"串口连接失败: {str(e)}")
         else:
             # 断开连接
-            asyncio.create_task(self.disconnect_serial())
+            # asyncio.create_task(self.disconnect_serial())
+            if self.serial_receive_task:
+                self.serial_receive_task.cancel()
+                self.serial_receive_task = None
+            
+            if self.serial_port and self.serial_port.is_open:
+                self.serial_port.close()
+                self.comun_type = "none"
+            
+            self.is_serial_connected = False
+            self.serial_connect_button.setText('连接串口')
+            self.disable_serial_settings(False)
+            self.blue_write_log("串口已断开")
 
     async def disconnect_serial(self):
         """断开串口连接"""
-        if self.serial_receive_task:
-            self.serial_receive_task.cancel()
-            self.serial_receive_task = None
-        
-        if self.serial_port and self.serial_port.is_open:
-            self.serial_port.close()
-        
-        self.is_serial_connected = False
-        self.serial_connect_button.setText('连接串口')
-        self.disable_serial_settings(False)
-        self.blue_write_log("串口已断开")
+        pass
+
 
     def disable_serial_settings(self, disabled: bool):
         """禁用/启用串口设置控件"""
@@ -520,6 +525,7 @@ class BluetoothTool(QWidget):
             try:
                 self.client = BleakClient(device_address)
                 await self.client.connect()
+                self.comun_type = "bluetooth"
                 # 创建消息框实例
                 connectMessage = QMessageBox(QMessageBox.Icon.Information, '连接成功', f'已连接到 {device_address}')
                 # 设置定时器自动关闭 (3000毫秒后)
@@ -533,6 +539,7 @@ class BluetoothTool(QWidget):
                 if self.client and self.client.is_connected:
                     await self.client.start_notify("0000ffe1-0000-1000-8000-00805f9b34fb", self.on_data_received)
             except Exception as e:
+                self.comun_type = "none"
                 QMessageBox.critical(self, '连接失败', str(e))
         else:
             QMessageBox.warning(self, '警告', '请先选择一个设备')
@@ -556,6 +563,7 @@ class BluetoothTool(QWidget):
                 self.disconnect_button.setEnabled(False)
                 self.send_button.setEnabled(False)
                 self.client = None
+                self.comun_type = "none"
             except Exception as e:
                 QMessageBox.critical(self, '断开失败', str(e))
         else:
@@ -980,7 +988,7 @@ class load_ui_dynamically(QMainWindow):
         except Exception as e:
             self.bluetooth_tool.blue_write_log(f"写入日志失败: {e}")
             traceback.print_exc()
-        ComunManager.get_instance().write_log(f"{header},{csv_data_str[:-1]}")
+        ComunManager.get_instance().write_csv(f"{header},{csv_data_str[:-1]}")
     async def get_data_from_device(self, time_interval = 1):
         """异步方法，从设备获取数据"""
         self.bluetooth_tool.blue_write_log(f"进入发送0x13命令函数")

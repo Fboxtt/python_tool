@@ -86,7 +86,7 @@ class ComunManager:
         """初始化通讯数据文件，创建log文件夹并按日期生成通讯数据文件"""
         # 获取当前日期作为文件名
         current_date = datetime.datetime.now().strftime("%Y-%m-%d")
-        log_filename = f"{current_date}.log"
+        log_filename = f"{current_date}.csv"
         
         # 设置通讯数据文件夹路径
         log_dir = os.path.join(os.getcwd(), "communication")
@@ -114,7 +114,7 @@ class ComunManager:
         except Exception as e:
             print(f"打开通讯数据文件失败: {e}")
 
-    def write_log(self, message):
+    def write_csv(self, message):
         """写入通讯数据信息"""
         """|时间|方向|命令|通讯方式|设备|数据"""
         if hasattr(self, 'log_file') and self.log_file:
@@ -133,7 +133,7 @@ class ComunManager:
         """关闭通讯数据文件"""
         if hasattr(self, 'log_file') and self.log_file:
             try:
-                self.write_log("程序关闭")
+                self.write_csv("程序关闭")
                 self.log_file.close()
                 print("通讯数据文件已关闭")
             except Exception as e:
