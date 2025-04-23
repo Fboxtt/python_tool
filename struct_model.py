@@ -288,7 +288,7 @@ class HexParserApp(QMainWindow):
         return parsed_data
     def decode_cmd_hex_data(self, cmd:int, data_bytes:bytes):
         """
-        严格按字节解析的增强版本
+        把二进制数据转换成字典数据
         """            
         parsed_data = {}
         if cmd in STRUCT_COMMANDS.values():
@@ -356,8 +356,8 @@ class HexParserApp(QMainWindow):
             LogManager.get_instance().write_log(f"解析 {struct_name} 失败: {str(e)}")
             pass
         LogManager.get_instance().write_log("发射dic信号")
-        self.decode_data_ok_signal.emit(cmd,parsed_data)
-        return parsed_data
+        # self.decode_data_ok_signal.emit(commuclass,cmd,parsed_data)
+        return struct_name,parsed_data
 
 
 

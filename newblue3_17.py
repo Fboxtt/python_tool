@@ -74,6 +74,7 @@ class SplashScreen(QSplashScreen):
 # 修改现有的BluetoothTool类为二级窗口
 class BluetoothTool(QWidget):
     receive_ok_signal = pyqtSignal(int,bytes)
+    decode_data_ok_signal = pyqtSignal(str,dict)
     task_flag = 0
     pass
     def __init__(self):
@@ -87,6 +88,7 @@ class BluetoothTool(QWidget):
         self.hex_model = HexFileModel()
         self.text_decode = TextDecode()
         self.download_data = OtaController()
+        self.hex_parser = HexParserApp()
         # asyncio.create_task(self.scan_devices())
         QTimer.singleShot(0, self.on_scan_devices_clicked)
         # 初始化定时器 
@@ -447,7 +449,7 @@ class BluetoothTool(QWidget):
                 reve_data = ' '.join([f'{b:02X}' for b in data])
         self.receive_output.append(f"RX-> {current_time} log接收(HEX): {reve_data}")
         LogManager.get_instance().write_log(f"RX-> {current_time} log接收(HEX): {reve_data}")
-        ComunManager.get_instance().write_log(f"RX-> {current_time} com接收(HEX): {reve_data}")
+        # ComunManager.get_instance().write_log(f"RX-> {current_time} com接收(HEX): {reve_data}")
 
     def display_send_data(self, data):
         """显示接收到的数据，根据16进制显示选项决定显示格式"""
@@ -671,7 +673,17 @@ class BluetoothTool(QWidget):
         if self.text_decode.have_hex:
             # self.blue_write_log(f"收到命令{self.text_decode.no80_cmd},收到数据{self.text_decode.data_hex}")
             self.blue_write_log(f"发送信号给数据解析模块")
-            self.receive_ok_signal.emit(self.text_decode.no80_cmd,bytes(self.text_decode.data_hex))
+            # self.receive_ok_signal.emit(self.text_decode.no80_cmd,bytes(self.text_decode.data_hex))
+            struct_name,dict_data = self.hex_parser.decode_cmd_hex_data(self.text_decode.no80_cmd,bytes(self.text_decode.data_hex))
+            if self.client:
+                commu_type = "蓝牙"
+            elif self.serial_port:
+                commu_type = "串口"
+            else:
+                commu_type = "未知"
+            if dict_data:
+                header = f"TX,{struct_name},{commu_type},{self.client.address}"
+                self.decode_data_ok_signal.emit(header,dict_data)
         self.display_received_data(self.received_data_buffer)
         # 清空缓冲区
         self.received_data_buffer.clear()
@@ -921,12 +933,8 @@ class load_ui_dynamically(QMainWindow):
             # 初始化电池状态查询
             self.pushButton_5.clicked.connect(self.bluetooth_tool.send_tbs_cmd)
 
-            # 初始化数据解析模块  
-            self.parser_data = HexParserApp()
-            self.parser_data.decode_data_ok_signal.connect(self.get_dict_from_struct_model)
-
-            # 初始化蓝牙数据接收发送信号给数据解析模块
-            self.bluetooth_tool.receive_ok_signal.connect(self.parser_data.decode_cmd_hex_data)
+            # 连接数据解析模块到主窗口
+            self.bluetooth_tool.decode_data_ok_signal.connect(self.get_dict_from_struct_model)
 
             # 初始化日志管理器
             self.logger = LogManager.get_instance()
@@ -962,12 +970,13 @@ class load_ui_dynamically(QMainWindow):
     def start_find_bat_status(self):
         self.bluetooth_tool.blue_write_log("查询一次电池状态")
 
-    def get_dict_from_struct_model(self, cmd:bytes, dict_data:dict):
+    def get_dict_from_struct_model(self, header:str, dict_data:dict):
         """从结构模型中获取字典"""
         self.mainWindowTextEdit.clear()
         json_str = json.dumps(dict_data, sort_keys= True)
         self.mainWindowTextEdit.append(json_str)
-        self.bluetooth_tool.blue_write_log(f"{dict_data}")
+        self.bluetooth_tool.blue_write_log(f"{header},{dict_data}")
+        ComunManager.get_instance().write_log(f"{header},{dict_data}")
 
     async def get_data_from_device(self, time_interval = 1):
         """异步方法，从设备获取数据"""

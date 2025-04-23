@@ -56,7 +56,7 @@ class LogManager:
                 current_time = datetime.datetime.now().strftime("%H:%M:%S.%f")[:-3]
                 
                 # 写入日志
-                self.log_file.write(f"[{current_time}] {message}\n")
+                self.log_file.write(f"[{current_time}],{message}\n")
                 self.log_file.flush()  # 立即写入文件
             except Exception as e:
                 print(f"写入日志失败: {e}")
@@ -119,6 +119,7 @@ class ComunManager:
 
     def write_log(self, message):
         """写入通讯数据信息"""
+        """|时间|方向|命令|通讯方式|设备|数据"""
         if hasattr(self, 'log_file') and self.log_file:
             try:
                 # 获取当前时间
@@ -126,7 +127,7 @@ class ComunManager:
                 current_time = datetime.datetime.now().strftime("%H:%M:%S.%f")[:-3]
                 
                 # 写入通讯数据
-                self.log_file.write(f"[{current_time}] {message}\n")
+                self.log_file.write(f"[{current_time}],{message}\n")
                 self.log_file.flush()  # 立即写入文件
             except Exception as e:
                 print(f"写入通讯数据失败: {e}")
