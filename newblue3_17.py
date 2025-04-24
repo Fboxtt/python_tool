@@ -452,7 +452,7 @@ class BluetoothTool(QWidget):
             except UnicodeDecodeError:
                 # 如果无法解码为文本，则显示16进制
                 reve_data = ' '.join([f'{b:02X}' for b in data])  
-        self.blue_write_log(f"RX->,cmd,{self.commu_type},{self.device_name},{reve_data}")
+        self.blue_write_log(f"RX->,{self.commu_type},{self.device_name},{reve_data},cmd")
     def display_send_data(self, data):
         """显示接收到的数据，根据16进制显示选项决定显示格式"""
         if self.hex_display_checkbox.isChecked():
@@ -678,7 +678,7 @@ class BluetoothTool(QWidget):
             self.blue_write_log(f"发送信号给数据解析模块")
             struct_name,dict_data = self.hex_parser.decode_cmd_hex_data(self.text_decode.no80_cmd,bytes(self.text_decode.data_hex))
             if dict_data:
-                header = f"RX->,{struct_name},{self.commu_type},{self.device_name}"
+                header = f"RX->,{self.commu_type},{self.device_name},{struct_name}"
                 """csv记录监控数据"""
                 """外部窗口展示 监控数据 |字典数据|纯参数数据|"""
                 self.decode_data_ok_signal.emit(header,dict_data) 
@@ -942,13 +942,8 @@ class load_ui_dynamically(QMainWindow):
             self.logger.write_log("UI文件加载成功")
             
             # 初始化结构体模型列表 到csv文件
-            self.struct_dict = self.bluetooth_tool.hex_parser.struct_name_value_dict
-            if ComunManager.get_instance().get_line_count() == 0:
-                for name, list in self.struct_dict.items():
-                    struct_str = f"数据方向,{name},通讯类型,设备名称"
-                    for value in list:
-                        struct_str += "," + value
-                    ComunManager.get_instance().write_csv(struct_str)
+            self.struct_list = self.bluetooth_tool.hex_parser.get_struct_name_list()
+            ComunManager.get_instance(self.struct_list)
 
             # 连接按钮信号
             # self.pushButton.clicked.connect(self.close)  # 假设 pushButton 是一个关闭按钮

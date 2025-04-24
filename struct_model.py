@@ -178,8 +178,7 @@ class HexParserApp(QMainWindow):
     def __init__(self):
         super().__init__()
         self.initUI()
-        self.struct_name_list = {}
-        self.struct_name_value_dict = STRUCT_VARIABLES
+        self.struct_name_list = []
     def initUI(self):
         self.setWindowTitle("HEX 文件解析器")
         self.setGeometry(100, 100, 800, 600)
@@ -202,7 +201,13 @@ class HexParserApp(QMainWindow):
         container = QWidget()
         container.setLayout(layout)
         self.setCentralWidget(container)
-
+    def get_struct_name_list(self):
+        for key, value in STRUCT_VARIABLES.items():
+            struct_str = key
+            for i in value:
+                struct_str += "," + i
+            self.struct_name_list.append(struct_str)
+        return self.struct_name_list
     def load_hex_file(self):
         # 打开文件对话框选择 HEX 文件
         file_path, _ = QFileDialog.getOpenFileName(self, "打开 HEX 文件", "", "(*.*);;HEX 文件 (*.hex)")

@@ -1,6 +1,6 @@
 import os
 import datetime
-
+import traceback
 class LogManager:
     _instance = None  # 类级别的变量，用于存储唯一实例
 
@@ -86,14 +86,14 @@ class ComunManager:
     _instance = None  # 类级别的变量，用于存储唯一实例
     line_count = 0
     @classmethod
-    def get_instance(cls):
+    def get_instance(cls,first_line:list = None):
         """获取 ComunManager 的唯一实例"""
         if cls._instance is None:
             cls._instance = ComunManager()
-            cls._instance.log_file_init()
+            cls._instance.log_file_init(first_line)
         return cls._instance
 
-    def log_file_init(self):
+    def log_file_init(self,first_line:list = None):
         """初始化通讯数据文件，创建log文件夹并按日期生成通讯数据文件，并检查文件行数"""
         # 获取当前日期作为文件名
         current_date = datetime.datetime.now().strftime("%Y-%m-%d")
@@ -130,10 +130,15 @@ class ComunManager:
             self.log_file = open(log_file_path, 'a', encoding='utf-8')
             print(f"通讯数据文件已初始化: {log_file_path}")
             
-            # 写入通讯数据头部信息
+            # 写入通讯数据头部信息 
+            if self.line_count <= 2:
+                for name_valiable in first_line:
+                    struct_str = f"时间,数据方向,通讯类型,设备名称,{name_valiable}"
+                    self.log_file.write(f"{struct_str}\n")
             self.log_file.flush()  # 立即写入文件
             
         except Exception as e:
+            traceback.print_exc()
             print(f"打开通讯数据文件失败: {e}")
 
     def write_csv(self, message):
@@ -148,7 +153,7 @@ class ComunManager:
                 # 写入通讯数据
                 self.log_file.write(f"[{current_time}],{message}\n")
                 self.log_file.flush()  # 立即写入文件
-                self.line_count += 1
+                # self.line_count += 1
             except Exception as e:
                 print(f"写入通讯数据失败: {e}")
     def get_line_count(self):
