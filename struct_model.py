@@ -101,7 +101,7 @@ STRUCT_VARIABLES = {
         "ulPackV", "ulBattV",
         *[f"usCellV[{i}]" for i in range(16)],
         "lCurrent",
-        *[f"sTemp[{i}]" for i in range(6)],
+        *[f"sTemp[{i}]" for i in range(5)],
         "usRemainAH", "usFccAH", "usBiaAH",
         "ulOtherInfo", "ulAlarmStatus", "ulProtectStatus", "ulFaultStatus", "ulBalanceStatus",
         "usBattStatus", "usSOC_Percent",
@@ -178,6 +178,8 @@ class HexParserApp(QMainWindow):
     def __init__(self):
         super().__init__()
         self.initUI()
+        self.struct_name_list = {}
+        self.struct_name_value_dict = STRUCT_VARIABLES
     def initUI(self):
         self.setWindowTitle("HEX 文件解析器")
         self.setGeometry(100, 100, 800, 600)

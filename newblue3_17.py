@@ -681,7 +681,8 @@ class BluetoothTool(QWidget):
                 header = f"RX->,{struct_name},{self.commu_type},{self.device_name}"
                 """csv记录监控数据"""
                 """外部窗口展示 监控数据 |字典数据|纯参数数据|"""
-                self.decode_data_ok_signal.emit(header,dict_data)
+                self.decode_data_ok_signal.emit(header,dict_data) 
+                # 发射到函数get_dict_from_struct_model(str,dict)
         """log记录调试数据"""
         """内部窗口展示 调试数据 |hex数据|字符串数据|"""
         self.display_received_data(self.received_data_buffer)
@@ -940,6 +941,15 @@ class load_ui_dynamically(QMainWindow):
             self.logger = LogManager.get_instance()
             self.logger.write_log("UI文件加载成功")
             
+            # 初始化结构体模型列表 到csv文件
+            self.struct_dict = self.bluetooth_tool.hex_parser.struct_name_value_dict
+            if ComunManager.get_instance().get_line_count() == 0:
+                for name, list in self.struct_dict.items():
+                    struct_str = f"数据方向,{name},通讯类型,设备名称"
+                    for value in list:
+                        struct_str += "," + value
+                    ComunManager.get_instance().write_csv(struct_str)
+
             # 连接按钮信号
             # self.pushButton.clicked.connect(self.close)  # 假设 pushButton 是一个关闭按钮
             self.bluetooth_tool.blue_write_log(f"UI文件 {ui_file} 加载成功")

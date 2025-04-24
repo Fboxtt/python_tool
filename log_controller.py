@@ -33,6 +33,17 @@ class LogManager:
         # 完整的日志文件路径
         log_file_path = os.path.join(log_dir, log_filename)
         
+        # 检查文件是否存在并计算行数
+        if os.path.exists(log_file_path):
+            try:
+                with open(log_file_path, 'r') as file:
+                    line_count = sum(1 for _ in file)
+                print(f"日志文件 {log_filename} 已存在，包含 {line_count} 行数据")
+            except Exception as e:
+                print(f"读取日志文件失败: {e}")
+        else:
+            print(f"日志文件 {log_filename} 不存在，将创建新文件")
+        
         # 以追加模式打开日志文件（如果文件不存在会自动创建）
         try:
             self.log_file = open(log_file_path, 'a', encoding='utf-8')
@@ -73,7 +84,7 @@ class LogManager:
 
 class ComunManager:
     _instance = None  # 类级别的变量，用于存储唯一实例
-
+    line_count = 0
     @classmethod
     def get_instance(cls):
         """获取 ComunManager 的唯一实例"""
@@ -83,7 +94,7 @@ class ComunManager:
         return cls._instance
 
     def log_file_init(self):
-        """初始化通讯数据文件，创建log文件夹并按日期生成通讯数据文件"""
+        """初始化通讯数据文件，创建log文件夹并按日期生成通讯数据文件，并检查文件行数"""
         # 获取当前日期作为文件名
         current_date = datetime.datetime.now().strftime("%Y-%m-%d")
         log_filename = f"{current_date}.csv"
@@ -100,10 +111,21 @@ class ComunManager:
                 print(f"创建通讯数据文件夹失败: {e}")
                 return None
         
-        # 完整的通讯数据文件路径
+        # 设置完整的日志文件路径
         log_file_path = os.path.join(log_dir, log_filename)
         
-        # 以追加模式打开通讯数据文件（如果文件不存在会自动创建）
+        # 检查文件是否存在并计算行数
+        if os.path.exists(log_file_path):
+            try:
+                with open(log_file_path, 'r') as file:
+                    self.line_count = sum(1 for _ in file)
+                print(f"日志文件 {log_filename} 已存在，包含 {self.line_count} 行数据")
+            except Exception as e:
+                print(f"读取日志文件失败: {e}")
+        else:
+            print(f"日志文件 {log_filename} 不存在，将创建新文件")
+        
+        # 打开文件进行写入（追加模式）
         try:
             self.log_file = open(log_file_path, 'a', encoding='utf-8')
             print(f"通讯数据文件已初始化: {log_file_path}")
@@ -126,9 +148,12 @@ class ComunManager:
                 # 写入通讯数据
                 self.log_file.write(f"[{current_time}],{message}\n")
                 self.log_file.flush()  # 立即写入文件
+                self.line_count += 1
             except Exception as e:
                 print(f"写入通讯数据失败: {e}")
-
+    def get_line_count(self):
+        """获取通讯数据文件行数"""
+        return self.line_count
     def close_log(self):
         """关闭通讯数据文件"""
         if hasattr(self, 'log_file') and self.log_file:
