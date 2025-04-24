@@ -5,6 +5,8 @@ import struct
 from intelhex import IntelHex
 from log_controller import LogManager
 from PyQt6.QtCore import pyqtSignal
+import json
+import os
 
 import traceback
 # Define constants at the top of your file
@@ -170,6 +172,14 @@ STRUCT_COMMANDS = {
     "MCU_A_PRINT": 0x94,
 }
 
+# 将所有字典组合成一个字典
+config_data = {
+    "STRUCT_FORMATS": STRUCT_FORMATS,
+    "STRUCT_ADDRESSES": STRUCT_ADDRESSES,
+    "STRUCT_VARIABLES": STRUCT_VARIABLES,
+    "STRUCT_COMMANDS": STRUCT_COMMANDS
+}
+
 
 
 class HexParserApp(QMainWindow):
@@ -178,7 +188,48 @@ class HexParserApp(QMainWindow):
     def __init__(self):
         super().__init__()
         self.initUI()
+        self.set_config_file()
         self.struct_name_list = []
+    def update_dict(self, target, source):
+        """递归更新字典"""
+        for key, value in source.items():
+            if isinstance(value, dict) and key in target:
+                self.update_dict(target[key], value)
+            else:
+                target[key] = value
+    def set_config_file(self):
+        # 配置文件路径
+        config_file_path = os.path.join(os.getcwd(), "default_config.json")
+
+        # 检查配置文件是否存在
+        if os.path.exists(config_file_path):
+            try:
+                # 读取现有配置文件
+                with open(config_file_path, 'r', encoding='utf-8') as config_file:
+                    existing_config = json.load(config_file)
+                
+                # 检查现有配置文件格式是否正确
+                if isinstance(existing_config, dict):
+                    # 比较现有配置文件与当前配置数据
+                    if existing_config != config_data:
+                        # 更新 config_data 为现有配置文件内容
+                        self.update_dict(config_data, existing_config)
+                    else:
+                        print("配置文件已存在且内容相同，无需更新")
+                else:
+                    print("配置文件格式不正确，使用当前配置数据")
+            except Exception as e:
+                traceback.print_exc()
+                print(f"读取配置文件失败: {e}")
+        else:
+            print("配置文件不存在，将创建新文件")
+
+        # 将字典写入 JSON 文件
+        with open(config_file_path, 'w', encoding='utf-8') as config_file:
+            json.dump(config_data, config_file, ensure_ascii=False, indent=4)
+
+        print(f"配置文件已生成或更新: {config_file_path}")
+        pass
     def initUI(self):
         self.setWindowTitle("HEX 文件解析器")
         self.setGeometry(100, 100, 800, 600)
@@ -372,7 +423,8 @@ if __name__ == "__main__":
     app = QApplication(sys.argv)
     window = HexParserApp()
     # print(window.send_hex_fill(0x41))
-    print(window.decode_cmd_hex_data(0x41,bytearray([0x01,0x02,0x03,0x04,0x05,0x06,0x07,0x08,0x09,0x0A,0x0B,0x0C,0x0D,0x0E,0x0F,0x10])))
+    # print(window.decode_cmd_hex_data(0x41,bytearray([0x01,0x02,0x03,0x04,0x05,0x06,0x07,0x08,0x09,0x0A,0x0B,0x0C,0x0D,0x0E,0x0F,0x10])))
     # window.show()
+    print(STRUCT_ADDRESSES)
     window.close()
     sys.exit(app.exec())
