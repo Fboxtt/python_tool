@@ -638,26 +638,34 @@ class BluetoothTool(QWidget):
         self.task_flag = False
 
     async def byte_send(self,data:bytes):
+        """异步方法，发送字节数据"""
+        self.text_decode.legality = ReceveDataStatus.ERR_NOTHING # 初始化数据解析状态
         if(len(data) == 0):
             return
-        if(not self.client or not self.client.is_connected):
-            QMessageBox.warning(self, '警告', '未连接到设备')
-        time_interval = int(self.test128.text()) / 1000
+        try:
+            if(not self.client or not self.client.is_connected):
+                if(not self.serial_port or not self.serial_port.is_open):
+                    QMessageBox.warning(self, '警告', '未连接到设备')
+                    raise Exception("未连接到设备")
+            if self.client and self.client.is_connected:
+                time_interval = int(self.test128.text()) / 1000
+                packet_count = len(data) // 128 + 1 if len(data) % 128 != 0 else len(data) // 128
+                for i in range(0,packet_count):
+                    if i + 1 == packet_count:
+                        left = i * 128
+                        right = len(data)
+                    else:
+                        left = i * 128
+                        right = (i + 1) * 128
+                    await self.client.write_gatt_char("0000ffe1-0000-1000-8000-00805f9b34fb", data[left:right])
+                    await asyncio.sleep(time_interval)
+            elif self.serial_port and self.serial_port.is_open:
+                self.serial_port.write(data)
+        except Exception as e:
+            traceback.print_exc()
+            QMessageBox.critical(self, '发送失败', str(e))
+            raise Exception("发送失败")
 
-        self.text_decode.legality = ReceveDataStatus.ERR_NOTHING
-        """异步方法，发送字节数据"""
-        if len(data) <= 128:
-            await self.client.write_gatt_char("0000ffe1-0000-1000-8000-00805f9b34fb", data)
-        elif len(data) <= 256:
-            await self.client.write_gatt_char("0000ffe1-0000-1000-8000-00805f9b34fb", data[0:128])
-            await asyncio.sleep(time_interval)
-            await self.client.write_gatt_char("0000ffe1-0000-1000-8000-00805f9b34fb", data[128:256])
-        else:
-            await self.client.write_gatt_char("0000ffe1-0000-1000-8000-00805f9b34fb", data[0:128])
-            await asyncio.sleep(time_interval)
-            await self.client.write_gatt_char("0000ffe1-0000-1000-8000-00805f9b34fb", data[128:256])
-            await asyncio.sleep(time_interval)
-            await self.client.write_gatt_char("0000ffe1-0000-1000-8000-00805f9b34fb", data[256:])
 
     async def on_data_received(self, sender, data):
         """回调函数，处理接收到的数据"""
@@ -761,7 +769,7 @@ class BluetoothTool(QWidget):
                 shake_count += 1
             else:
                 self.blue_write_log(f"握手命令发送成功")
-            self.text_decode.legality = ReceveDataStatus.ERR_NOTHING
+            # self.text_decode.legality = ReceveDataStatus.ERR_NOTHING
 
 
 
@@ -886,14 +894,9 @@ class BluetoothTool(QWidget):
 
     def send_command(self, command:bytes):
         """发送指令数据"""
-        if self.client and self.client.is_connected:
-            asyncio.create_task(self.byte_send(command))
-            self.display_send_data(command)
-        elif self.commu_type == 'serial' and self.is_serial_connected:
-            asyncio.create_task(self.send_data(command))
-        else:
-            QMessageBox.warning(self, '警告', '未连接到设备')
-            raise Exception("未连接到设备")
+        asyncio.create_task(self.byte_send(command))
+        self.display_send_data(command)
+
     def send_sbs_cmd(self):
         """发送sbs查询电池数据"""
         self.send_command(self.text_decode.send_hex_fill(0x13))
