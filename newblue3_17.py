@@ -724,8 +724,9 @@ class BluetoothTool(QWidget):
             # return
         
         if not self.client or not self.client.is_connected:
-            QMessageBox.warning(self, '警告', '请先连接设备')
-            return
+            if not self.serial_port or not self.serial_port.is_open:
+                QMessageBox.warning(self, '警告', '请先连接设备')
+                return
         
         # 创建烧录任务
         asyncio.create_task(self.start_programming())
@@ -835,6 +836,7 @@ class BluetoothTool(QWidget):
                     except Exception as e:
                         self.blue_write_log(f"有错误------------------")
                         traceback.print_exc()
+                        break
                     else:
                         self.blue_write_log(f"没有错误-----------------")
 
