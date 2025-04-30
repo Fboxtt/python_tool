@@ -356,7 +356,10 @@ class HexParserApp(QMainWindow):
                     break
         else:
             LogManager.get_instance().write_log(f"解析 {cmd:02X} 失败: 无当前命令")
-            return None,None
+            return "no_cmd",None
+        if struct_name not in STRUCT_FORMATS:
+            LogManager.get_instance().write_log(f"解析 {struct_name} 失败: 这个命令没有预存格式细节")
+            return struct_name,None
         try:
             fmt = STRUCT_FORMATS[struct_name]
             size = struct.calcsize(fmt)

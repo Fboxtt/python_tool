@@ -384,17 +384,19 @@ class BluetoothTool(QWidget):
                 if self.serial_port.in_waiting:
                     data = self.serial_port.read(self.serial_port.in_waiting)
                     if data:
+                        # 调用 on_data_received 函数处理接收到的数据
+                        await self.on_data_received(None, data)
                         # 使用与蓝牙相同的显示逻辑
                         if self.hex_display_checkbox.isChecked():
                             hex_data = ' '.join([f'{b:02X}' for b in data])
-                            self.blue_write_log(f"接收: {hex_data}")
+                            # self.blue_write_log(f"接收: {hex_data}")
                         else:
                             try:
                                 text_data = data.decode('utf-8')
-                                self.blue_write_log(f"接收: {text_data}")
+                                # self.blue_write_log(f"接收: {text_data}")
                             except UnicodeDecodeError:
                                 hex_data = ' '.join([f'{b:02X}' for b in data])
-                                self.blue_write_log(f"接收(HEX): {hex_data}")
+                                # self.blue_write_log(f"接收(HEX): {hex_data}")
                 await asyncio.sleep(0.01)
             except Exception as e:
                 self.blue_write_log(f"接收数据错误: {str(e)}")
@@ -452,7 +454,7 @@ class BluetoothTool(QWidget):
             except UnicodeDecodeError:
                 # 如果无法解码为文本，则显示16进制
                 reve_data = ' '.join([f'{b:02X}' for b in data])  
-        self.blue_write_log(f"RX->,{self.commu_type},{self.device_name},{reve_data},cmd")
+        self.blue_write_log(f"RX->,{self.commu_type},{self.device_name},cmd,{reve_data}")
     def display_send_data(self, data):
         """显示接收到的数据，根据16进制显示选项决定显示格式"""
         if self.hex_display_checkbox.isChecked():
@@ -465,7 +467,7 @@ class BluetoothTool(QWidget):
             except UnicodeDecodeError:
                 # 如果无法解码为文本，则显示16进制
                 send_data = ' '.join([f'{b:02X}' for b in data])
-        self.blue_write_log(f"TX->,cmd,{self.commu_type},{self.device_name},{send_data}")
+        self.blue_write_log(f"TX->,{self.commu_type},{self.device_name},cmd,{send_data}")
 
     def on_scan_devices_clicked(self):
         """同步方法，用于触发异步扫描"""
