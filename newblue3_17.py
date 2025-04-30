@@ -186,7 +186,7 @@ class BluetoothTool(QWidget):
         self.baud_label = QLabel('波特率:')
         self.baud_combo = QComboBox()
         self.baud_combo.addItems(['9600', '19200', '38400', '57600', '115200'])
-        self.baud_combo.setCurrentText('115200')
+        self.baud_combo.setCurrentText('19200')
         param_layout.addWidget(self.baud_label, 1, 0)
         param_layout.addWidget(self.baud_combo, 1, 1)
         
@@ -647,6 +647,7 @@ class BluetoothTool(QWidget):
                 if(not self.serial_port or not self.serial_port.is_open):
                     QMessageBox.warning(self, '警告', '未连接到设备')
                     raise Exception("未连接到设备")
+                """蓝牙发送"""
             if self.client and self.client.is_connected:
                 time_interval = int(self.test128.text()) / 1000
                 packet_count = len(data) // 128 + 1 if len(data) % 128 != 0 else len(data) // 128
@@ -659,6 +660,7 @@ class BluetoothTool(QWidget):
                         right = (i + 1) * 128
                     await self.client.write_gatt_char("0000ffe1-0000-1000-8000-00805f9b34fb", data[left:right])
                     await asyncio.sleep(time_interval)
+                """串口发送"""
             elif self.serial_port and self.serial_port.is_open:
                 self.serial_port.write(data)
         except Exception as e:
@@ -690,7 +692,7 @@ class BluetoothTool(QWidget):
                 """csv记录监控数据"""
                 """外部窗口展示 监控数据 |字典数据|纯参数数据|"""
                 self.decode_data_ok_signal.emit(header,dict_data) 
-                # 发射到函数get_dict_from_struct_model(str,dict)
+                # 发射到函数get_dict_from_receive_data(str,dict)
         """log记录调试数据"""
         """内部窗口展示 调试数据 |hex数据|字符串数据|"""
         self.display_received_data(self.received_data_buffer)
@@ -938,7 +940,7 @@ class load_ui_dynamically(QMainWindow):
             self.pushButton_5.clicked.connect(self.bluetooth_tool.send_tbs_cmd)
 
             # 连接数据解析模块到主窗口
-            self.bluetooth_tool.decode_data_ok_signal.connect(self.get_dict_from_struct_model)
+            self.bluetooth_tool.decode_data_ok_signal.connect(self.get_dict_from_receive_data)
 
             # 初始化日志管理器
             self.logger = LogManager.get_instance()
@@ -978,7 +980,7 @@ class load_ui_dynamically(QMainWindow):
     def start_find_bat_status(self):
         self.bluetooth_tool.blue_write_log("查询一次电池状态")
 
-    def get_dict_from_struct_model(self, header:str, dict_data:dict):
+    def get_dict_from_receive_data(self, header:str, dict_data:dict):
         """从结构模型中获取字典"""
         self.mainWindowTextEdit.clear()
         json_str = json.dumps(dict_data, sort_keys= True)
