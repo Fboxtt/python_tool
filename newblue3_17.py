@@ -344,6 +344,7 @@ class BluetoothTool(QWidget):
                     # 禁用参数设置
                     self.disable_serial_settings(True)
                     # 启动接收任务
+                    self.send_button.setEnabled(True)
                     self.serial_receive_task = asyncio.create_task(self.serial_receive_loop())
             except Exception as e:
                 QMessageBox.critical(self, '错误', f'串口连接失败: {str(e)}')
@@ -356,6 +357,7 @@ class BluetoothTool(QWidget):
                 self.serial_receive_task = None
             
             if self.serial_port and self.serial_port.is_open:
+                self.send_button.setEnabled(False)
                 self.serial_port.close()
                 self.commu_type = "none"
             
@@ -405,35 +407,33 @@ class BluetoothTool(QWidget):
 
     async def send_data(self, data: str):
         """发送数据（兼容蓝牙和串口模式）"""
-        if self.commu_type == 'serial' and self.is_serial_connected:
-            try:
-                if self.hex_send_checkbox.isChecked():
-                    # 16进制发送
-                    try:
-                        hex_data = data.replace(" ", "")
-                        if not all(c in '0123456789ABCDEFabcdef' for c in hex_data):
-                            raise ValueError("Invalid hex string")
-                        data_bytes = bytes.fromhex(hex_data)
-                    except ValueError as e:
-                        QMessageBox.warning(self, '警告', '无效的16进制数据')
-                        return
-                else:
-                    # 文本发送
-                    data_bytes = data.encode()
+        try:
+            if self.hex_send_checkbox.isChecked():
+                # 16进制发送
+                try:
+                    print(f"send data type = {type(data)}")
+                    hex_data = data.replace(" ", "")
+                    if not all(c in '0123456789ABCDEFabcdef' for c in hex_data):
+                        raise ValueError("Invalid hex string")
+                    data_bytes = bytes.fromhex(hex_data)
+                except ValueError as e:
+                    QMessageBox.warning(self, '警告', '无效的16进制数据')
+                    return
+            else:
+                # 文本发送
+                data_bytes = data.encode()
 
-                self.serial_port.write(data_bytes)
-                # 显示发送的数据
-                if self.hex_send_checkbox.isChecked():
-                    hex_data = ' '.join([f'{b:02X}' for b in data_bytes])
-                    self.blue_write_log(f"发送: {hex_data}")
-                else:
-                    self.blue_write_log(f"发送: {data}")
-            except Exception as e:
-                QMessageBox.critical(self, '发送失败', str(e))
-        elif self.client and self.client.is_connected:
-            # 原有的蓝牙发送逻辑
-            await self.bluetooth_send_data(data)
-            self.display_send_data(data)
+            await self.byte_send(data_bytes)
+            # 显示发送的数据
+            if self.hex_send_checkbox.isChecked():
+                hex_data = ' '.join([f'{b:02X}' for b in data_bytes])
+                self.blue_write_log(f"发送: {hex_data}")
+                self.display_send_data(data_bytes)
+            else:
+                self.blue_write_log(f"发送: {data}")
+                self.display_send_data(data)
+        except Exception as e:
+            QMessageBox.critical(self, '发送失败', str(e))
 
     def on_hex_display_changed(self, state):
         """当16进制显示选项改变时，重新显示接收到的数据"""
@@ -844,6 +844,7 @@ class BluetoothTool(QWidget):
             err_count = 0   
             while err_count < 5:
                 data = self.download_data.get_download_data(BmsCmdType.REC_TOTAL_CHECKSUM)
+                self.display_send_data(data)
                 await self.byte_send(data)
                 await asyncio.sleep(time512 * 2)
                 if(self.text_decode.no80_cmd == BmsCmdType.REC_TOTAL_CHECKSUM  and self.text_decode.cmd_ack == 0x00):
@@ -858,6 +859,7 @@ class BluetoothTool(QWidget):
                 self.blue_write_log("电池重启")
                 while err_count < 5:
                     data = self.download_data.get_download_data(BmsCmdType.READ_IC_INF)
+                    self.display_send_data(data)
                     await self.byte_send(data)
                     await asyncio.sleep(time512 * 2)
                     if(self.text_decode.no80_cmd == BmsCmdType.READ_IC_INF  and self.text_decode.cmd_ack == 0x00):
