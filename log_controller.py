@@ -36,7 +36,7 @@ class LogManager:
         # 检查文件是否存在并计算行数
         if os.path.exists(log_file_path):
             try:
-                with open(log_file_path, 'r') as file:
+                with open(log_file_path, 'r', encoding='utf-8') as file:
                     line_count = sum(1 for _ in file)
                 print(f"日志文件 {log_filename} 已存在，包含 {line_count} 行数据")
             except Exception as e:
@@ -117,13 +117,13 @@ class ComunManager:
         # 检查文件是否存在并计算行数
         if os.path.exists(log_file_path):
             try:
-                with open(log_file_path, 'r') as file:
+                with open(log_file_path, 'r', encoding='utf-8') as file:
                     self.line_count = sum(1 for _ in file)
-                print(f"日志文件 {log_filename} 已存在，包含 {self.line_count} 行数据")
+                print(f"通讯文件 {log_filename} 已存在，包含 {self.line_count} 行数据")
             except Exception as e:
-                print(f"读取日志文件失败: {e}")
+                print(f"读取通讯文件失败: {e}")
         else:
-            print(f"日志文件 {log_filename} 不存在，将创建新文件")
+            print(f"通讯文件 {log_filename} 不存在，将创建新文件")
         
         # 打开文件进行写入（追加模式）
         try:
