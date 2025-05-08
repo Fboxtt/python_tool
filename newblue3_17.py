@@ -687,7 +687,7 @@ class BluetoothTool(QWidget):
         # 处理数据
         self.text_decode.split_data(self.received_data_buffer)
         if self.text_decode.have_hex:
-            self.blue_write_log(f"发送信号给数据解析模块")
+            # self.blue_write_log(f"发送信号给数据解析模块")
             struct_name,dict_data = self.hex_parser.decode_cmd_hex_data(self.text_decode.no80_cmd,bytes(self.text_decode.data_hex))
             if dict_data:
                 header = f"RX->,{self.commu_type},{self.device_name},{struct_name}"
@@ -741,19 +741,20 @@ class BluetoothTool(QWidget):
             self.program_button.setEnabled(False)
             self.program_button.setText('烧录中...')
             err_count = 0  
-            while err_count < 4:
-                data = self.download_data.get_download_data(BmsCmdType.DOWNLOAD_BUFFER)
-                await self.byte_send(data)
-                # await self.client.write_gatt_char("0000ffe1-0000-1000-8000-00805f9b34fb", data)
-                self.blue_write_log("75发送")
-                await asyncio.sleep(time512)
-                if self.text_decode.legality == ReceveDataStatus.ERR_NOTHING:
-                    await asyncio.sleep(time512 * 4)
-                if(self.text_decode.no80_cmd == BmsCmdType.DOWNLOAD_BUFFER  and self.text_decode.cmd_ack == 0x00):
-                    err_count -= 1
-                    break
-                else:
-                    err_count += 1
+            # while err_count < 4:
+            #     data = self.download_data.get_download_data(BmsCmdType.DOWNLOAD_BUFFER)
+            #     self.display_send_data(data)
+            #     await self.byte_send(data)
+            #     # await self.client.write_gatt_char("0000ffe1-0000-1000-8000-00805f9b34fb", data)
+            #     self.blue_write_log("75发送")
+            #     await asyncio.sleep(time512)
+            #     if self.text_decode.legality == ReceveDataStatus.ERR_NOTHING:
+            #         await asyncio.sleep(time512 * 4)
+            #     if(self.text_decode.no80_cmd == BmsCmdType.DOWNLOAD_BUFFER  and self.text_decode.cmd_ack == 0x00):
+            #         err_count -= 1
+            #         break
+            #     else:
+            #         err_count += 1
             # await asyncio.sleep(1)
 
             shake_count = 0
@@ -761,9 +762,10 @@ class BluetoothTool(QWidget):
                 err_count = 0
                 while err_count < 3:
                     data = bytearray([0x00,0x00,0x04,0x01,0x76,0x55,0xaa,0x7a])
+                    self.display_send_data(data)
                     await self.byte_send(data)
                     # self.blue_write_log("76发送")
-                    await asyncio.sleep(time512)
+                    await asyncio.sleep(time512 * 2)
                     if(self.text_decode.is_download_cmd):
                         break
                     err_count += 1
@@ -781,9 +783,10 @@ class BluetoothTool(QWidget):
             err_count = 0  
             while err_count < 1:
                 data = self.download_data.get_download_data(BmsCmdType.DOWNLOAD_BUFFER)
+                self.display_send_data(data)
                 await self.byte_send(data)
                 # self.blue_write_log("75发送")
-                await asyncio.sleep(time512)
+                await asyncio.sleep(time512 * 2)
                 if self.text_decode.legality == ReceveDataStatus.ERR_NOTHING:
                     await asyncio.sleep(time512 * 4)
                 if(self.text_decode.no80_cmd == BmsCmdType.DOWNLOAD_BUFFER  and self.text_decode.cmd_ack == 0x00):
