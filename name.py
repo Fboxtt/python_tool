@@ -15,8 +15,8 @@ class ConfigManager:
             "voltages": ["12", "24", "36", "48"],
             "capacities": ["100", "120", "140", "160", "200", "240"],
             "cell_models": ["G_N_H10", "L_F_H20", "P_C_H50", "A_K_H100"],
-            "product_lines": ["T", "ST", "GC"],
-            "features": ["HTS", "HT", "PWR", "COM"]
+            "use_cases": ["T", "ST", "GC"],
+            "features": ["HTS", "HT", "PWR", "COM", "THIN"]
         }
         
     def load_config(self):
@@ -89,19 +89,19 @@ class FirmwareNamingTool(QMainWindow):
         group = QGroupBox("基本信息")
         layout = QHBoxLayout()
 
+        # 使用场景
+        self.use_case_container = self.create_combo("使用场景", self.config["use_cases"])
         # 电压选择
         self.voltage_container = self.create_combo("电压(V)", self.config["voltages"])
         # 容量选择
         self.capacity_container = self.create_combo("容量(Ah)", self.config["capacities"])
         # 电芯型号
         self.cell_container = self.create_combo("电芯型号", self.config["cell_models"])
-        # 产品线
-        self.product_line_container = self.create_combo("产品线", self.config["product_lines"])
 
+        layout.addWidget(self.use_case_container)
         layout.addWidget(self.voltage_container)
         layout.addWidget(self.capacity_container)
         layout.addWidget(self.cell_container)
-        layout.addWidget(self.product_line_container)
         group.setLayout(layout)
         parent_layout.addWidget(group)
 
@@ -177,8 +177,8 @@ class FirmwareNamingTool(QMainWindow):
         self.capacity_container.findChild(QComboBox).addItems(self.config["capacities"])
         self.cell_container.findChild(QComboBox).clear()
         self.cell_container.findChild(QComboBox).addItems(self.config["cell_models"])
-        self.product_line_container.findChild(QComboBox).clear()
-        self.product_line_container.findChild(QComboBox).addItems(self.config["product_lines"])
+        self.use_case_container.findChild(QComboBox).clear()
+        self.use_case_container.findChild(QComboBox).addItems(self.config["use_cases"])
         
         # 更新功能特征复选框
         for cb in self.feature_checks:
@@ -196,12 +196,12 @@ class FirmwareNamingTool(QMainWindow):
     def get_selected_features(self):
         """获取选中的功能特征并按优先级排序"""
         features = []
-        for i, feature in enumerate(self.config["features"]):
-            if self.feature_checks[i].isChecked():
-                features.append(feature)
+        for feature in self.feature_checks:
+            if feature.isChecked():
+                features.append(feature.text())
 
         # 按优先级排序
-        priority_order = ["HTS", "HT", "PWR", "COM"]
+        priority_order = ["HTS", "HT", "PWR", "COM", "THIN"]
         return sorted(features, key=lambda x: priority_order.index(x))
     
     def generate_names(self):
@@ -210,7 +210,7 @@ class FirmwareNamingTool(QMainWindow):
         voltage = self.voltage_container.findChild(QComboBox).currentText()
         capacity = self.capacity_container.findChild(QComboBox).currentText()
         cell_model = self.cell_container.findChild(QComboBox).currentText()
-        product_line = self.product_line_container.findChild(QComboBox).currentText()
+        use_case = self.use_case_container.findChild(QComboBox).currentText()
         
         # 获取功能特征
         features = self.get_selected_features()
@@ -226,15 +226,15 @@ class FirmwareNamingTool(QMainWindow):
         date = self.date_edit.date().toString("yyyyMMdd")
         
         # 生成硬件版本
-        hw_version = f"{voltage}{capacity}-{feature_str}-V{main_ver}.{rev_ver}"
+        hw_version = f"{use_case}{voltage}{capacity}-{feature_str}-V{main_ver}.{rev_ver}"
         
         # 生成固件版本
-        fw_version = f"{product_line}{voltage}{capacity}-{feature_str}-V{main_ver}.{rev_ver}.{fix_ver}"
+        fw_version = f"{use_case}{voltage}{capacity}-{feature_str}-V{main_ver}.{rev_ver}.{fix_ver}"
         
         # 生成各种文件名
-        app_name = f"APP_APT-BMS-{voltage}{capacity}-{cell_model}_{feature_str}_{version_str}_{date}.hex"
-        iap_name = f"IAP_APP-BMS-{voltage}{capacity}_{feature_str}_{version_str}_{date}.bin"
-        iap_full_name = f"IAP_APP-BMS-{voltage}{capacity}_{feature_str}_FULL_{version_str}_{date}.bin"
+        app_name = f"APP_APT-BMS-{use_case}{voltage}{capacity}-{cell_model}_{feature_str}_{version_str}_{date}.hex"
+        iap_name = f"IAP_APP-BMS-{use_case}{voltage}{capacity}_{feature_str}_{version_str}_{date}.bin"
+        iap_full_name = f"IAP_APP-BMS-{use_case}{voltage}{capacity}_{feature_str}_FULL_{version_str}_{date}.bin"
         
         # 显示结果
         result = f"硬件版本定义 (ver_HW): {hw_version}\n"
@@ -251,24 +251,24 @@ class FirmwareNamingTool(QMainWindow):
         description = """=== BMS固件命名规范说明 ===
 
 1. 硬件版本定义 (ver_HW):
-   [电压V][容量Ah]-[功能特征]-V[主版本].[次版本]
-   示例: "12200-HTS-HT-V1.5"
+   [使用场景][电压V][容量Ah]-[功能特征]-V[主版本].[次版本]
+   示例: "T12200-HTS-HT-V1.5"
 
 2. 固件版本定义 (ver_FW):
-   [产品线][电压][容量]-[功能特征]-V[主版本].[次版本].[修订号]
+   [使用场景][电压][容量]-[功能特征]-V[主版本].[次版本].[修订号]
    示例: "T12200-HTS-HT-V1.7.0"
 
 3. 主应用固件 (APP):
-   APP_APT-BMS-[电压][容量]-[电芯型号]_[功能特征]_V[主版本]-[次版本]-[修订号]_[日期].hex
-   示例: "APP_APT-BMS-12200-G_N_H10_HTS-HT_V1-7-0_20240624.hex"
+   APP_APT-BMS-[使用场景][电压][容量]-[电芯型号]_[功能特征]_V[主版本]-[次版本]-[修订号]_[日期].hex
+   示例: "APP_APT-BMS-T12200-G_N_H10_HTS-HT_V1-7-0_20240624.hex"
 
 4. 增量升级包 (IAP):
-   IAP_APP-BMS-[电压][容量]_[功能特征]_V[主版本]-[次版本]-[修订号]_[日期].bin
-   示例: "IAP_APP-BMS-12200_HTS-HT_V1-7-0_20240624.bin"
+   IAP_APP-BMS-[使用场景][电压][容量]_[功能特征]_V[主版本]-[次版本]-[修订号]_[日期].bin
+   示例: "IAP_APP-BMS-T12200_HTS-HT_V1-7-0_20240624.bin"
 
 5. 完整升级包 (IAP_APP):
-   IAP_APP-BMS-[电压][容量]_[功能特征]_FULL_V[主版本]-[次版本]-[修订号]_[日期].bin
-   示例: "IAP_APP-BMS-12200_HTS-HT_FULL_V1-7-0_20240624.bin"
+   IAP_APP-BMS-[使用场景][电压][容量]_[功能特征]_FULL_V[主版本]-[次版本]-[修订号]_[日期].bin
+   示例: "IAP_APP-BMS-T12200_HTS-HT_FULL_V1-7-0_20240624.bin"
 
 功能特征优先级: HTS > HT > PWR > COM
 日期格式: YYYYMMDD (如20240624)"""
@@ -300,15 +300,15 @@ class ConfigDialog(QDialog):
         self.capacities_edit = self.create_list_editor("容量选项", self.current_config["capacities"])
         # 电芯型号
         self.cell_models_edit = self.create_list_editor("电芯型号", self.current_config["cell_models"])
-        # 产品线
-        self.product_lines_edit = self.create_list_editor("产品线", self.current_config["product_lines"])
+        # 使用场景
+        self.use_cases_edit = self.create_list_editor("使用场景", self.current_config["use_cases"])
         # 功能特征
         self.features_edit = self.create_list_editor("功能特征", self.current_config["features"])
         
         self.tabs.addTab(self.voltages_edit, "电压")
         self.tabs.addTab(self.capacities_edit, "容量")
         self.tabs.addTab(self.cell_models_edit, "电芯型号")
-        self.tabs.addTab(self.product_lines_edit, "产品线")
+        self.tabs.addTab(self.use_cases_edit, "使用场景")
         self.tabs.addTab(self.features_edit, "功能特征")
         
         # 按钮组
@@ -342,7 +342,7 @@ class ConfigDialog(QDialog):
             "voltages": self.voltages_edit.findChild(QTextEdit).toPlainText().split(),
             "capacities": self.capacities_edit.findChild(QTextEdit).toPlainText().split(),
             "cell_models": self.cell_models_edit.findChild(QTextEdit).toPlainText().split(),
-            "product_lines": self.product_lines_edit.findChild(QTextEdit).toPlainText().split(),
+            "use_cases": self.use_cases_edit.findChild(QTextEdit).toPlainText().split(),
             "features": self.features_edit.findChild(QTextEdit).toPlainText().split()
         }
     
