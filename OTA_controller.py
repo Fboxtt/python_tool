@@ -256,7 +256,7 @@ class TextDecode:
             traceback.print_exc()
 
         if self.legality == ERR_NO:
-            print(f"cmd = 0x{self.cmd:02x} cmd_ack = 0x{self.cmd_ack:02x} cmd_data_len = {self.data_len}")
+            print(f"slave cmd = 0x{self.cmd:02x} cmd_ack = 0x{self.cmd_ack:02x} cmd_data_len = {self.data_len}")
         return
     def send_hex_fill(self, cmd_type, data_array = None) -> bytearray:
         """获取下载数据包

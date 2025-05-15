@@ -781,7 +781,7 @@ class BluetoothTool(QWidget):
 
 
             err_count = 0  
-            while err_count < 1:
+            while err_count < 2:
                 data = self.download_data.get_download_data(BmsCmdType.DOWNLOAD_BUFFER)
                 self.display_send_data(data)
                 await self.byte_send(data)
@@ -790,7 +790,7 @@ class BluetoothTool(QWidget):
                 if self.text_decode.legality == ReceveDataStatus.ERR_NOTHING:
                     await asyncio.sleep(time512 * 4)
                 if(self.text_decode.no80_cmd == BmsCmdType.DOWNLOAD_BUFFER  and self.text_decode.cmd_ack == 0x00):
-                    self.blue_write_log(f"擦除命令发送失败")
+                    self.blue_write_log(f"擦除命令发送成功")
                     break
                 else:
                     err_count += 1
@@ -931,7 +931,7 @@ class load_ui_dynamically(QMainWindow):
             uic.loadUi(ui_file, self)
             # 初始化连接窗口
             self.bluetooth_tool = BluetoothTool()
-            self.bluetooth_tool.setWindowModality(Qt.WindowModality.ApplicationModal)
+            # self.bluetooth_tool.setWindowModality(Qt.WindowModality.ApplicationModal)
             self.pushButton.clicked.connect(self.bluetooth_tool.show)
             self.pushButton_6.clicked.connect(self.disconnect_device)
             # self.pushButton_2.clicked.connect()
