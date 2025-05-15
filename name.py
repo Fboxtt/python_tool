@@ -19,6 +19,14 @@ class ConfigManager:
             "features": ["HTS", "HT", "PWR", "COM", "THIN"]
         }
         
+        self.config_explanations = {
+            "voltages": "支持的电压值（单位：V）",
+            "capacities": "支持的容量值（单位：Ah）",
+            "cell_models": "支持的电芯型号",
+            "use_cases": "支持的使用场景（T: 通用，ST: 高温，GC: 工业）",
+            "features": "支持的功能特征（HTS: 高温保护，HT: 高功率，PWR: 电源管理，COM: 通信，THIN: 薄型设计）"
+        }
+        
     def load_config(self):
         try:
             if not self.config_path.exists():
