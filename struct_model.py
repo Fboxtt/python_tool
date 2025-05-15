@@ -40,7 +40,16 @@ STRUCT_FORMATS = {
         "HHH"  # usRemainAH, usFccAH, usBiaAH
         "LLLLL"  # ulOtherInfo, ulAlarmStatus, ulProtectStatus, ulFaultStatus, ulBalanceStatus
         "HH"  # usBattStatus, usSOC_Percent
-        "LLL"  # ulSOH_Percent, ulDisTimes, ulTotalDisAH
+        "LLL",  # ulSOH_Percent, ulDisTimes, ulTotalDisAH
+    "PC_GET_INF": "<"
+        "HHBBBB"  # TVER: usMajorVer, usMinorVer, usRevision, usCompileYear, ucCompileMonth, ucCompileDay
+        "HHBBBB"  # TVER: btVer
+        "HHBBBB"  # TVER: appVer
+        "HHBBBB"  # TVER: bufferVer
+        "HHBBBB"  # TVER: backupVer
+        "15s"     # icName (15 bytes)
+        "B"       # writableArea (1 byte)
+        "L"       # pcAddr (4 bytes)
 }
 
 STRUCT_ADDRESSES = {
@@ -108,6 +117,15 @@ STRUCT_VARIABLES = {
         "ulOtherInfo", "ulAlarmStatus", "ulProtectStatus", "ulFaultStatus", "ulBalanceStatus",
         "usBattStatus", "usSOC_Percent",
         "ulSOH_Percent", "ulDisTimes", "ulTotalDisAH"
+    ],
+    "PC_GET_INF": [
+        "btVer.usMajorVer", "btVer.usMinorVer", "btVer.usRevision", "btVer.usCompileYear", "btVer.ucCompileMonth", "btVer.ucCompileDay",
+        "appVer.usMajorVer", "appVer.usMinorVer", "appVer.usRevision", "appVer.usCompileYear", "appVer.ucCompileMonth", "appVer.ucCompileDay",
+        "bufferVer.usMajorVer", "bufferVer.usMinorVer", "bufferVer.usRevision", "bufferVer.usCompileYear", "bufferVer.ucCompileMonth", "bufferVer.ucCompileDay",
+        "backupVer.usMajorVer", "backupVer.usMinorVer", "backupVer.usRevision", "backupVer.usCompileYear", "backupVer.ucCompileMonth", "backupVer.ucCompileDay",
+        "icName",
+        "writableArea",
+        "pcAddr"
     ]
 }
 
@@ -170,6 +188,7 @@ STRUCT_COMMANDS = {
     "PC_GET_MOSHTDATA": 0x65,
     "PC_SET_MOSHTDATA": 0x66,
     "MCU_A_PRINT": 0x94,
+    "PC_GET_INF" : 0x71
 }
 
 # 将所有字典组合成一个字典
@@ -425,9 +444,25 @@ class HexParserApp(QMainWindow):
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     window = HexParserApp()
-    # print(window.send_hex_fill(0x41))
-    # print(window.decode_cmd_hex_data(0x41,bytearray([0x01,0x02,0x03,0x04,0x05,0x06,0x07,0x08,0x09,0x0A,0x0B,0x0C,0x0D,0x0E,0x0F,0x10])))
-    # window.show()
-    print(STRUCT_ADDRESSES)
-    window.close()
+
+    # 测试数据
+    test_data = bytearray([
+        0x01, 0x00, 0x02, 0x00, 0x03, 0x00, 0xE7, 0x07, 0x0A, 0x0F,  # btVer
+        0x04, 0x00, 0x05, 0x00, 0x06, 0x00, 0xE7, 0x07, 0x0B, 0x14,  # appVer
+        0x07, 0x00, 0x08, 0x00, 0x09, 0x00, 0xE7, 0x07, 0x0C, 0x19,  # bufferVer
+        0x0A, 0x00, 0x0B, 0x00, 0x0C, 0x00, 0xE8, 0x07, 0x01, 0x01,  # backupVer
+        0x49, 0x43, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38,  # icName
+        0x39, 0x30, 0x31, 0x32, 0x33,  # icName (continued)
+        0x01,  # writableArea
+        0x78, 0x56, 0x34, 0x12  # pcAddr
+    ])
+
+    # 解析测试数据
+    struct_name, parsed_data = window.decode_cmd_hex_data(0x71, test_data)
+    print(f"Struct Name: {struct_name}")
+    print("Parsed Data:")
+    for var_name, hex_val, dec_val in parsed_data["PC_GET_INF"]:
+        print(f"{var_name}: {hex_val} | {dec_val}")
+
+    window.show()
     sys.exit(app.exec())
