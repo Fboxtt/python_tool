@@ -822,10 +822,15 @@ class BluetoothTool(QWidget):
                             # current_time = datetime.now().strftime("%H:%M:%S.%f")[:-3]
                             # self.blue_write_log(f"TX->数据包发送完成 - 时间: {current_time}")
                             await asyncio.sleep(time512)  
-                            if(self.text_decode.no80_cmd == BmsCmdType.WRITE_FLASH  and self.text_decode.cmd_ack == 0x00):
-                                err_count = 0
-                                hex_packet += 1
-                                break
+                            if self.text_decode.legality == ReceveDataStatus.ERR_NOTHING:
+                                await asyncio.sleep(time512)  
+                            print("7返回烧录过程")
+                            if(self.text_decode.no80_cmd == BmsCmdType.WRITE_FLASH  and 
+                                self.text_decode.cmd_ack == 0x00 and
+                                self.text_decode.cmd_packet_num == hex_packet + 1):
+                                    err_count = 0
+                                    hex_packet += 1
+                                    break
                             else:
                                 await asyncio.sleep(time512*3)  
                                 err_count += 1
