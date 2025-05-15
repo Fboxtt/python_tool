@@ -375,69 +375,87 @@ class HexParserApp(QMainWindow):
                     break
         else:
             LogManager.get_instance().write_log(f"解析 {cmd:02X} 失败: 无当前命令")
-            return "no_cmd",None
+            return "no_cmd", None
         if struct_name not in STRUCT_FORMATS:
             LogManager.get_instance().write_log(f"解析 {struct_name} 失败: 这个命令没有预存格式细节")
-            return struct_name,None
+            return struct_name, None
         try:
             fmt = STRUCT_FORMATS[struct_name]
             size = struct.calcsize(fmt)
             if size != len(data_bytes):
                 print(f"解析 {struct_name} 失败: 数据长度不匹配")
                 LogManager.get_instance().write_log(f"解析 {struct_name} 失败: 数据长度不匹配")
-                return None,None
-            # 读取原始字节
-            # data_bytes = ih.tobinstr(start=address, size=size)
+                return None, None
+            
             # 解析为元组
             values = struct.unpack(fmt, data_bytes)
-            # 转换为十六进制字符串
-            hex_values = [f"0x{b:02X}" for b in data_bytes]
-            # print(struct_name, data_bytes)
-            # print(type(hex_values))
-            # print(type(hex_values[0]))
-            # print(type(data_bytes))
-            hex_byte_array = []
-
+            
             # 处理有符号值
             dec_values = []
+            hex_byte_array = []
+            
+            # 首先找到icName字段在values中的索引
+            icname_index = None
+            for i, var_name in enumerate(STRUCT_VARIABLES[struct_name]):
+                if var_name == "icName":
+                    icname_index = i
+                    break
+            
             for i, (var_name, value) in enumerate(zip(STRUCT_VARIABLES[struct_name], values)):
-                # 根据格式字符判断符号
-                fmt_char = fmt[1:][i]  # 跳过字节序字符
-                byte_len = struct.calcsize(fmt_char)
-                if byte_len == 1:
-                    hex_byte_array.append(f"0x{value:02X}")
-                elif byte_len == 2:
-                    hex_byte_array.append(f"0x{value:04X}")
-                elif byte_len == 4:
-                    hex_byte_array.append(f"0x{value:08X}")
-                    pass
-                if fmt_char in ('h', 'l'):
-                    dec_values.append(str(value))  # 保留符号
+                if var_name == "icName":
+                    # 检查value的类型并相应处理
+                    if isinstance(value, bytes):
+                        # 如果已经是bytes类型，直接解码
+                        str_value = value.decode('utf-8', errors='replace').rstrip('\x00')
+                        dec_values.append(str_value)
+                        hex_bytes = ''.join([f"{b:02X}" for b in value])
+                        hex_byte_array.append(hex_bytes)
+                    else:
+                        # 如果不是bytes类型，从原始数据中提取
+                        # 假设icName是15字节长度，并且在数据中的位置可以计算
+                        # 这里我们需要找到icName在data_bytes中的偏移量
+                        # 一个简单的方法是从结尾往前数16字节（15字节icName + 1字节writableArea + 4字节pcAddr）
+                        icname_bytes = data_bytes[-20:-5]  # 从末尾往前15字节
+                        str_value = icname_bytes.decode('utf-8', errors='replace').rstrip('\x00')
+                        dec_values.append(str_value)
+                        hex_bytes = ''.join([f"{b:02X}" for b in icname_bytes])
+                        hex_byte_array.append(hex_bytes)
                 else:
-                    dec_values.append(str(value & 0xFFFF_FFFF))  # 无符号显示
+                    # 处理数值字段
+                    if isinstance(value, int):
+                        if value < 256:
+                            hex_byte_array.append(f"0x{value:02X}")
+                        elif value < 65536:
+                            hex_byte_array.append(f"0x{value:04X}")
+                        else:
+                            hex_byte_array.append(f"0x{value:08X}")
+                        
+                        # 根据约定确定符号
+                        if var_name.startswith('s') or var_name.startswith('l'):
+                            dec_values.append(str(value))  # 保留符号
+                        else:
+                            dec_values.append(str(value & 0xFFFF_FFFF))  # 无符号显示
+                    else:
+                        # 其他类型的值
+                        hex_byte_array.append(str(value))
+                        dec_values.append(str(value))
             
             # 按字节对齐显示
             display_data = []
-            byte_offset = 0
-            i = 0
-            for var_name, dec_val in zip(STRUCT_VARIABLES[struct_name], dec_values):
-                byte_len = struct.calcsize(fmt[1:][i])  # 计算变量字节长度
+            for i, (var_name, dec_val) in enumerate(zip(STRUCT_VARIABLES[struct_name], dec_values)):
                 display_data.append((
                     var_name,
-                    ''.join(hex_byte_array[i]),
+                    hex_byte_array[i],
                     dec_val
                 ))
-                byte_offset += byte_len
-                i += 1
             parsed_data[struct_name] = display_data
             
         except Exception as e:
             traceback.print_exc()
             LogManager.get_instance().write_log(f"解析 {struct_name} 失败: {str(e)}")
-            pass
+        
         LogManager.get_instance().write_log("发射dic信号")
-        # self.decode_data_ok_signal.emit(commuclass,cmd,parsed_data)
-        return struct_name,parsed_data
+        return struct_name, parsed_data
 
 
 
