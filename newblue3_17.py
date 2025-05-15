@@ -101,7 +101,7 @@ class BluetoothTool(QWidget):
         # 用于存储接收到的数据
         self.received_data_buffer = bytearray()
     def initUI(self):
-        self.setWindowTitle('蓝牙和串口连接工具')
+        self.setWindowTitle('firstuse')
 
         # 创建主布局
         layout = QVBoxLayout()
@@ -827,6 +827,7 @@ class BluetoothTool(QWidget):
                                 hex_packet += 1
                                 break
                             else:
+                                await asyncio.sleep(time512*3)  
                                 err_count += 1
                         else:
                             self.blue_write_log(f"数据发送失败")
@@ -929,6 +930,7 @@ class load_ui_dynamically(QMainWindow):
         try:
             # 加载UI文件
             uic.loadUi(ui_file, self)
+            self.setWindowTitle('firstuse')
             # 初始化连接窗口
             self.bluetooth_tool = BluetoothTool()
             # self.bluetooth_tool.setWindowModality(Qt.WindowModality.ApplicationModal)
