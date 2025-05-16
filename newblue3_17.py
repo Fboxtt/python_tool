@@ -248,7 +248,7 @@ class BluetoothTool(QWidget):
         self.test_layout = QHBoxLayout()
         self.test_send_button = QPushButton('连续发送')
         self.test128 = QLineEdit('0')
-        self.test512 = QLineEdit('300')
+        self.test512 = QLineEdit('280')
         self.test_layout.addWidget(self.test128)
         self.test_layout.addWidget(self.test512)
         self.test_layout.addWidget(self.test_send_button)
@@ -843,7 +843,7 @@ class BluetoothTool(QWidget):
                         # traceback.print_exc()
                         raise Exception("蓝牙断开")
                     except Exception as e:
-                        self.blue_write_log(f"有错误------------------")
+                        self.blue_write_log(f"有错误------------------{e}")
                         traceback.print_exc()
                         break
                     else:
@@ -925,6 +925,9 @@ class BluetoothTool(QWidget):
             self.send_command(self.text_decode.send_hex_fill(0x15))
         except:
             pass
+    def send_find_version_cmd(self):
+        """发送版本号查询命令"""
+        self.send_command(self.text_decode.send_hex_fill(0x71))
 
 
 # 修正后的函数 - 注意这是一个函数，不是类
@@ -946,6 +949,8 @@ class load_ui_dynamically(QMainWindow):
             # 分配监控按钮
             self.pushButton_4.clicked.connect(self.start_scan_task)
 
+            # 分配版本号查询按钮
+            self.pushButton_7.clicked.connect(self.bluetooth_tool.send_find_version_cmd)
 
             self.mainWindowTextEdit.clear()
             self.mainWindowTextEdit.setReadOnly(True)
@@ -997,15 +1002,27 @@ class load_ui_dynamically(QMainWindow):
         self.bluetooth_tool.blue_write_log("查询一次电池状态")
 
     def get_dict_from_receive_data(self, header:str, dict_data:dict):
-        """从结构模型中获取字典"""
+        """从结构模型中获取字典，并按列打印到窗口"""
         self.mainWindowTextEdit.clear()
-        json_str = json.dumps(dict_data, sort_keys= True)
-        self.mainWindowTextEdit.append(json_str)
+        # 构建列格式化字符串
+        formatted_text = ""
+        for category, items in dict_data.items():
+            formatted_text += f"[{category}]\n"
+            for item in items:
+                # 假设item为[name, unit, value, ...]
+                if len(item) >= 3:
+                    name = item[0] if len(item) > 0 else ""
+                    unit = item[1] if len(item) > 1 else ""
+                    value = item[2] if len(item) > 2 else ""
+                    formatted_text += f"{name:>10}\t{value:>10}\t{unit:>10}\n"
+            formatted_text += "\n"
+        # 显示到窗口
+        self.mainWindowTextEdit.append(formatted_text)
         self.bluetooth_tool.blue_write_log(f"{header},{dict_data}")
         csv_data_str = ""
         try:
-            for list in dict_data.values():
-                for value in list:
+            for lst in dict_data.values():
+                for value in lst:
                     csv_data_str += value[2] + ","
         except Exception as e:
             self.bluetooth_tool.blue_write_log(f"写入日志失败: {e}")

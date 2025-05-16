@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>619</width>
-    <height>548</height>
+    <height>588</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -88,14 +88,14 @@
     </rect>
    </property>
    <property name="text">
-    <string>查询</string>
+    <string>查询KB</string>
    </property>
   </widget>
   <widget class="QGroupBox" name="groupBox">
    <property name="geometry">
     <rect>
      <x>10</x>
-     <y>260</y>
+     <y>310</y>
      <width>120</width>
      <height>80</height>
     </rect>
@@ -162,8 +162,34 @@
      <x>150</x>
      <y>10</y>
      <width>451</width>
-     <height>531</height>
+     <height>571</height>
     </rect>
+   </property>
+  </widget>
+  <widget class="QPushButton" name="pushButton_7">
+   <property name="geometry">
+    <rect>
+     <x>20</x>
+     <y>250</y>
+     <width>75</width>
+     <height>24</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>查询版本号</string>
+   </property>
+  </widget>
+  <widget class="QPushButton" name="pushButton_8">
+   <property name="geometry">
+    <rect>
+     <x>20</x>
+     <y>280</y>
+     <width>75</width>
+     <height>24</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>PushButton</string>
    </property>
   </widget>
  </widget>

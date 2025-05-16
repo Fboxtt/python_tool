@@ -42,14 +42,14 @@ STRUCT_FORMATS = {
         "HH"  # usBattStatus, usSOC_Percent
         "LLL",  # ulSOH_Percent, ulDisTimes, ulTotalDisAH
     "PC_GET_INF": "<"
-        "HHBBBB"  # TVER: usMajorVer, usMinorVer, usRevision, usCompileYear, ucCompileMonth, ucCompileDay
-        "HHBBBB"  # TVER: btVer
-        "HHBBBB"  # TVER: appVer
-        "HHBBBB"  # TVER: bufferVer
-        "HHBBBB"  # TVER: backupVer
+        "HHHHBBBB"  # TVER: bootVer
+        "HHHHBBBB"  # TVER: app_Ver
+        "HHHHBBBB"  # TVER: buffVer
+        "HHHHBBBB"  # TVER: backVer
         "15s"     # icName (15 bytes)
         "B"       # writableArea (1 byte)
         "L"       # pcAddr (4 bytes)
+        "L"       # uniqueID (4 bytes)
 }
 
 STRUCT_ADDRESSES = {
@@ -119,13 +119,14 @@ STRUCT_VARIABLES = {
         "ulSOH_Percent", "ulDisTimes", "ulTotalDisAH"
     ],
     "PC_GET_INF": [
-        "btVer.usMajorVer", "btVer.usMinorVer", "btVer.usRevision", "btVer.usCompileYear", "btVer.ucCompileMonth", "btVer.ucCompileDay",
-        "appVer.usMajorVer", "appVer.usMinorVer", "appVer.usRevision", "appVer.usCompileYear", "appVer.ucCompileMonth", "appVer.ucCompileDay",
-        "bufferVer.usMajorVer", "bufferVer.usMinorVer", "bufferVer.usRevision", "bufferVer.usCompileYear", "bufferVer.ucCompileMonth", "bufferVer.ucCompileDay",
-        "backupVer.usMajorVer", "backupVer.usMinorVer", "backupVer.usRevision", "backupVer.usCompileYear", "backupVer.ucCompileMonth", "backupVer.ucCompileDay",
+        "bootVer.usMajorVer", "bootVer.usMinorVer", "bootVer.usRevision", "bootVer.usYear", "bootVer.ucMonth", "bootVer.ucDay","bootVer.reserved","bootVer.reserved",
+        "app_Ver.usMajorVer", "app_Ver.usMinorVer", "app_Ver.usRevision", "app_Ver.usYear", "app_Ver.ucMonth", "app_Ver.ucDay","app_Ver.reserved","app_Ver.reserved",
+        "buffVer.usMajorVer", "buffVer.usMinorVer", "buffVer.usRevision", "buffVer.usYear", "buffVer.ucMonth", "buffVer.ucDay","buffVer.reserved","buffVer.reserved",
+        "backVer.usMajorVer", "backVer.usMinorVer", "backVer.usRevision", "backVer.usYear", "backVer.ucMonth", "backVer.ucDay","backVer.reserved","backVer.reserved",
         "icName",
         "writableArea",
-        "pcAddr"
+        "pcAddr",
+        "uniqueID"
     ]
 }
 
@@ -381,6 +382,7 @@ class HexParserApp(QMainWindow):
             return struct_name, None
         try:
             fmt = STRUCT_FORMATS[struct_name]
+            print(fmt)
             size = struct.calcsize(fmt)
             if size != len(data_bytes):
                 print(f"解析 {struct_name} 失败: 数据长度不匹配")
@@ -465,14 +467,15 @@ if __name__ == "__main__":
 
     # 测试数据
     test_data = bytearray([
-        0x01, 0x00, 0x02, 0x00, 0x03, 0x00, 0xE7, 0x07, 0x0A, 0x0F,  # btVer
-        0x04, 0x00, 0x05, 0x00, 0x06, 0x00, 0xE7, 0x07, 0x0B, 0x14,  # appVer
-        0x07, 0x00, 0x08, 0x00, 0x09, 0x00, 0xE7, 0x07, 0x0C, 0x19,  # bufferVer
-        0x0A, 0x00, 0x0B, 0x00, 0x0C, 0x00, 0xE8, 0x07, 0x01, 0x01,  # backupVer
+        0x01, 0x00, 0x02, 0x00, 0x03, 0x00, 0xE7, 0x07, 0x0A, 0x0F, 0x00,0x00, # bootVer
+        0x04, 0x00, 0x05, 0x00, 0x06, 0x00, 0xE7, 0x07, 0x0B, 0x14, 0x00,0x00, # app_Ver
+        0x07, 0x00, 0x08, 0x00, 0x09, 0x00, 0xE7, 0x07, 0x0C, 0x19, 0x00,0x00, # buffVer
+        0x0A, 0x00, 0x0B, 0x00, 0x0C, 0x00, 0xE8, 0x07, 0x01, 0x01, 0x00,0x00, # backVer
         0x49, 0x43, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38,  # icName
         0x39, 0x30, 0x31, 0x32, 0x33,  # icName (continued)
         0x01,  # writableArea
-        0x78, 0x56, 0x34, 0x12  # pcAddr
+        0x78, 0x56, 0x34, 0x12,  # pcAddr
+        0xD0, 0x34, 0x56, 0x78  # uniqueID
     ])
 
     # 解析测试数据
