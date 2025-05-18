@@ -85,7 +85,8 @@ class BluetoothTool(QWidget):
         self.commu_type = None
         self.device_name = None
         self.is_serial_connected = False
-        self.serial_receive_task = None
+        self.serial_receive_task = None #串口接收任务对象
+        self.program_task = None #烧录任务对象
         self.initUI()
         self.hex_model = HexFileModel()
         self.text_decode = TextDecode()
@@ -100,6 +101,10 @@ class BluetoothTool(QWidget):
 
         # 用于存储接收到的数据
         self.received_data_buffer = bytearray()
+
+        # 烧录计数
+        self.ota_start_count = 0
+        self.ota_ok_count = 0
     def initUI(self):
         self.setWindowTitle('firstuse')
 
@@ -719,27 +724,26 @@ class BluetoothTool(QWidget):
 
     def on_program_clicked(self):
         """同步方法，用于触发异步烧录"""
-        if not self.hex_model.is_file_loaded:
-            QMessageBox.warning(self, '警告', '请先选择HEX文件')
-            # return
-        
-        if not self.client or not self.client.is_connected:
-            if not self.serial_port or not self.serial_port.is_open:
-                QMessageBox.warning(self, '警告', '请先连接设备')
+        if self.program_task:
+            self.program_task.cancel()
+            self.program_task = None
+            self.program_button.setEnabled(True)
+            self.program_button.setText('开始烧录')
+        else:
+            if not self.client or not self.client.is_connected:
+                if not self.serial_port or not self.serial_port.is_open:
+                    QMessageBox.warning(self, '警告', '请先连接设备')
                 return
-        
-        # 创建烧录任务
-        asyncio.create_task(self.start_programming())
+            # 创建烧录任务
+            self.program_task = asyncio.create_task(self.start_programming())
 
     async def start_programming(self):
         """异步方法，执行烧录过程"""
         try:
-            
+            self.ota_start_count += 1
             time128 = int(self.test128.text()) / 1000
             time512 = int(self.test512.text()) / 1000
-            # 禁用烧录按钮，避免重复点击
-            self.program_button.setEnabled(False)
-            self.program_button.setText('烧录中...')
+            self.program_button.setText('再点击即停止')
             err_count = 0  
             # while err_count < 4:
             #     data = self.download_data.get_download_data(BmsCmdType.DOWNLOAD_BUFFER)
@@ -855,7 +859,7 @@ class BluetoothTool(QWidget):
                 data = self.download_data.get_download_data(BmsCmdType.REC_TOTAL_CHECKSUM)
                 self.display_send_data(data)
                 await self.byte_send(data)
-                await asyncio.sleep(time512 * 2)
+                await asyncio.sleep(time512 * 4)
                 if(self.text_decode.no80_cmd == BmsCmdType.REC_TOTAL_CHECKSUM  and self.text_decode.cmd_ack == 0x00):
                     break
                 else:
@@ -872,6 +876,7 @@ class BluetoothTool(QWidget):
                     await self.byte_send(data)
                     await asyncio.sleep(time512 * 2)
                     if(self.text_decode.no80_cmd == BmsCmdType.READ_IC_INF  and self.text_decode.cmd_ack == 0x00):
+                        self.ota_ok_count += 1
                         break
                     else:
                         err_count += 1
@@ -883,6 +888,7 @@ class BluetoothTool(QWidget):
         
         finally:
             # 恢复按钮状态
+            self.program_task = None
             self.program_button.setEnabled(True)
             self.program_button.setText('开始烧录')
 
