@@ -105,6 +105,7 @@ class BluetoothTool(QWidget):
         # 烧录计数
         self.ota_start_count = 0
         self.ota_ok_count = 0
+        self.batch_task = None
     def initUI(self):
         self.setWindowTitle('firstuse')
 
@@ -265,6 +266,15 @@ class BluetoothTool(QWidget):
         self.program_button = QPushButton('开始烧录')
         self.program_button.clicked.connect(self.on_program_clicked)
         self.program_layout.addWidget(self.program_button)
+
+        # 新增：批量烧录按钮和成功数label
+        self.batch_program_button = QPushButton('批量烧录100次')
+        self.batch_program_button.clicked.connect(self.on_batch_program_clicked)
+        self.program_layout.addWidget(self.batch_program_button)
+
+        self.batch_success_label = QLabel('成功数: 0')
+        self.program_layout.addWidget(self.batch_success_label)
+
         layout.addLayout(self.program_layout)
 
         # 数据接收部分
@@ -680,7 +690,7 @@ class BluetoothTool(QWidget):
         """回调函数，处理接收到的数据"""
         # 将数据添加到缓冲区
         self.received_data_buffer.extend(data)
-
+        print("2第一次收到数据J")
         # 重启定时器
         self.data_timer.start(100)  # 100ms
 
@@ -690,19 +700,23 @@ class BluetoothTool(QWidget):
         # self.blue_write_log(f"Received complete data packet: {self.received_data_buffer}")
     
         # 处理数据
+        print("3收完数据")
         self.text_decode.split_data(self.received_data_buffer)
         if self.text_decode.have_hex:
             # self.blue_write_log(f"发送信号给数据解析模块")
             struct_name,dict_data = self.hex_parser.decode_cmd_hex_data(self.text_decode.no80_cmd,bytes(self.text_decode.data_hex))
+            print("4解析完数据")
             if dict_data:
                 header = f"RX->,{self.commu_type},{self.device_name},{struct_name}"
                 """csv记录监控数据"""
                 """外部窗口展示 监控数据 |字典数据|纯参数数据|"""
                 self.decode_data_ok_signal.emit(header,dict_data) 
+                print("5发射完字典")
                 # 发射到函数get_dict_from_receive_data(str,dict)
         """log记录调试数据"""
         """内部窗口展示 调试数据 |hex数据|字符串数据|"""
         self.display_received_data(self.received_data_buffer)
+        print("6显示完数据")
         # 清空缓冲区
         self.received_data_buffer.clear()
 
@@ -821,7 +835,7 @@ class BluetoothTool(QWidget):
                         err_count = 0
                         while err_count < 5:
                             self.display_send_data(data)
-                            self.blue_write_log("开始发送----------------")
+                            self.blue_write_log("1开始发送----------------")
                             await self.byte_send(data)
                             # current_time = datetime.now().strftime("%H:%M:%S.%f")[:-3]
                             # self.blue_write_log(f"TX->数据包发送完成 - 时间: {current_time}")
@@ -884,7 +898,7 @@ class BluetoothTool(QWidget):
         except Exception as e:
             traceback.print_exc()
             self.blue_write_log(f"烧录失败: {str(e)}")
-            QMessageBox.critical(self, '错误', f'烧录失败: {str(e)}')
+            # QMessageBox.critical(self, '错误', f'烧录失败: {str(e)}')
         
         finally:
             # 恢复按钮状态
@@ -935,7 +949,31 @@ class BluetoothTool(QWidget):
         """发送版本号查询命令"""
         self.send_command(self.text_decode.send_hex_fill(0x71))
 
+    def on_batch_program_clicked(self):
+        """同步方法，批量烧录100次"""
+        if self.batch_task:
+            self.batch_task.cancel()
+            self.batch_program_button.setText('开始烧录100')
+            self.batch_task = None
+            return
+        self.batch_program_button.setText('再点击即停止')
+        self.ota_start_count = 0
+        self.ota_ok_count = 0
+        self.batch_success_label.setText('成功数: 0')
+        self.batch_task = asyncio.create_task(self.batch_programming())
 
+    async def batch_programming(self):
+        """异步方法，批量烧录100次"""
+        for i in range(100):
+            try:
+                await self.start_programming()
+                self.batch_success_label.setText(f'总数: {self.ota_start_count} 成功数: {self.ota_ok_count}')
+            except Exception as e:
+                self.blue_write_log(f'第{i+1}次烧录失败: {e}')
+                traceback.print_exc()
+                self.batch_task = None
+                continue
+        self.batch_program_button.setText('开始烧录100')
 # 修正后的函数 - 注意这是一个函数，不是类
 class load_ui_dynamically(QMainWindow):
     scan_task = None
