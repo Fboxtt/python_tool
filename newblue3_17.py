@@ -524,8 +524,14 @@ class BluetoothTool(QWidget):
         except ValueError:
             rssi_threshold = -100  # 默认值，显示所有设备
 
-        # 设置扫描时间为3秒
-        devices = await BleakScanner.discover(timeout=2.0)  # 单位是秒
+        try:
+            # 设置扫描时间为3秒
+            devices = await BleakScanner.discover(timeout=2.0)  # 单位是秒
+        except Exception as e:
+            # QMessageBox.critical(self, '扫描失败', str(e))
+            self.blue_write_log(f"扫描失败 {str(e)}")
+            traceback.print_exc()
+            return
         
         self.device_list.clear()
         for device in devices:
@@ -980,8 +986,12 @@ class load_ui_dynamically(QMainWindow):
     def __init__(self, ui_file):
         super().__init__()
         try:
+            # 初始化日志管理器
+            self.logger = LogManager.get_instance()
+
             # 加载UI文件
             uic.loadUi(ui_file, self)
+            self.logger.write_log("UI文件加载成功")
             self.setWindowTitle('firstuse')
             # 初始化连接窗口
             self.bluetooth_tool = BluetoothTool()
@@ -1007,9 +1017,6 @@ class load_ui_dynamically(QMainWindow):
             # 连接数据解析模块到主窗口
             self.bluetooth_tool.decode_data_ok_signal.connect(self.get_dict_from_receive_data)
 
-            # 初始化日志管理器
-            self.logger = LogManager.get_instance()
-            self.logger.write_log("UI文件加载成功")
             
             # 初始化结构体模型列表 到csv文件
             self.struct_list = self.bluetooth_tool.hex_parser.get_struct_name_list()
@@ -1019,7 +1026,7 @@ class load_ui_dynamically(QMainWindow):
             # self.pushButton.clicked.connect(self.close)  # 假设 pushButton 是一个关闭按钮
             self.bluetooth_tool.blue_write_log(f"UI文件 {ui_file} 加载成功")
         except Exception as e:
-            self.bluetooth_tool.blue_write_log(f"加载UI文件失败: {e}")
+            self.logger.write_log(f"加载UI文件失败: {e}")
             traceback.print_exc()
             # return None
     def disconnect_device(self):
@@ -1174,15 +1181,19 @@ if __name__ == '__main__':
             # 加载失败时显示错误消息
             QMessageBox.critical(None, '错误', 'UI文件加载失败')
             traceback.print_exc()
-            sys.exit(1)
+            # sys.exit(1)
         
         # 运行事件循环
         with loop:
             loop.run_forever()
     except Exception as e:
-        error_msg = traceback.format_exc()  # 获取 traceback 字符串\
-        LogManager.get_instance.write_log(str(e))
-        LogManager.get_instance.write_log(error_msg)
-        traceback.print_exc()
-        sys.exit(1)
+        try:
+            error_msg = traceback.format_exc()  # 获取 traceback 字符串\
+            log = LogManager.get_instance()
+            log.write_log(str(e))
+            log.write_log(error_msg)
+            traceback.print_exc()
+        except Exception as e:
+            print(f"写入日志失败: {e}")
+            sys.exit(1)
 
