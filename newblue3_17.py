@@ -9,7 +9,7 @@ import os
 from PyQt6.QtCore import QTimer  # 导入 QTimer
 from PyQt6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QPushButton, QListWidget, QLabel, QMessageBox, QTextEdit, QLineEdit, QHBoxLayout,
-    QCheckBox, QFileDialog, QComboBox, QGridLayout, QMainWindow, QSplashScreen
+    QCheckBox, QFileDialog, QComboBox, QGridLayout, QMainWindow, QSplashScreen, QSizePolicy
 )
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QPixmap, QFont
@@ -993,6 +993,7 @@ class load_ui_dynamically(QMainWindow):
             uic.loadUi(ui_file, self)
             self.logger.write_log("UI文件加载成功")
             self.setWindowTitle('firstuse')
+            self.setFixedSize(620,620)
             # 初始化连接窗口
             self.bluetooth_tool = BluetoothTool()
             # self.bluetooth_tool.setWindowModality(Qt.WindowModality.ApplicationModal)
