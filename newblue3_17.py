@@ -464,8 +464,8 @@ class BluetoothTool(QWidget):
         """当16进制显示选项改变时，重新显示接收到的数据"""
         if hasattr(self, 'received_data_buffer'):
             self.receive_output.clear()
-            for data in self.received_data_buffer:
-                self.display_received_data(data)
+            # for data in self.received_data_buffer:
+            self.display_received_data(self.received_data_buffer)
 
     def display_received_data(self, data):
         """显示接收到的数据，根据16进制显示选项决定显示格式"""
