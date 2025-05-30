@@ -678,7 +678,7 @@ class BluetoothTool(QWidget):
         try:
             if(not self.client or not self.client.is_connected):
                 if(not self.serial_port or not self.serial_port.is_open):
-                    QMessageBox.warning(self, '警告', '未连接到设备')
+                    # QMessageBox.warning(self, '警告', '未连接到设备')
                     raise Exception("未连接到设备")
                 """蓝牙发送"""
             if self.client and self.client.is_connected:
@@ -1003,28 +1003,32 @@ class BluetoothTool(QWidget):
         painter.end()
         self.status_indicator.setPixmap(pixmap)
 
-    async def on_register_clicked(self):
+    def on_register_clicked(self):
+        asyncio.create_task(self.send_register_cmd())
+        pass
+    
+    async def send_register_cmd(self):
         """注册按钮点击处理"""
         try:
+            self.update_registration_status(False)
             # 这里添加实际的注册逻辑
-            registration_success = await self.perform_registration()
-            
-            self.update_registration_status(registration_success)
-            if registration_success:
+            data = bytearray([0x00,0x00,0x04,0x01,0x01,0x55,0xaa,0x05])
+            self.display_send_data(data)
+            await self.byte_send(data)
+            await asyncio.sleep(0.2)
+            if self.text_decode.legality != ReceveDataStatus.ERR_NO:
+                await asyncio.sleep(0.7)
+            if(self.text_decode.legality == ReceveDataStatus.ERR_NO and self.text_decode.cmd_ack == 0x00):
+                self.update_registration_status(True)
                 self.blue_write_log("注册成功")
             else:
+                self.update_registration_status(False)
                 self.blue_write_log("注册失败")
-            
+                
         except Exception as e:
             self.blue_write_log(f"注册异常: {str(e)}")
             self.update_registration_status(False)
 
-    async def perform_registration(self):
-        """模拟注册操作，返回是否成功"""
-        # 这里添加真实的注册逻辑，例如：
-        # return await some_registration_api()
-        await asyncio.sleep(1)  # 模拟异步操作
-        return random.choice([True, False])  # 随机返回成功/失败用于测试
 
 # 修正后的函数 - 注意这是一个函数，不是类
 class load_ui_dynamically(QMainWindow):
