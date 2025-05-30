@@ -475,6 +475,7 @@ class BluetoothTool(QWidget):
         else:
             # 文本显示
             try:
+                print(type(data),'|||',data)
                 reve_data = data.decode('utf-8')
             except UnicodeDecodeError:
                 # 如果无法解码为文本，则显示16进制
@@ -574,6 +575,7 @@ class BluetoothTool(QWidget):
                 if self.client and self.client.is_connected:
                     self.device_name = selected_device.text().split(' - ')[0]
                     await self.client.start_notify("0000ffe1-0000-1000-8000-00805f9b34fb", self.on_data_received)
+                QTimer.singleShot(1000, self.send_find_version_cmd)
             except Exception as e:
                 self.commu_type = "none"
                 QMessageBox.critical(self, '连接失败', str(e))
@@ -1016,7 +1018,7 @@ class BluetoothTool(QWidget):
             data = bytearray([0x00,0x00,0x04,0x01,0x01,0x55,0xaa,0x05])
             self.display_send_data(data)
             await self.byte_send(data)
-            await asyncio.sleep(0.2)
+            await asyncio.sleep(0.3)
             if self.text_decode.legality != ReceveDataStatus.ERR_NO:
                 await asyncio.sleep(0.7)
             if(self.text_decode.legality == ReceveDataStatus.ERR_NO and self.text_decode.cmd_ack == 0x00):
@@ -1077,10 +1079,33 @@ class load_ui_dynamically(QMainWindow):
             # 连接按钮信号
             # self.pushButton.clicked.connect(self.close)  # 假设 pushButton 是一个关闭按钮
             self.bluetooth_tool.blue_write_log(f"UI文件 {ui_file} 加载成功")
+
+            # 在一级窗口上再创建一个qwidget用来显示一些标志位
+            # self.setGeometry(0, 0, 900, 600)
+            self.setFixedSize(900,600)
+            self.bit_window = QWidget(self)
+            self.test_pushButton = QPushButton('test_hide')
+            # self.test_pushButton.setGeometry(10, 10, 100, 100)
+            self.bit_layout = QHBoxLayout()
+            self.bit_layout.addWidget(self.test_pushButton)
+            self.bit_window.setLayout(self.bit_layout)
+            self.test_pushButton.clicked.connect(self.test_open_close_bitwidows)
+            self.bit_window.setWindowTitle('烧录标志位')
+            self.bit_window.setGeometry(620, 10, 300, 600)
+            self.bit_window.show()
         except Exception as e:
             self.logger.write_log(f"加载UI文件失败: {e}")
             traceback.print_exc()
             # return None
+    def test_open_close_bitwidows(self):
+        # 实际使用需要删掉
+        if self.test_pushButton.text() == "test_hide":
+            self.bit_window.hide()
+            self.test_pushButton.setText('test_show')
+        else:
+            self.bit_window.show()
+            self.test_pushButton.setText('test_hide')
+
     def disconnect_device(self):
         """断开连接"""
         if self.scan_task:
