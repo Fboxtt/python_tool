@@ -5,6 +5,7 @@ import time
 import json
 from datetime import datetime
 import os
+import random
 
 from PyQt6.QtCore import QTimer  # 导入 QTimer
 from PyQt6.QtWidgets import (
@@ -12,7 +13,7 @@ from PyQt6.QtWidgets import (
     QCheckBox, QFileDialog, QComboBox, QGridLayout, QMainWindow, QSplashScreen, QSizePolicy
 )
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QPixmap, QFont
+from PyQt6.QtGui import QPixmap, QFont, QColor, QPainter
 from bleak import BleakScanner, BleakClient
 from qasync import QEventLoop, asyncSlot
 import serial.tools.list_ports
@@ -191,7 +192,7 @@ class BluetoothTool(QWidget):
         # 波特率设置
         self.baud_label = QLabel('波特率:')
         self.baud_combo = QComboBox()
-        self.baud_combo.addItems(['9600', '19200', '38400', '57600', '115200'])
+        self.baud_combo.addItems(['9600', '18000','18600', '19200', '38400', '57600', '115200'])
         self.baud_combo.setCurrentText('19200')
         param_layout.addWidget(self.baud_label, 1, 0)
         param_layout.addWidget(self.baud_combo, 1, 1)
@@ -245,9 +246,18 @@ class BluetoothTool(QWidget):
         self.send_button = QPushButton('发送数据')
         self.send_button.clicked.connect(self.on_send_data_clicked)
         self.send_button.setEnabled(False)  # 初始状态下发送按钮不可用
+        self.register_button = QPushButton('注册')
+        self.register_button.clicked.connect(self.on_register_clicked)
+        
+        # 新增状态指示灯
+        self.status_indicator = QLabel()
+        self.update_registration_status(False)  # 初始状态为未注册
+        
         self.send_layout.addWidget(self.send_input)
         self.send_layout.addWidget(self.hex_send_checkbox)
         self.send_layout.addWidget(self.send_button)
+        self.send_layout.addWidget(self.register_button)
+        self.send_layout.addWidget(self.status_indicator)  # 添加状态指示灯
         layout.addLayout(self.send_layout)
 
         # 测试数据发送部分
@@ -980,6 +990,42 @@ class BluetoothTool(QWidget):
                 self.batch_task = None
                 continue
         self.batch_program_button.setText('开始烧录100')
+
+    def update_registration_status(self, is_registered: bool):
+        """更新注册状态指示"""
+        color = QColor(0, 255, 0) if is_registered else QColor(255, 0, 0)  # 绿/红
+        pixmap = QPixmap(16, 16)
+        pixmap.fill(Qt.GlobalColor.transparent)
+        painter = QPainter(pixmap)
+        painter.setBrush(color)
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.drawEllipse(0, 0, 15, 15)
+        painter.end()
+        self.status_indicator.setPixmap(pixmap)
+
+    async def on_register_clicked(self):
+        """注册按钮点击处理"""
+        try:
+            # 这里添加实际的注册逻辑
+            registration_success = await self.perform_registration()
+            
+            self.update_registration_status(registration_success)
+            if registration_success:
+                self.blue_write_log("注册成功")
+            else:
+                self.blue_write_log("注册失败")
+            
+        except Exception as e:
+            self.blue_write_log(f"注册异常: {str(e)}")
+            self.update_registration_status(False)
+
+    async def perform_registration(self):
+        """模拟注册操作，返回是否成功"""
+        # 这里添加真实的注册逻辑，例如：
+        # return await some_registration_api()
+        await asyncio.sleep(1)  # 模拟异步操作
+        return random.choice([True, False])  # 随机返回成功/失败用于测试
+
 # 修正后的函数 - 注意这是一个函数，不是类
 class load_ui_dynamically(QMainWindow):
     scan_task = None

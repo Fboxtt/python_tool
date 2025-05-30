@@ -92,7 +92,7 @@ STRUCT_VARIABLES = {
         "usDisCurrSK", "sDisCurrSB",
         "usChgCurrSSK", "sChgCurrSSB",
         "usDisCurrSSK", "sDisCurrSSB",
-        *[f"usTempK[{i}]" for i in range(5)]
+        *[f"usTempK[{i}]" for i in range(8)]
     ],
     "PC_GET_OCP_DELAYTIME": [
         "ChgDelayCount_1C", "ChgDelayCount_2C",
