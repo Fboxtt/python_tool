@@ -500,6 +500,7 @@ class BluetoothTool(QWidget):
 
     def on_connect_device_clicked(self):
         """同步方法，用于触发异步连接"""
+        self.decode_data_ok_signal.emit(None,{"connect" : "nothing"}) 
         asyncio.create_task(self.connect_device())
 
     def on_disconnect_device_clicked(self):
