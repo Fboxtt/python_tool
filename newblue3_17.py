@@ -994,18 +994,6 @@ class BluetoothTool(QWidget):
                 continue
         self.batch_program_button.setText('开始烧录100')
 
-    def update_registration_status(self, is_registered: bool):
-        """更新注册状态指示"""
-        color = QColor(0, 255, 0) if is_registered else QColor(255, 0, 0)  # 绿/红
-        pixmap = QPixmap(16, 16)
-        pixmap.fill(Qt.GlobalColor.transparent)
-        painter = QPainter(pixmap)
-        painter.setBrush(color)
-        painter.setPen(Qt.PenStyle.NoPen)
-        painter.drawEllipse(0, 0, 15, 15)
-        painter.end()
-        self.status_indicator.setPixmap(pixmap)
-
     def on_register_clicked(self):
         asyncio.create_task(self.send_register_cmd())
         pass
@@ -1018,12 +1006,16 @@ class BluetoothTool(QWidget):
             data = bytearray([0x00,0x00,0x04,0x01,0x01,0x55,0xaa,0x05])
             self.display_send_data(data)
             await self.byte_send(data)
-            await asyncio.sleep(0.3)
-            if self.text_decode.legality != ReceveDataStatus.ERR_NO:
+            await asyncio.sleep(0.4)
+            if self.text_decode.legality == ReceveDataStatus.ERR_NOTHING:
                 await asyncio.sleep(0.7)
-            if(self.text_decode.legality == ReceveDataStatus.ERR_NO and self.text_decode.cmd_ack == 0x00):
-                self.update_registration_status(True)
-                self.blue_write_log("注册成功")
+            if self.text_decode.legality != ReceveDataStatus.ERR_NOTHING:
+                if self.text_decode.cmd_ack in [0x00, 0x04]:
+                    self.update_registration_status(True)
+                    self.blue_write_log("注册成功")
+                else:
+                    self.update_registration_status(False)
+                    self.blue_write_log("注册失败")
             else:
                 self.update_registration_status(False)
                 self.blue_write_log("注册失败")
@@ -1032,6 +1024,17 @@ class BluetoothTool(QWidget):
             self.blue_write_log(f"注册异常: {str(e)}")
             self.update_registration_status(False)
 
+    def update_registration_status(self, is_registered: bool):
+        """更新注册状态指示"""
+        color = QColor(0, 255, 0) if is_registered else QColor(255, 0, 0)  # 绿/红
+        pixmap = QPixmap(16, 16)
+        pixmap.fill(Qt.GlobalColor.transparent)
+        painter = QPainter(pixmap)
+        painter.setBrush(color)
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.drawEllipse(0, 0, 15, 15)
+        painter.end()
+        self.status_indicator.setPixmap(pixmap)
 
 # 修正后的函数 - 注意这是一个函数，不是类
 class load_ui_dynamically(QMainWindow):
