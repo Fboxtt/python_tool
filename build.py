@@ -16,8 +16,8 @@ def build_exe(mode: str):
     
     # 构建参数
     args = [
-        "main.py",
-        "--name=MyApp",
+        "newblue3_17.py",
+        f"--name={mode}",
         "--onefile",
         "--windowed",
         # f"--icon=build/icon.ico",
@@ -31,7 +31,7 @@ def build_exe(mode: str):
     ]
     
     # 调试版额外配置
-    if mode == "debug":
+    if mode in ["debugApp","firstuse"]:
         args += [
             "--debug=all",
             "--console"  # 调试版显示控制台
@@ -42,7 +42,7 @@ def build_exe(mode: str):
 
 if __name__ == "__main__":
     # 编译两个版本
-    for mode in ["user", "debug"]:
+    for mode in ["userApp", "debugApp","firstuse"]:
         build_exe(mode)
     
     print("编译完成！")
