@@ -277,6 +277,9 @@ class BluetoothTool(QWidget):
         self.program_button.clicked.connect(self.on_program_clicked)
         self.program_layout.addWidget(self.program_button)
 
+        self.packet_success_label = QLabel('包号: 0 总包数 0')
+        self.program_layout.addWidget(self.packet_success_label)
+
         # 新增：批量烧录按钮和成功数label
         self.batch_program_button = QPushButton('批量烧录100次')
         self.batch_program_button.clicked.connect(self.on_batch_program_clicked)
@@ -798,6 +801,7 @@ class BluetoothTool(QWidget):
             while shake_count < 3:
                 err_count = 0
                 while err_count < 3:
+                    self.packet_success_label.setText('开始握手')
                     data = bytearray([0x00,0x00,0x04,0x01,0x76,0x55,0xaa,0x7a])
                     self.display_send_data(data)
                     await self.byte_send(data)
@@ -812,6 +816,7 @@ class BluetoothTool(QWidget):
                         # raise Exception("握手命令发送失败")
                 shake_count += 1
             else:
+                self.packet_success_label.setText('握手成功')
                 self.blue_write_log(f"握手命令发送成功")
             # self.text_decode.legality = ReceveDataStatus.ERR_NOTHING
 
@@ -828,6 +833,7 @@ class BluetoothTool(QWidget):
                     await asyncio.sleep(time512 * 4)
                 if(self.text_decode.no80_cmd == BmsCmdType.DOWNLOAD_BUFFER  and self.text_decode.cmd_ack == 0x00):
                     self.blue_write_log(f"擦除命令发送成功")
+                    self.packet_success_label.setText('擦除成功')
                     break
                 else:
                     err_count += 1
@@ -865,6 +871,7 @@ class BluetoothTool(QWidget):
                             if(self.text_decode.no80_cmd == BmsCmdType.WRITE_FLASH  and 
                                 self.text_decode.cmd_ack == 0x00 and
                                 self.text_decode.cmd_packet_num == hex_packet + 1):
+                                    self.packet_success_label.setText(f'包号: {hex_packet + 1} 总包数: {self.download_data.packet_num}')
                                     err_count = 0
                                     hex_packet += 1
                                     break
