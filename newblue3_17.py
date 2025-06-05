@@ -76,7 +76,6 @@ class SplashScreen(QSplashScreen):
 class BluetoothTool(QWidget):
     receive_ok_signal = pyqtSignal(int,bytes)
     decode_data_ok_signal = pyqtSignal(str,dict)
-    task_flag = 0
     pass
     def __init__(self):
         super().__init__()
@@ -88,6 +87,7 @@ class BluetoothTool(QWidget):
         self.is_serial_connected = False
         self.serial_receive_task = None #串口接收任务对象
         self.program_task = None #烧录任务对象
+        self.task_flag = False
         self.initUI()
         self.hex_model = HexFileModel()
         self.text_decode = TextDecode()
@@ -270,6 +270,18 @@ class BluetoothTool(QWidget):
         self.test_layout.addWidget(self.test_send_button)
         self.test_send_button.clicked.connect(self.on_test_send_buttoned)
         layout.addLayout(self.test_layout)
+
+        # 测试数据结果显示部分
+        self.success_couont_layout = QHBoxLayout()
+        self.no_ack_label = QLabel('无回应=0')
+        self.no_ack_count = 0
+        self.err_ack_label = QLabel('ack错误=0')
+        self.err_ack_count = 0
+        self.total_send_label = QLabel('发送总次数=0')
+        self.success_couont_layout.addWidget(self.no_ack_label)
+        self.success_couont_layout.addWidget(self.err_ack_label)
+        self.success_couont_layout.addWidget(self.total_send_label)
+        layout.addLayout(self.success_couont_layout)
 
         # 烧录控制部分
         self.program_layout = QHBoxLayout()
@@ -525,6 +537,11 @@ class BluetoothTool(QWidget):
             self.task.cancel()
             self.task_flag = False
             return
+        self.total_send_label.setText(f'总 = 0')
+        self.no_ack_label.setText(f'无回复 = 0')
+        self.err_ack_label.setText(f'ack错误 = 0')
+        self.err_ack_count = 0
+        self.no_ack_count = 0
         self.task_flag = True
         self.task = asyncio.create_task(self.test_send_data())
 
@@ -646,17 +663,37 @@ class BluetoothTool(QWidget):
 
     async def test_send_data(self):
         """异步方法，发送测试数据"""
-        data = bytes(128)
+        data = self.text_decode.send_hex_fill(0x13)
         self.send_count = 0
-        while 1:
-            time512 = int(self.test512.text()) / 1000
+        send_max_count = 100
+        while send_max_count:
+            send_max_count-=1
+            time512 = int(self.test512.text()) / 1000 * 2
             if self.client and self.client.is_connected:
                 try:
                     # 假设设备的写特征 UUID 是 "0000ffe1-0000-1000-8000-00805f9b34fb"
                     self.byte_send(data)
                     await self.client.write_gatt_char("0000ffe1-0000-1000-8000-00805f9b34fb", data)
-                    time.sleep(time512)
+                    self.display_send_data(data)
+                    # time.sleep(time512)
                     self.send_count += 1
+                    self.total_send_label.setText(f'总 = {self.send_count}')
+
+                    await asyncio.sleep(0.4)
+                    if self.text_decode.legality == ReceveDataStatus.ERR_NOTHING:
+                        await asyncio.sleep(0.7)
+                    if self.text_decode.legality != ReceveDataStatus.ERR_NOTHING:
+                        if self.text_decode.cmd_ack in [0x00]:
+                            self.blue_write_log("回复成功")
+                        else:
+                            self.err_ack_count+=1
+                            self.err_ack_label.setText(f'err回复={self.err_ack_count}')
+                            self.blue_write_log("回复错误")
+                    else:
+                        self.no_ack_count+=1
+                        self.no_ack_label.setText(f'无回复={self.no_ack_count}')
+                        self.blue_write_log("没有回复")
+
                     # 如果收到数据过长，清楚部分开头数据，提升软件性能
                     if self.send_count > 10:                        
                         cursor = self.receive_output.textCursor()  # 获取 QTextCursor
@@ -670,7 +707,6 @@ class BluetoothTool(QWidget):
                     traceback.print_exc()
                     self.blue_write_log(f"蓝牙发送失败 {str(e)}")
                     QMessageBox.critical(self, '发送失败', str(e))
-                    break
             else:
                 # QMessageBox.warning(self, '警告', '未连接到设备')
                 break
