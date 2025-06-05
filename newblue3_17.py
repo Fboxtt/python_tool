@@ -1096,9 +1096,11 @@ class load_ui_dynamically(QMainWindow):
             self.bit_window = QWidget(self)
             self.test_pushButton = QPushButton('test_hide')
             # self.test_pushButton.setGeometry(10, 10, 100, 100)
-            self.bit_layout = QHBoxLayout()
+            self.bit_layout = QGridLayout()
             self.bit_layout.addWidget(self.test_pushButton)
             self.bit_window.setLayout(self.bit_layout)
+            self.key_label_list = []
+            self.value_label_list = []
             self.test_pushButton.clicked.connect(self.test_open_close_bitwidows)
             self.bit_window.setWindowTitle('烧录标志位')
             self.bit_window.setGeometry(620, 10, 300, 600)
@@ -1115,7 +1117,17 @@ class load_ui_dynamically(QMainWindow):
         else:
             self.bit_window.show()
             self.test_pushButton.setText('test_hide')
-
+    def visualize_bit_flags(self,data: list):
+        for i,unit in enumerate(data):
+            if i >= len(self.key_label_list):
+                self.key_label_list.append(QLabel(f'{unit[0]}'))
+                self.value_label_list.append(QLabel(f'{unit[2]}'))
+                self.bit_layout.addWidget(self.key_label_list[i],i,0)
+                self.bit_layout.addWidget(self.value_label_list[i],i,1)
+            else:
+                self.key_label_list[i].setText(f'{unit[0]}')
+                self.value_label_list[i].setText(f'{unit[2]}')
+        pass
     def disconnect_device(self):
         """断开连接"""
         if self.scan_task:
@@ -1165,6 +1177,7 @@ class load_ui_dynamically(QMainWindow):
         except Exception as e:
             self.bluetooth_tool.blue_write_log(f"写入日志失败: {e}")
             traceback.print_exc()
+        self.visualize_bit_flags(dict_data.values())
         ComunManager.get_instance().write_csv(f"{header},{csv_data_str[:-1]}")
     async def get_data_from_device(self, time_interval = 1):
         """异步方法，从设备获取数据"""
