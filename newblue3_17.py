@@ -516,7 +516,7 @@ class BluetoothTool(QWidget):
 
     def on_connect_device_clicked(self):
         """同步方法，用于触发异步连接"""
-        self.decode_data_ok_signal.emit(None,{"connect" : "nothing"}) 
+        self.decode_data_ok_signal.emit(None,{"connect" : {'nothing':('nothing','nothing','nothing')}}) 
         asyncio.create_task(self.connect_device())
 
     def on_disconnect_device_clicked(self):
@@ -770,7 +770,7 @@ class BluetoothTool(QWidget):
                 """外部窗口展示 监控数据 |字典数据|纯参数数据|"""
                 self.decode_data_ok_signal.emit(header,dict_data) 
                 print("5发射完字典")
-                # 发射到函数get_dict_from_receive_data(str,dict)
+                # 发射到函数 get_dict_from_receive_data (str,dict)
         """log记录调试数据"""
         """内部窗口展示 调试数据 |hex数据|字符串数据|"""
         self.display_received_data(self.received_data_buffer)
@@ -1128,12 +1128,14 @@ class load_ui_dynamically(QMainWindow):
 
             # 在一级窗口上再创建一个qwidget用来显示一些标志位
             # self.setGeometry(0, 0, 900, 600)
-            self.setFixedSize(900,600)
+            self.setFixedSize(1100,600)
             self.bit_window = QWidget(self)
             self.test_pushButton = QPushButton('test_hide')
             # self.test_pushButton.setGeometry(10, 10, 100, 100)
             self.bit_layout = QGridLayout()
-            self.bit_layout.addWidget(self.test_pushButton)
+            self.bit_layout.setVerticalSpacing(1)
+            self.bit_layout.setHorizontalSpacing(10)
+            self.bit_layout.addWidget(self.test_pushButton,0,0)
             self.bit_window.setLayout(self.bit_layout)
             self.key_label_list = []
             self.value_label_list = []
@@ -1154,15 +1156,28 @@ class load_ui_dynamically(QMainWindow):
             self.bit_window.show()
             self.test_pushButton.setText('test_hide')
     def visualize_bit_flags(self,data: list):
-        for i,unit in enumerate(data):
-            if i >= len(self.key_label_list):
-                self.key_label_list.append(QLabel(f'{unit[0]}'))
-                self.value_label_list.append(QLabel(f'{unit[2]}'))
-                self.bit_layout.addWidget(self.key_label_list[i],i,0)
-                self.bit_layout.addWidget(self.value_label_list[i],i,1)
-            else:
-                self.key_label_list[i].setText(f'{unit[0]}')
-                self.value_label_list[i].setText(f'{unit[2]}')
+        row = 0
+        clomn = 0
+        try:
+            for i,unit in enumerate(data):
+                print(f'i = {i} len(list) = {len(self.key_label_list)} tuple = {len(unit)}',end = '')
+                # print(f"len(value_label_list) = {len(self.value_label_list)}")
+                print(f'row = {row} clomn = {clomn}')
+                if i >= len(self.key_label_list):
+                    self.key_label_list.append(QLabel(f'{unit[0]}'))
+                    self.value_label_list.append(QLabel(f'{unit[2]}'))
+                    self.bit_layout.addWidget(self.key_label_list[i],row,clomn)
+                    self.bit_layout.addWidget(self.value_label_list[i],row,clomn+1)
+                else:
+                    self.key_label_list[i].setText(f'{unit[0]}')
+                    self.value_label_list[i].setText(f'{unit[2]}')
+                row+=1
+                if row >= 30:
+                    row = 0
+                    clomn+=2
+        except Exception as e:
+            self.logger.write_log(f"bit windows写入失败: {e}")
+            traceback.print_exc()
         pass
     def disconnect_device(self):
         """断开连接"""
@@ -1194,6 +1209,7 @@ class load_ui_dynamically(QMainWindow):
         formatted_text = ""
         for category, items in dict_data.items():
             formatted_text += f"[{category}]\n"
+            self.visualize_bit_flags(list(items)) # 删 改，影响程序运行时间
             for item in items:
                 # 假设item为[name, unit, value, ...]
                 if len(item) >= 3:
@@ -1213,7 +1229,6 @@ class load_ui_dynamically(QMainWindow):
         except Exception as e:
             self.bluetooth_tool.blue_write_log(f"写入日志失败: {e}")
             traceback.print_exc()
-        self.visualize_bit_flags(dict_data.values())
         ComunManager.get_instance().write_csv(f"{header},{csv_data_str[:-1]}")
     async def get_data_from_device(self, time_interval = 1):
         """异步方法，从设备获取数据"""
