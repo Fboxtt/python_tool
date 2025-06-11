@@ -149,7 +149,7 @@ class BluetoothTool(QWidget):
         self.rssi_threshold_layout = QHBoxLayout()
         self.rssi_threshold_label = QLabel('信号强度筛选 (RSSI >):')
         self.rssi_threshold_input = QLineEdit()
-        self.rssi_threshold_input.setText("-80")
+        self.rssi_threshold_input.setText("-100")
         self.rssi_threshold_input.setPlaceholderText('例如: -70')
         self.rssi_threshold_layout.addWidget(self.rssi_threshold_label)
         self.rssi_threshold_layout.addWidget(self.rssi_threshold_input)
