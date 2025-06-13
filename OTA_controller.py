@@ -4,6 +4,7 @@ import traceback
 from enum import IntEnum
 from typing import List, Optional
 from datetime import datetime
+from log_controller import LogManager
 # from OTA_controller import OtaController  # 更新导入语句
 
 # 定义错误常量
@@ -254,6 +255,7 @@ class TextDecode:
         except Exception as e:
             print(f"接收命令无法解析: {e}")
             traceback.print_exc()
+            LogManager.get_instance().write_log(f"接收命令无法解析: {e}")
 
         if self.legality == ERR_NO:
             print(f"slave cmd = 0x{self.cmd:02x} cmd_ack = 0x{self.cmd_ack:02x} cmd_data_len = {self.data_len}")
