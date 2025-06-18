@@ -28,6 +28,8 @@ from OTA_controller import OtaController
 from OTA_controller import TextDecode
 from OTA_controller import ReceveDataStatus,BmsCmdType,ComStatus,DownloadErr
 from struct_model import HexParserApp
+
+from ui_main import Ui_Form
 # class MainWindow(QMainWindow):
 #     """主窗口（一级窗口）"""
 #     def __init__(self):
@@ -1079,6 +1081,8 @@ class BluetoothTool(QWidget):
         painter.end()
         self.status_indicator.setPixmap(pixmap)
 
+widgets = None
+
 # 修正后的函数 - 注意这是一个函数，不是类
 class load_ui_dynamically(QMainWindow):
     scan_task = None
@@ -1088,31 +1092,38 @@ class load_ui_dynamically(QMainWindow):
             # 初始化日志管理器
             self.logger = LogManager.get_instance()
 
-            # 加载UI文件
-            uic.loadUi(ui_file, self)
+            # SET AS GLOBAL WIDGETS
+            # ///////////////////////////////////////////////////////////////
+            self.ui = Ui_Form()
+            self.ui.setupUi(self)
+            global widgets
+            widgets = self.ui
+
+            # # 加载UI文件
+            # uic.loadUi(ui_file, self)
             self.logger.write_log("UI文件加载成功")
             self.setWindowTitle('firstuse')
             self.setFixedSize(620,620)
             # 初始化连接窗口
             self.bluetooth_tool = BluetoothTool()
             # self.bluetooth_tool.setWindowModality(Qt.WindowModality.ApplicationModal)
-            self.pushButton.clicked.connect(self.bluetooth_tool.show)
-            self.pushButton_6.clicked.connect(self.disconnect_device)
+            widgets.pushButton.clicked.connect(self.bluetooth_tool.show)
+            widgets.pushButton_6.clicked.connect(self.disconnect_device)
             # self.pushButton_2.clicked.connect()
 
             # 分配监控按钮
-            self.pushButton_4.clicked.connect(self.start_scan_task)
+            widgets.pushButton_4.clicked.connect(self.start_scan_task)
 
             # 分配版本号查询按钮
-            self.pushButton_7.clicked.connect(self.bluetooth_tool.send_find_version_cmd)
+            widgets.pushButton_7.clicked.connect(self.bluetooth_tool.send_find_version_cmd)
 
-            self.mainWindowTextEdit.clear()
-            self.mainWindowTextEdit.setReadOnly(True)
-            self.mainWindowTextEdit.setFontFamily("Courier New")  # 使用等宽字体
+            widgets.mainWindowTextEdit.clear()
+            widgets.mainWindowTextEdit.setReadOnly(True)
+            widgets.mainWindowTextEdit.setFontFamily("Courier New")  # 使用等宽字体
 
 
             # 初始化电池状态查询
-            self.pushButton_5.clicked.connect(self.bluetooth_tool.send_tbs_cmd)
+            widgets.pushButton_5.clicked.connect(self.bluetooth_tool.send_tbs_cmd)
 
             # 连接数据解析模块到主窗口
             self.bluetooth_tool.decode_data_ok_signal.connect(self.get_dict_from_receive_data)
