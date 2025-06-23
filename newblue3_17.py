@@ -807,7 +807,6 @@ class BluetoothTool(QWidget):
             if not self.client or not self.client.is_connected:
                 if not self.serial_port or not self.serial_port.is_open:
                     QMessageBox.warning(self, '警告', '请先连接设备')
-                return
             # 创建烧录任务
             self.program_task = asyncio.create_task(self.start_programming())
 
@@ -1099,8 +1098,8 @@ class load_ui_dynamically(QMainWindow):
             global widgets
             widgets = self.ui
 
-            # # 加载UI文件
-            # uic.loadUi(ui_file, self)
+            # 加载UI文件
+            # uic.loadUi(ui_file, widgets)
             self.logger.write_log("UI文件加载成功")
             self.setWindowTitle('firstuse')
             self.setFixedSize(620,620)

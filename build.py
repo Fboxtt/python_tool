@@ -28,7 +28,13 @@ def build_exe(mode: str):
         # "--specpath=build",
         f"--runtime-hook=runtime_hook_{mode}.py",
         "--clean",
-        "--noconfirm"
+        "--noconfirm",
+        # 排除PySide6以避免冲突
+        "--exclude-module=PySide6",
+        "--exclude-module=PySide6.QtCore",
+        "--exclude-module=PySide6.QtGui", 
+        "--exclude-module=PySide6.QtWidgets",
+        "--exclude-module=shiboken6"
     ]
     
     # 调试版额外配置
@@ -73,7 +79,7 @@ def convert_ui_to_py(ui_file, py_file):
 if __name__ == "__main__":
     # 转换UI文件
     convert_ui_to_py('测试上位机.ui', 'ui_main.py')
-
+    convert_ui_to_py('monitor_interface.ui', 'ui_monitor.py')
     # 编译两个版本
 
     for mode in ["userApp", "debugApp","firstuse"]:
