@@ -1108,7 +1108,7 @@ class load_ui_dynamically(QMainWindow):
             # self.bluetooth_tool.setWindowModality(Qt.WindowModality.ApplicationModal)
             widgets.pushButton.clicked.connect(self.bluetooth_tool.show)
             widgets.pushButton_6.clicked.connect(self.disconnect_device)
-            # self.pushButton_2.clicked.connect()
+            # widgets.pushButton_2.clicked.connect()
 
             # 分配监控按钮
             widgets.pushButton_4.clicked.connect(self.start_scan_task)
@@ -1133,7 +1133,7 @@ class load_ui_dynamically(QMainWindow):
             ComunManager.get_instance(self.struct_list)
 
             # 连接按钮信号
-            # self.pushButton.clicked.connect(self.close)  # 假设 pushButton 是一个关闭按钮
+            # widgets.pushButton.clicked.connect(self.close)  # 假设 pushButton 是一个关闭按钮
             self.bluetooth_tool.blue_write_log(f"UI文件 {ui_file} 加载成功")
 
             # 在一级窗口上再创建一个qwidget用来显示一些标志位
@@ -1202,11 +1202,11 @@ class load_ui_dynamically(QMainWindow):
         """启动扫描任务"""
         if not self.scan_task:
             self.bluetooth_tool.blue_write_log("启动扫描任务")
-            self.pushButton_4.setText("停止监控")
+            widgets.pushButton_4.setText("停止监控")
             self.scan_task = asyncio.create_task(self.get_data_from_device(0.5))
         else:
             self.scan_task.cancel()
-            self.pushButton_4.setText("开始监控")
+            widgets.pushButton_4.setText("开始监控")
             self.scan_task = None
 
     def start_find_bat_status(self):
@@ -1214,7 +1214,7 @@ class load_ui_dynamically(QMainWindow):
 
     def get_dict_from_receive_data(self, header:str, dict_data:dict):
         """从结构模型中获取字典，并按列打印到窗口"""
-        self.mainWindowTextEdit.clear()
+        widgets.mainWindowTextEdit.clear()
         # 构建列格式化字符串
         formatted_text = ""
         for category, items in dict_data.items():
@@ -1229,7 +1229,7 @@ class load_ui_dynamically(QMainWindow):
                     formatted_text += f"{name:>10}\t{value:>10}\t{unit:>10}\n"
             formatted_text += "\n"
         # 显示到窗口
-        self.mainWindowTextEdit.append(formatted_text)
+        widgets.mainWindowTextEdit.append(formatted_text)
         self.bluetooth_tool.blue_write_log(f"{header},{dict_data}")
         csv_data_str = ""
         try:
@@ -1252,7 +1252,7 @@ class load_ui_dynamically(QMainWindow):
             except Exception as e:
                 if str(e) == "未连接到设备":
                     self.bluetooth_tool.blue_write_log(f"获取数据失败: {e}")
-                    self.pushButton_4.setText("开始监控")
+                    widgets.pushButton_4.setText("开始监控")
                     traceback.print_exc()
                     break
                 else:
