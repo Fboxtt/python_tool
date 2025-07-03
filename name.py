@@ -222,7 +222,7 @@ class FirmwareNamingTool(QMainWindow):
         
         # 获取功能特征
         features = self.get_selected_features()
-        feature_str = "-".join(features) if features else "BASE"
+        feature_str = "-".join(features) if features else ""
         
         # 获取版本信息
         main_ver = self.main_ver_spin.value()
@@ -233,16 +233,23 @@ class FirmwareNamingTool(QMainWindow):
         # 获取日期
         date = self.date_edit.date().toString("yyyyMMdd")
         
-        # 生成硬件版本
-        hw_version = f"{use_case}{voltage}{capacity}-{feature_str}-V{main_ver}.{rev_ver}"
+        # 生成硬件版本和固件版本时，处理空的feature_str
+        if feature_str:
+            hw_version = f"{use_case}{voltage}{capacity}-{feature_str}-V{main_ver}.{rev_ver}"
+            fw_version = f"{use_case}{voltage}{capacity}-{feature_str}-V{main_ver}.{rev_ver}.{fix_ver}"
+        else:
+            hw_version = f"{use_case}{voltage}{capacity}-V{main_ver}.{rev_ver}"
+            fw_version = f"{use_case}{voltage}{capacity}-V{main_ver}.{rev_ver}.{fix_ver}"
         
-        # 生成固件版本
-        fw_version = f"{use_case}{voltage}{capacity}-{feature_str}-V{main_ver}.{rev_ver}.{fix_ver}"
-        
-        # 生成各种文件名
-        app_name = f"APP_APT-BMS-{use_case}{voltage}{capacity}-{cell_model}_{feature_str}_{version_str}_{date}.hex"
-        iap_name = f"IAP_APP-BMS-{use_case}{voltage}{capacity}_{feature_str}_{version_str}_{date}.bin"
-        iap_full_name = f"IAP_APP-BMS-{use_case}{voltage}{capacity}_{feature_str}_FULL_{version_str}_{date}.bin"
+        # 生成各种文件名时，处理空的feature_str
+        if feature_str:
+            app_name = f"APP_APT-BMS-{use_case}{voltage}{capacity}-{cell_model}_{feature_str}_{version_str}_{date}.hex"
+            iap_name = f"IAP_APP-BMS-{use_case}{voltage}{capacity}_{feature_str}_{version_str}_{date}.bin"
+            iap_full_name = f"IAP_APP-BMS-{use_case}{voltage}{capacity}_{feature_str}_FULL_{version_str}_{date}.bin"
+        else:
+            app_name = f"APP_APT-BMS-{use_case}{voltage}{capacity}-{cell_model}_{version_str}_{date}.hex"
+            iap_name = f"IAP_APP-BMS-{use_case}{voltage}{capacity}_{version_str}_{date}.bin"
+            iap_full_name = f"IAP_APP-BMS-{use_case}{voltage}{capacity}_FULL_{version_str}_{date}.bin"
         
         # 显示结果
         result = f"硬件版本定义 (ver_HW): {hw_version}\n"

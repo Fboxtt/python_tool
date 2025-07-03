@@ -447,14 +447,14 @@ class BluetoothTool(QWidget):
                 await self.disconnect_serial()
                 break
 
-    async def send_data(self, data: str):
+    async def send_data(self, input_data: str):
         """发送数据（兼容蓝牙和串口模式）"""
         try:
             if self.hex_send_checkbox.isChecked():
                 # 16进制发送
                 try:
-                    print(f"send data type = {type(data)}")
-                    hex_data = data.replace(" ", "")
+                    print(f"send data type = {type(input_data)}")
+                    hex_data = input_data.replace(" ", "")
                     if not all(c in '0123456789ABCDEFabcdef' for c in hex_data):
                         raise ValueError("Invalid hex string")
                     data_bytes = bytes.fromhex(hex_data)
@@ -463,7 +463,7 @@ class BluetoothTool(QWidget):
                     return
             else:
                 # 文本发送
-                data_bytes = data.encode()
+                data_bytes = input_data.encode()
 
             await self.byte_send(data_bytes)
             # 显示发送的数据
@@ -472,8 +472,8 @@ class BluetoothTool(QWidget):
                 self.blue_write_log(f"发送: {hex_data}")
                 self.display_send_data(data_bytes)
             else:
-                self.blue_write_log(f"发送: {data}")
-                self.display_send_data(data)
+                self.blue_write_log(f"发送: {input_data}")
+                self.display_send_data(input_data)
         except Exception as e:
             QMessageBox.critical(self, '发送失败', str(e))
 
@@ -498,18 +498,26 @@ class BluetoothTool(QWidget):
                 # 如果无法解码为文本，则显示16进制
                 reve_data = ' '.join([f'{b:02X}' for b in data])  
         self.blue_write_log(f"RX->,{self.commu_type},{self.device_name},cmd,{reve_data}")
-    def display_send_data(self, data):
+    def display_send_data(self, input_data):
         """显示接收到的数据，根据16进制显示选项决定显示格式"""
         if self.hex_display_checkbox.isChecked():
             # 16进制显示
-            send_data = ' '.join([f'{b:02X}' for b in data])
+            if isinstance(input_data, str):
+                # 如果是字符串，将每个字符转换为ASCII值再格式化为十六进制
+                send_data = ' '.join([f'{ord(b):02X}' for b in input_data])
+            else:
+                # 如果是字节数据，直接格式化为十六进制
+                send_data = ' '.join([f'{b:02X}' for b in input_data])
         else:
             # 文本显示
-            try:
-                send_data = data.decode('utf-8')
-            except UnicodeDecodeError:
-                # 如果无法解码为文本，则显示16进制
-                send_data = ' '.join([f'{b:02X}' for b in data])
+            if isinstance(input_data, str):
+                send_data = input_data
+            else:
+                try:
+                    send_data = input_data.decode('utf-8')
+                except UnicodeDecodeError:
+                    # 如果无法解码为文本，则显示16进制
+                    send_data = ' '.join([f'{b:02X}' for b in input_data])
         self.blue_write_log(f"TX->,{self.commu_type},{self.device_name},cmd,{send_data}")
 
     def on_scan_devices_clicked(self):
