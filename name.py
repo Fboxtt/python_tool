@@ -239,25 +239,28 @@ class FirmwareNamingTool(QMainWindow):
             fw_version = f"{use_case}{voltage}{capacity}-{feature_str}-V{main_ver}.{rev_ver}.{fix_ver}"
         else:
             hw_version = f"{use_case}{voltage}{capacity}-V{main_ver}.{rev_ver}"
-            fw_version = f"{use_case}{voltage}{capacity}-V{main_ver}.{rev_ver}.{fix_ver}"
+            fw_version = f"{use_case}{voltage}{capacity}-V{main_ver}.{rev_ver}"
         
         # 生成各种文件名时，处理空的feature_str
         if feature_str:
-            app_name = f"APP_APT-BMS-{use_case}{voltage}{capacity}-{cell_model}_{feature_str}_{version_str}_{date}.hex"
-            iap_name = f"IAP_APP-BMS-{use_case}{voltage}{capacity}_{feature_str}_{version_str}_{date}.bin"
-            iap_full_name = f"IAP_APP-BMS-{use_case}{voltage}{capacity}_{feature_str}_FULL_{version_str}_{date}.bin"
+            no_ota_name     = f"FULL_BMS-{use_case}{voltage}{capacity}-{cell_model}_{feature_str}_{version_str}_{date}.hex"
+            app_name        = f"APP_BMS-{use_case}{voltage}{capacity}-{cell_model}_{feature_str}_{version_str}_{date}.hex"
+            iap_name        = f"IAP_BMS-{use_case}{voltage}{capacity}_{feature_str}_{version_str}_{date}.bin"
+            iap_full_name   = f"FULL_IAP_BMS-{use_case}{voltage}{capacity}_{feature_str}_{version_str}_{date}.bin"
         else:
-            app_name = f"APP_APT-BMS-{use_case}{voltage}{capacity}-{cell_model}_{version_str}_{date}.hex"
-            iap_name = f"IAP_APP-BMS-{use_case}{voltage}{capacity}_{version_str}_{date}.bin"
-            iap_full_name = f"IAP_APP-BMS-{use_case}{voltage}{capacity}_FULL_{version_str}_{date}.bin"
+            no_ota_name     = f"FULL_BMS-{use_case}{voltage}{capacity}-{cell_model}_{version_str}_{date}.hex"
+            app_name        = f"APP_BMS-{use_case}{voltage}{capacity}-{cell_model}_{version_str}_{date}.hex"
+            iap_name        = f"IAP_BMS-{use_case}{voltage}{capacity}_{version_str}_{date}.bin"
+            iap_full_name   = f"FULL_IAP_BMS-{use_case}{voltage}{capacity}_{version_str}_{date}.bin"
         
         # 显示结果
         result = f"硬件版本定义 (ver_HW): {hw_version}\n"
         result += f"固件版本定义 (ver_FW): {fw_version}\n\n"
         result += "生成的文件名:\n"
-        result += f"1. 主应用固件: {app_name}\n"
-        result += f"2. 增量升级包: {iap_name}\n"
-        result += f"3. 完整升级包: {iap_full_name}"
+        result += f"无OTA固件:   {no_ota_name}\n"
+        result += f"1. 升级包:   {app_name}\n"
+        result += f"2. boot命名: {iap_name}\n"
+        result += f"3. 完整包:   {iap_full_name}"
         
         self.result_text.setPlainText(result)
     
