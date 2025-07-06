@@ -181,11 +181,18 @@ class FirmwareNamingTool(QMainWindow):
         self.group = QGroupBox("func_feature")
         layout = QHBoxLayout()
         
+        # 设置更紧密的间距
+        layout.setSpacing(5)  # 设置控件之间的间距为5像素
+        layout.setContentsMargins(10, 10, 10, 10)  # 设置边距
+        
         self.feature_checks = []
         for feature in self.config["features"]:
             cb = QCheckBox(feature)
             layout.addWidget(cb)
             self.feature_checks.append(cb)
+        
+        # 添加弹簧以使复选框靠左排列
+        layout.addStretch()
         
         self.group.setLayout(layout)
         parent_layout.addWidget(self.group)
@@ -270,10 +277,21 @@ class FirmwareNamingTool(QMainWindow):
         # 查找 QGroupBox内的QCheckBox，并更新
         feature_group = self.group
         layout = feature_group.layout()
+        
+        # 移除所有现有的控件（除了弹簧）
+        while layout.count():
+            child = layout.takeAt(0)
+            if child.widget():
+                child.widget().deleteLater()
+        
+        # 重新添加复选框
         for feature in self.config["features"]:
             cb = QCheckBox(feature)
             layout.addWidget(cb)
             self.feature_checks.append(cb)
+        
+        # 重新添加弹簧以使复选框靠左排列
+        layout.addStretch()
 
     def get_selected_features(self):
         """获取选中的功能特征并按优先级排序"""
@@ -282,9 +300,16 @@ class FirmwareNamingTool(QMainWindow):
             if feature.isChecked():
                 features.append(feature.text())
 
-        # 按优先级排序
+        # 按优先级排序，如果功能特征不在优先级列表中，则放在最后
         priority_order = ["HTS", "HT", "PWR", "COM", "THIN"]
-        return sorted(features, key=lambda x: priority_order.index(x))
+        def get_priority(feature):
+            try:
+                return priority_order.index(feature)
+            except ValueError:
+                # 如果不在优先级列表中，返回一个大的数值，使其排在最后
+                return len(priority_order)
+        
+        return sorted(features, key=get_priority)
     
     def generate_names(self):
         """生成各种固件文件名"""
