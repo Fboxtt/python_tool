@@ -73,7 +73,30 @@ class FirmwareNamingTool(QMainWindow):
 
     def init_ui(self):
         self.setWindowTitle("BMS固件命名工具 v2.0 (PyQt6)")
-        self.setFixedSize(1000, 800)
+        self.setFixedSize(1400, 800)  # 增加窗口宽度以适应左右布局
+        
+        # 设置QGroupBox样式
+        self.setStyleSheet("""
+            QGroupBox {
+                font-weight: bold;
+                border: 2px solid #4CAF50;
+                border-radius: 8px;
+                margin-top: 10px;
+                padding-top: 10px;
+                background-color: #f8f9fa;
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                left: 10px;
+                padding: 0 8px 0 8px;
+                background-color: #4CAF50;
+                color: white;
+                border-radius: 4px;
+            }
+            QGroupBox:hover {
+                border-color: #45a049;
+            }
+        """)
         
         main_widget = QWidget()
         self.setCentralWidget(main_widget)
@@ -84,34 +107,56 @@ class FirmwareNamingTool(QMainWindow):
         config_btn.clicked.connect(self.show_config_dialog)
         main_layout.addWidget(config_btn, alignment=Qt.AlignmentFlag.AlignRight)
 
+        # 创建水平布局，左边是输入控件，右边是结果显示
+        content_layout = QHBoxLayout()
+        
+        # 左侧输入区域
+        left_widget = QWidget()
+        left_layout = QVBoxLayout(left_widget)
+        
         # 基本信息组
-        self.init_basic_info_group(main_layout)
+        self.init_basic_info_group(left_layout)
         
         # 芯片平台和产品序号组
-        self.init_chip_product_group(main_layout)
+        self.init_chip_product_group(left_layout)
         
         # 功能特征组
-        self.init_feature_group(main_layout)
+        self.init_feature_group(left_layout)
         
         # 版本信息组
-        self.init_version_group(main_layout)
+        self.init_version_group(left_layout)
         
         # 生成按钮
         generate_btn = QPushButton("生成文件名")
         generate_btn.clicked.connect(self.generate_names)
-        main_layout.addWidget(generate_btn)
-
+        left_layout.addWidget(generate_btn)
+        
+        # 添加弹性空间，让输入控件紧凑排列
+        left_layout.addStretch()
+        
+        # 右侧结果显示区域
+        right_widget = QWidget()
+        right_layout = QVBoxLayout(right_widget)
+        
         # 结果显示
+        right_layout.addWidget(QLabel("📊 生成结果:"))
         self.result_text = QTextEdit()
         self.result_text.setReadOnly(True)
-        main_layout.addWidget(QLabel("生成结果:"))
-        main_layout.addWidget(self.result_text)
+        self.result_text.setMinimumHeight(300)
+        right_layout.addWidget(self.result_text)
 
         # 格式说明
+        right_layout.addWidget(QLabel("📖 命名格式说明:"))
         self.format_text = QTextEdit()
         self.format_text.setReadOnly(True)
-        main_layout.addWidget(QLabel("命名格式说明:"))
-        main_layout.addWidget(self.format_text)
+        self.format_text.setMinimumHeight(200)
+        right_layout.addWidget(self.format_text)
+        
+        # 设置左右两侧的比例 (输入区域:结果区域 = 1:1)
+        content_layout.addWidget(left_widget, 1)
+        content_layout.addWidget(right_widget, 1)
+        
+        main_layout.addLayout(content_layout)
 
     def init_basic_info_group(self, parent_layout):
         group = QGroupBox("基本信息")
@@ -392,14 +437,30 @@ class FirmwareNamingTool(QMainWindow):
                 iap_name        = f"     IAP_BMS-{full_product}-{chip_platform}_{version_str}_{date}.bin"
                 iap_full_name   = f"FULL_OTA_BMS-{full_product}-{chip_platform}{product_number}_{version_str}_{date}.bin"
         
-        # 显示结果
-        result = f"硬件版本定义 (ver_HW): {hw_version}\n"
-        result += f"固件版本定义 (ver_FW): {fw_version}\n\n"
-        result += "生成的文件名:\n"
-        result += f" boot命名: {iap_name}\n"
-        result += f" 升级包:   {app_name}\n"
-        result += f" 完整包:   {iap_full_name}\n\n"
-        result += f" 无OTA固件:{no_ota_name}"
+        result = ""
+        # 版本定义部分
+        result += "📋 版本定义:\n"
+        result += "─" * 50 + "\n"
+        result += f"   硬件版本 (ver_HW): {hw_version}\n"
+        result += f"   固件版本 (ver_FW): {fw_version}\n\n"
+        
+        # 文件名生成部分
+        result += "📁 生成的文件名:\n"
+        result += "─" * 50 + "\n"
+        result += f"   🔧 Boot命名:    {iap_name.strip()}\n"
+        result += f"   📦 升级包:      {app_name.strip()}\n"
+        result += f"   🔄 完整包:      {iap_full_name}\n"
+        result += f"   💾 无OTA固件:   {no_ota_name.strip()}\n\n"
+        
+        # 配置信息部分
+        result += "⚙️ 当前配置:\n"
+        result += "─" * 50 + "\n"
+        result += f"   使用场景: {use_case}    电压: {voltage}V    容量: {capacity}Ah\n"
+        result += f"   电芯型号: {cell_model if cell_model != '略' else '无'}\n"
+        result += f"   芯片平台: {chip_platform}    产品序号: {product_number}\n"
+        result += f"   功能特征: {feature_str if feature_str else '无'}\n"
+        result += f"   版本信息: V{main_ver}.{rev_ver}.{fix_ver}    发布日期: {date}\n"
+        result += "=" * 80
         
         self.result_text.setPlainText(result)
     
