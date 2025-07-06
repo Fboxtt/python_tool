@@ -306,13 +306,13 @@ class FirmwareNamingTool(QMainWindow):
         
         # 获取功能特征
         features = self.get_selected_features()
-        feature_str = "_".join(features) if features else ""
+        feature_str = "-".join(features) if features else ""
         
         # 获取版本信息
         main_ver = self.main_ver_spin.value()
         rev_ver = self.rev_ver_spin.value()
         fix_ver = self.fix_ver_spin.value()
-        version_str = f"V{main_ver}-{rev_ver}-{fix_ver}"
+        version_str = f"V{main_ver}_{rev_ver}_{fix_ver}"
         
         # 获取日期
         date = self.date_edit.date().toString("yyyyMMdd")
@@ -330,51 +330,51 @@ class FirmwareNamingTool(QMainWindow):
         
         # 生成硬件版本和固件版本
         if feature_str:
-            hw_version = f"{full_product}-{chip_platform}{product_number}_V{main_ver}.{rev_ver}"
-            fw_version = f"{full_product}-{chip_platform}{product_number}_V{main_ver}.{rev_ver}"
+            hw_version = f"{full_product}-{chip_platform}{product_number}_V{main_ver}_{rev_ver}"
+            fw_version = f"{full_product}-{chip_platform}{product_number}_V{main_ver}_{rev_ver}"
         else:
-            hw_version = f"{full_product}-{chip_platform}{product_number}_V{main_ver}.{rev_ver}"
-            fw_version = f"{full_product}-{chip_platform}{product_number}_V{main_ver}.{rev_ver}"
+            hw_version = f"{full_product}-{chip_platform}{product_number}_V{main_ver}_{rev_ver}"
+            fw_version = f"{full_product}-{chip_platform}{product_number}_V{main_ver}_{rev_ver}"
         
         # 判断是否包含电芯型号
         include_cell_model = cell_model != "略"
         
-        # 生成各种文件名 - 新格式
+        # 生成各种文件名 - 新格式（芯片平台、版本字符串和日期之间用下划线连接）
         if include_cell_model:
             if feature_str:
-                # 有功能特征+有电芯型号：FULL_BMS-T12100-HTS_HT-C02-G_N_H10_V1-0-0_20250704.hex
-                no_ota_name     = f"    FULL_BMS-{full_product}-{chip_platform}{product_number}-{cell_model}_{version_str}_{date}.hex"
-                app_name        = f"     APP_BMS-{full_product}-{chip_platform}{product_number}-{cell_model}_{version_str}_{date}.hex"
-                iap_name        = f"     IAP_BMS-{full_product}-{chip_platform}{product_number}_{version_str}_{date}.bin"
-                iap_full_name   = f"FULL_IAP_BMS-{full_product}-{chip_platform}{product_number}_{version_str}_{date}.bin"
+                # 有功能特征+有电芯型号：FULL_BMS-T12100-HTS-HT-G_N_H10-C02_V1_0_0_20250704.hex
+                no_ota_name     = f"    FULL_BMS-{full_product}-{cell_model}-{chip_platform}{product_number}_{version_str}_{date}.hex"
+                app_name        = f"     APP_BMS-{full_product}-{cell_model}-{chip_platform}{product_number}_{version_str}_{date}.hex"
+                iap_name        = f"     IAP_BMS-{full_product}-{chip_platform}_{version_str}_{date}.bin"
+                iap_full_name   = f"FULL_OTA_BMS-{full_product}-{cell_model}-{chip_platform}{product_number}_{version_str}_{date}.bin"
             else:
-                # 无功能特征+有电芯型号：FULL_BMS-T12100-D01-G_N_H10_V1-0-0_20250704.hex
-                no_ota_name     = f"    FULL_BMS-{full_product}-{chip_platform}{product_number}-{cell_model}_{version_str}_{date}.hex"
-                app_name        = f"     APP_BMS-{full_product}-{chip_platform}{product_number}-{cell_model}_{version_str}_{date}.hex"
-                iap_name        = f"     IAP_BMS-{full_product}-{chip_platform}{product_number}_{version_str}_{date}.bin"
-                iap_full_name   = f"FULL_IAP_BMS-{full_product}-{chip_platform}{product_number}_{version_str}_{date}.bin"
+                # 无功能特征+有电芯型号：FULL_BMS-T12100-G_N_H10-D01_V1_0_0_20250704.hex
+                no_ota_name     = f"    FULL_BMS-{full_product}-{cell_model}-{chip_platform}{product_number}_{version_str}_{date}.hex"
+                app_name        = f"     APP_BMS-{full_product}-{cell_model}-{chip_platform}{product_number}_{version_str}_{date}.hex"
+                iap_name        = f"     IAP_BMS-{full_product}-{chip_platform}_{version_str}_{date}.bin"
+                iap_full_name   = f"FULL_OTA_BMS-{full_product}-{cell_model}-{chip_platform}{product_number}_{version_str}_{date}.bin"
         else:
             if feature_str:
-                # 有功能特征+无电芯型号：FULL_BMS-T12100-HTS_HT-C02_V1-0-0_20250704.hex
+                # 有功能特征+无电芯型号：FULL_BMS-T12100-HTS-HT-C02_V1_0_0_20250704.hex
                 no_ota_name     = f"    FULL_BMS-{full_product}-{chip_platform}{product_number}_{version_str}_{date}.hex"
                 app_name        = f"     APP_BMS-{full_product}-{chip_platform}{product_number}_{version_str}_{date}.hex"
-                iap_name        = f"     IAP_BMS-{full_product}-{chip_platform}{product_number}_{version_str}_{date}.bin"
-                iap_full_name   = f"FULL_IAP_BMS-{full_product}-{chip_platform}{product_number}_{version_str}_{date}.bin"
+                iap_name        = f"     IAP_BMS-{full_product}-{chip_platform}_{version_str}_{date}.bin"
+                iap_full_name   = f"FULL_OTA_BMS-{full_product}-{chip_platform}{product_number}_{version_str}_{date}.bin"
             else:
-                # 无功能特征+无电芯型号：FULL_BMS-T12100-D01_V1-0-0_20250704.hex
+                # 无功能特征+无电芯型号：FULL_BMS-T12100-D01_V1_0_0_20250704.hex
                 no_ota_name     = f"    FULL_BMS-{full_product}-{chip_platform}{product_number}_{version_str}_{date}.hex"
                 app_name        = f"     APP_BMS-{full_product}-{chip_platform}{product_number}_{version_str}_{date}.hex"
-                iap_name        = f"     IAP_BMS-{full_product}-{chip_platform}{product_number}_{version_str}_{date}.bin"
-                iap_full_name   = f"FULL_IAP_BMS-{full_product}-{chip_platform}{product_number}_{version_str}_{date}.bin"
+                iap_name        = f"     IAP_BMS-{full_product}-{chip_platform}_{version_str}_{date}.bin"
+                iap_full_name   = f"FULL_OTA_BMS-{full_product}-{chip_platform}{product_number}_{version_str}_{date}.bin"
         
         # 显示结果
         result = f"硬件版本定义 (ver_HW): {hw_version}\n"
         result += f"固件版本定义 (ver_FW): {fw_version}\n\n"
         result += "生成的文件名:\n"
-        result += f"无OTA固件:   {no_ota_name}\n"
-        result += f"1. 升级包:   {app_name}\n"
-        result += f"2. boot命名: {iap_name}\n"
-        result += f"3. 完整包:   {iap_full_name}"
+        result += f" boot命名: {iap_name}\n"
+        result += f" 升级包:   {app_name}\n"
+        result += f" 完整包:   {iap_full_name}\n\n"
+        result += f" 无OTA固件:{no_ota_name}"
         
         self.result_text.setPlainText(result)
     
@@ -383,42 +383,47 @@ class FirmwareNamingTool(QMainWindow):
         description = """=== BMS固件命名规范说明 ===
 
 1. 硬件版本定义 (ver_HW):
-   [使用场景][电压V][容量Ah]-[功能特征]-[芯片平台][产品序号]_V[主版本].[次版本]
-   示例: "T12100-HTS_HT-D01_V1.5"
-   无功能特征时: "T12100-D01_V1.5"
+   [使用场景][电压V][容量Ah]-[功能特征]-[芯片平台][产品序号]_V[主版本]_[次版本]
+   示例: "T12100-HTS-HT-D01_V1_5"
+   无功能特征时: "T12100-D01_V1_5"
 
 2. 固件版本定义 (ver_FW):
-   [使用场景][电压][容量]-[功能特征]-[芯片平台][产品序号]_V[主版本].[次版本]
-   示例: "T12100-HTS_HT-D01_V1.7"
-   无功能特征时: "T12100-D01_V1.7"
+   [使用场景][电压][容量]-[功能特征]-[芯片平台][产品序号]_V[主版本]_[次版本]
+   示例: "T12100-HTS-HT-D01_V1_7"
+   无功能特征时: "T12100-D01_V1_7"
 
 3. 无OTA固件 (FULL):
-   有电芯型号: FULL_BMS-[使用场景][电压][容量]-[功能特征]-[芯片平台][产品序号]-[电芯型号]_V[主版本]-[次版本]-[修订号]_[日期].hex
-   示例: "FULL_BMS-T12100-HTS_HT-C02-G_N_H10_V1-0-0_20250704.hex"
-   无电芯型号: FULL_BMS-[使用场景][电压][容量]-[功能特征]-[芯片平台][产品序号]_V[主版本]-[次版本]-[修订号]_[日期].hex
-   示例: "FULL_BMS-T12100-HTS_HT-C02_V1-0-0_20250704.hex"
-   无功能特征时: "FULL_BMS-T12100-D01_V1-0-0_20250704.hex"
+   有电芯型号: FULL_BMS-[使用场景][电压][容量]-[功能特征]-[电芯型号]-[芯片平台][产品序号]_V[主版本]_[次版本]_[修订号]_[日期].hex
+   示例: "FULL_BMS-T12100-HTS-HT-G_N_H10-C02_V1_0_0_20250704.hex"
+   无电芯型号: FULL_BMS-[使用场景][电压][容量]-[功能特征]-[芯片平台][产品序号]_V[主版本]_[次版本]_[修订号]_[日期].hex
+   示例: "FULL_BMS-T12100-HTS-HT-C02_V1_0_0_20250704.hex"
+   无功能特征时: "FULL_BMS-T12100-G_N_H10-D01_V1_0_0_20250704.hex"
 
 4. 升级包 (APP):
    格式与无OTA固件相同，前缀为APP_BMS
-   示例: "APP_BMS-T12100-HTS_HT-C02-G_N_H10_V1-0-0_20250704.hex"
+   示例: "APP_BMS-T12100-HTS-HT-G_N_H10-C02_V1_0_0_20250704.hex"
 
 5. Boot命名 (IAP):
-   IAP_BMS-[使用场景][电压][容量]-[功能特征]-[芯片平台][产品序号]_V[主版本]-[次版本]-[修订号]_[日期].bin
-   示例: "IAP_BMS-T12100-HTS_HT-D01_V1-0-0_20250704.bin"
+   IAP_BMS-[使用场景][电压][容量]-[功能特征]-[芯片平台]_V[主版本]_[次版本]_[修订号]_[日期].bin
+   示例: "IAP_BMS-T12100-HTS-HT-D01_V1_0_0_20250704.bin"
 
-6. 完整包 (FULL_IAP):
-   FULL_IAP_BMS-[使用场景][电压][容量]-[功能特征]-[芯片平台][产品序号]_V[主版本]-[次版本]-[修订号]_[日期].bin
-   示例: "FULL_IAP_BMS-T12100-HTS_HT-D01_V1-0-0_20250704.bin"
+6. 完整包 (FULL_OTA):
+   有电芯型号: FULL_OTA_BMS-[使用场景][电压][容量]-[功能特征]-[电芯型号]-[芯片平台][产品序号]_V[主版本]_[次版本]_[修订号]_[日期].bin
+   示例: "FULL_OTA_BMS-T12100-HTS-HT-G_N_H10-C02_V1_0_0_20250704.bin"
+   无电芯型号: FULL_OTA_BMS-[使用场景][电压][容量]-[功能特征]-[芯片平台][产品序号]_V[主版本]_[次版本]_[修订号]_[日期].bin
+   示例: "FULL_OTA_BMS-T12100-HTS-HT-C02_V1_0_0_20250704.bin"
 
 重要说明:
 - 电芯型号: 选择"略"时不包含在文件名中
 - 芯片平台: C/D (互斥选择)
 - 产品序号: 01/02/03... (该平台的第几款产品)
 - 功能特征优先级: HTS > HT > PWR > COM > THIN
-- 功能特征分隔符: _ (下划线)
-- 功能特征跟在基础产品后面，用 - 连接
-- 芯片平台在版本前面，用 _ 连接
+- 功能特征分隔符: - (连字符)
+- 版本号格式: V[主版本]_[次版本]_[修订号] (用下划线连接)
+- 硬件/固件版本: V[主版本]_[次版本] (用下划线连接)
+- FULL_OTA_BMS: 固件类型标识符，和后面内容用 - 连接
+- 芯片平台、版本字符串和日期: 用 _ 连接
+- 其他地方: 用 - 连接
 - 日期格式: YYYYMMDD (如20250704)"""
         
         self.format_text.setPlainText(description)
