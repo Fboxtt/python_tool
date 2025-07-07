@@ -5,6 +5,7 @@ from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QH
                             QLabel, QComboBox, QLineEdit, QCheckBox, QPushButton,
                             QTextEdit, QGroupBox, QSpinBox, QDateEdit, QMessageBox, QDialog, QTabWidget, QRadioButton, QButtonGroup)
 from PyQt6.QtCore import QDate, Qt
+from PyQt6.QtGui import QFont
 
 CONFIG_FILE = "bms_config.json"
 
@@ -143,6 +144,13 @@ class FirmwareNamingTool(QMainWindow):
         self.result_text = QTextEdit()
         self.result_text.setReadOnly(True)
         self.result_text.setMinimumHeight(300)
+        # 设置等宽字体
+        font = QFont("Consolas", 10)  # Windows上的等宽字体
+        if not font.exactMatch():
+            font = QFont("Courier New", 10)  # 备用等宽字体
+        if not font.exactMatch():
+            font = QFont("monospace", 10)  # Linux/Mac上的等宽字体
+        self.result_text.setFont(font)
         right_layout.addWidget(self.result_text)
 
         # 格式说明
