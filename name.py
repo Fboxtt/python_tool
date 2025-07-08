@@ -13,22 +13,26 @@ class ConfigManager:
     def __init__(self):
         self.config_path = Path(CONFIG_FILE)
         self.default_config = {
+            "bms_voltages": ["12", "24", "36", "48"],
+            "bms_capacities": ["50", "100", "140", "165", "200", "300"],
             "voltages": ["12", "24", "36", "48"],
-            "capacities": ["100", "120", "140", "160", "200", "240"],
+            "capacities": ["50", "100", "140", "165", "200", "300"],
             "cell_models": ["略", "G_N_H10", "L_F_H20", "P_C_H50", "A_K_H100"],
-            "use_cases": ["T", "ST", "GC"],
-            "features": ["HTS", "HT", "PWR", "COM", "THIN"],
+            "use_cases": ["T", "S", "GC"],
+            "features": ["HTS", "HT", "PWR", "COM", "HTIN", "OTA", "LINK", "PARA", "MON"],
             "chip_platforms": ["C", "D"],
             "product_numbers": ["01", "02", "03", "04", "05"]
         }
         
         self.config_explanations = {
-            "voltages": "支持的电压值（单位：V）",
-            "capacities": "支持的容量值（单位：Ah）",
+            "bms_voltages": "BMS保护板额定电压值（单位：V）",
+            "bms_capacities": "BMS保护板额定容量值（单位：Ah）",
+            "voltages": "软件特性电压值（单位：V）",
+            "capacities": "软件特性容量值（单位：Ah）",
             "cell_models": "支持的电芯型号",
-            "use_cases": "支持的使用场景（T: 通用，ST: 高温，GC: 工业）",
-            "features": "支持的功能特征（HTS: 高温保护，HT: 高功率，PWR: 电源管理，COM: 通信，THIN: 薄型设计）",
-            "chip_platforms": "芯片平台（C/D代表不同芯片）",
+            "use_cases": "使用场景（T: 普通场景，S: 启动电池，GC: 高尔夫）",
+            "features": "功能特征（HTS: 智能加热，HT: 加热，PWR: 保电，COM: 通信，HTIN: 薄款电池，OTA: 无线升级，LINK: 互联，PARA: 并机，MON: 屏幕监控）",
+            "chip_platforms": "芯片平台（C: 中微，D: 国民）",
             "product_numbers": "产品序号（01/02等代表该平台的第几款产品）"
         }
         
@@ -46,6 +50,18 @@ class ConfigManager:
                 if key not in loaded_config:
                     loaded_config[key] = value
                     updated = True
+            
+            # 更新使用场景：ST改为S
+            if "ST" in loaded_config.get("use_cases", []):
+                loaded_config["use_cases"] = [case if case != "ST" else "S" for case in loaded_config["use_cases"]]
+                updated = True
+                print("更新使用场景: ST -> S")
+            
+            # 更新功能特征：THIN改为HTIN
+            if "THIN" in loaded_config.get("features", []):
+                loaded_config["features"] = [feature if feature != "THIN" else "HTIN" for feature in loaded_config["features"]]
+                updated = True
+                print("更新功能特征: THIN -> HTIN")
             
             # 如果有更新，保存配置文件
             if updated:
@@ -115,8 +131,11 @@ class FirmwareNamingTool(QMainWindow):
         left_widget = QWidget()
         left_layout = QVBoxLayout(left_widget)
         
-        # 基本信息组
-        self.init_basic_info_group(left_layout)
+        # BMS特性组
+        self.init_bms_info_group(left_layout)
+        
+        # 软件特性组
+        self.init_software_info_group(left_layout)
         
         # 芯片平台和产品序号组
         self.init_chip_product_group(left_layout)
@@ -166,8 +185,38 @@ class FirmwareNamingTool(QMainWindow):
         
         main_layout.addLayout(content_layout)
 
-    def init_basic_info_group(self, parent_layout):
-        group = QGroupBox("基本信息")
+    def init_bms_info_group(self, parent_layout):
+        group = QGroupBox("BMS特性")
+        layout = QVBoxLayout()
+
+        # BMS特性启用checkbox
+        self.bms_enable_checkbox = QCheckBox("BMS的电压容量和软件容量不同")
+        self.bms_enable_checkbox.stateChanged.connect(self.on_bms_enable_changed)
+        layout.addWidget(self.bms_enable_checkbox)
+
+        # BMS电压和容量选择容器
+        self.bms_controls_container = QWidget()
+        bms_controls_layout = QHBoxLayout(self.bms_controls_container)
+        
+        # BMS电压选择
+        self.bms_voltage_container = self.create_combo("BMS电压(V)", self.config["bms_voltages"])
+        # BMS容量选择
+        self.bms_capacity_container = self.create_combo("BMS容量(Ah)", self.config["bms_capacities"])
+
+        bms_controls_layout.addWidget(self.bms_voltage_container)
+        bms_controls_layout.addWidget(self.bms_capacity_container)
+        bms_controls_layout.addStretch()  # 添加弹性空间
+        
+        layout.addWidget(self.bms_controls_container)
+        
+        # 默认隐藏BMS控件
+        self.bms_controls_container.setVisible(False)
+        
+        group.setLayout(layout)
+        parent_layout.addWidget(group)
+
+    def init_software_info_group(self, parent_layout):
+        group = QGroupBox("软件特性")
         layout = QHBoxLayout()
 
         # 使用场景
@@ -231,7 +280,7 @@ class FirmwareNamingTool(QMainWindow):
         parent_layout.addWidget(group)
 
     def init_feature_group(self, parent_layout):
-        self.group = QGroupBox("func_feature")
+        self.group = QGroupBox("功能特征（最多6个，HTS和HT互斥）")
         layout = QHBoxLayout()
         
         # 设置更紧密的间距
@@ -241,6 +290,7 @@ class FirmwareNamingTool(QMainWindow):
         self.feature_checks = []
         for feature in self.config["features"]:
             cb = QCheckBox(feature)
+            cb.stateChanged.connect(self.on_feature_changed)
             layout.addWidget(cb)
             self.feature_checks.append(cb)
         
@@ -293,7 +343,16 @@ class FirmwareNamingTool(QMainWindow):
             self.refresh_ui()
 
     def refresh_ui(self):
-        # 更新基本信息下拉框
+        # 更新BMS特性下拉框
+        self.bms_voltage_container.findChild(QComboBox).clear()
+        self.bms_voltage_container.findChild(QComboBox).addItems(self.config["bms_voltages"])
+        self.bms_capacity_container.findChild(QComboBox).clear()
+        self.bms_capacity_container.findChild(QComboBox).addItems(self.config["bms_capacities"])
+        # 重置BMS特性checkbox状态
+        self.bms_enable_checkbox.setChecked(False)
+        self.bms_controls_container.setVisible(False)
+        
+        # 更新软件特性下拉框
         self.voltage_container.findChild(QComboBox).clear()
         self.voltage_container.findChild(QComboBox).addItems(self.config["voltages"])
         self.capacity_container.findChild(QComboBox).clear()
@@ -346,6 +405,43 @@ class FirmwareNamingTool(QMainWindow):
         # 重新添加弹簧以使复选框靠左排列
         layout.addStretch()
 
+    def on_bms_enable_changed(self):
+        """BMS特性启用状态变化时的处理"""
+        is_enabled = self.bms_enable_checkbox.isChecked()
+        self.bms_controls_container.setVisible(is_enabled)
+
+    def on_feature_changed(self):
+        """功能特征变化时的处理"""
+        selected_features = []
+        for cb in self.feature_checks:
+            if cb.isChecked():
+                selected_features.append(cb.text())
+        
+        # 检查HTS和HT互斥
+        if "HTS" in selected_features and "HT" in selected_features:
+            # 找到最后被选中的，保留它，取消另一个
+            sender = self.sender()
+            if sender.text() == "HTS":
+                # 取消HT
+                for cb in self.feature_checks:
+                    if cb.text() == "HT":
+                        cb.setChecked(False)
+                        break
+            elif sender.text() == "HT":
+                # 取消HTS
+                for cb in self.feature_checks:
+                    if cb.text() == "HTS":
+                        cb.setChecked(False)
+                        break
+        
+        # 检查功能特征数量限制（最多6个）
+        selected_count = sum(1 for cb in self.feature_checks if cb.isChecked())
+        if selected_count > 6:
+            # 取消最后选中的
+            sender = self.sender()
+            sender.setChecked(False)
+            QMessageBox.warning(self, "功能特征限制", "功能特征最多只能选择6个！")
+
     def get_selected_features(self):
         """获取选中的功能特征并按优先级排序"""
         features = []
@@ -354,7 +450,7 @@ class FirmwareNamingTool(QMainWindow):
                 features.append(feature.text())
 
         # 按优先级排序，如果功能特征不在优先级列表中，则放在最后
-        priority_order = ["HTS", "HT", "PWR", "COM", "THIN"]
+        priority_order = ["HTS", "HT", "PWR", "COM", "HTIN", "OTA", "LINK", "PARA", "MON"]
         def get_priority(feature):
             try:
                 return priority_order.index(feature)
@@ -366,7 +462,14 @@ class FirmwareNamingTool(QMainWindow):
     
     def generate_names(self):
         """生成各种固件文件名"""
-        # 获取基本参数
+        # 获取BMS特性启用状态
+        bms_enabled = self.bms_enable_checkbox.isChecked()
+        
+        # 获取BMS特性参数（始终获取，但只在启用时使用）
+        bms_voltage = self.bms_voltage_container.findChild(QComboBox).currentText()
+        bms_capacity = self.bms_capacity_container.findChild(QComboBox).currentText()
+        
+        # 获取软件特性参数
         voltage = self.voltage_container.findChild(QComboBox).currentText()
         capacity = self.capacity_container.findChild(QComboBox).currentText()
         cell_model = self.cell_container.findChild(QComboBox).currentText()
@@ -395,75 +498,68 @@ class FirmwareNamingTool(QMainWindow):
         # 获取日期
         date = self.date_edit.date().toString("yyyyMMdd")
         
-        # 生成基础产品标识：T12100 
-        base_product = f"{use_case}{voltage}{capacity}"
+        # 生成BMS特性标识（始终包含BMS，但电压容量根据checkbox决定）
+        bms_spec = f"BMS{bms_voltage}{bms_capacity}" if bms_enabled else "BMS"
         
-        # 构建完整的产品标识，包含功能特征
-        if feature_str:
-            # 有功能特征：T12100-HTS_HT
-            full_product = f"{base_product}-{feature_str}"
-        else:
-            # 无功能特征：T12100
-            full_product = base_product
+        # 生成软件特性标识
+        software_spec = f"{use_case}{voltage}{capacity}"
         
-        # 生成硬件版本和固件版本
+        # 生成唯一码
+        unique_code = f"{chip_platform}{product_number}"
+        
+        # 生成软件版本定义 (ver_FW)
         if feature_str:
-            hw_version = f"{full_product}-{chip_platform}{product_number}_V{main_ver}_{rev_ver}"
-            fw_version = f"{full_product}-{chip_platform}{product_number}_V{main_ver}_{rev_ver}"
+            fw_version = f"{software_spec}-{feature_str}-{unique_code}_V{main_ver}_{rev_ver}"
         else:
-            hw_version = f"{full_product}-{chip_platform}{product_number}_V{main_ver}_{rev_ver}"
-            fw_version = f"{full_product}-{chip_platform}{product_number}_V{main_ver}_{rev_ver}"
+            fw_version = f"{software_spec}-{unique_code}_V{main_ver}_{rev_ver}"
         
         # 判断是否包含电芯型号
         include_cell_model = cell_model != "略"
         
-        # 生成各种文件名 - 新格式（芯片平台、版本字符串和日期之间用下划线连接）
+        # 生成各种文件名 - 按照新规范
+        # BOOT命名: IAP-【芯片平台】_V【主版本】_【次版本】_【修订号】_【日期】.bin
+        iap_name = f"IAP-{chip_platform}_{version_str}_{date}.bin"
+        
+        # 始终包含BMS特性标识
         if include_cell_model:
             if feature_str:
-                # 有功能特征+有电芯型号：FULL_BMS-T12100-HTS-HT-G_N_H10-C02_V1_0_0_20250704.hex
-                no_ota_name     = f"    FULL_BMS-{full_product}-{cell_model}-{chip_platform}{product_number}_{version_str}_{date}.hex"
-                app_name        = f"     APP_BMS-{full_product}-{cell_model}-{chip_platform}{product_number}_{version_str}_{date}.hex"
-                iap_name        = f"     IAP_BMS-{full_product}-{chip_platform}_{version_str}_{date}.bin"
-                iap_full_name   = f"FULL_OTA_BMS-{full_product}-{cell_model}-{chip_platform}{product_number}_{version_str}_{date}.bin"
+                # 升级固件: APP-【BMS特性】-【使用场景】【电压】【容量】-【功能特征】-【电芯型号】-OTA-【芯片平台】【产品序号】_V【主版本】_【次版本】_【修订号】_【日期】.hex
+                app_name = f"APP-{bms_spec}-{software_spec}-{feature_str}-{cell_model}-OTA-{unique_code}_{version_str}_{date}.hex"
+                # 完整固件: IAP+APP-【BMS特性】-【使用场景】【电压】【容量】-【功能特征】-【电芯型号】-【芯片平台】【产品序号】_V【主版本】_【次版本】_【修订号】_【日期】.hex
+                full_name = f"IAP+APP-{bms_spec}-{software_spec}-{feature_str}-{cell_model}-{unique_code}_{version_str}_{date}.hex"
             else:
-                # 无功能特征+有电芯型号：FULL_BMS-T12100-G_N_H10-D01_V1_0_0_20250704.hex
-                no_ota_name     = f"    FULL_BMS-{full_product}-{cell_model}-{chip_platform}{product_number}_{version_str}_{date}.hex"
-                app_name        = f"     APP_BMS-{full_product}-{cell_model}-{chip_platform}{product_number}_{version_str}_{date}.hex"
-                iap_name        = f"     IAP_BMS-{full_product}-{chip_platform}_{version_str}_{date}.bin"
-                iap_full_name   = f"FULL_OTA_BMS-{full_product}-{cell_model}-{chip_platform}{product_number}_{version_str}_{date}.bin"
+                app_name = f"APP-{bms_spec}-{software_spec}-{cell_model}-OTA-{unique_code}_{version_str}_{date}.hex"
+                full_name = f"IAP+APP-{bms_spec}-{software_spec}-{cell_model}-{unique_code}_{version_str}_{date}.hex"
         else:
             if feature_str:
-                # 有功能特征+无电芯型号：FULL_BMS-T12100-HTS-HT-C02_V1_0_0_20250704.hex
-                no_ota_name     = f"    FULL_BMS-{full_product}-{chip_platform}{product_number}_{version_str}_{date}.hex"
-                app_name        = f"     APP_BMS-{full_product}-{chip_platform}{product_number}_{version_str}_{date}.hex"
-                iap_name        = f"     IAP_BMS-{full_product}-{chip_platform}_{version_str}_{date}.bin"
-                iap_full_name   = f"FULL_OTA_BMS-{full_product}-{chip_platform}{product_number}_{version_str}_{date}.bin"
+                app_name = f"APP-{bms_spec}-{software_spec}-{feature_str}-OTA-{unique_code}_{version_str}_{date}.hex"
+                full_name = f"IAP+APP-{bms_spec}-{software_spec}-{feature_str}-{unique_code}_{version_str}_{date}.hex"
             else:
-                # 无功能特征+无电芯型号：FULL_BMS-T12100-D01_V1_0_0_20250704.hex
-                no_ota_name     = f"    FULL_BMS-{full_product}-{chip_platform}{product_number}_{version_str}_{date}.hex"
-                app_name        = f"     APP_BMS-{full_product}-{chip_platform}{product_number}_{version_str}_{date}.hex"
-                iap_name        = f"     IAP_BMS-{full_product}-{chip_platform}_{version_str}_{date}.bin"
-                iap_full_name   = f"FULL_OTA_BMS-{full_product}-{chip_platform}{product_number}_{version_str}_{date}.bin"
+                app_name = f"APP-{bms_spec}-{software_spec}-OTA-{unique_code}_{version_str}_{date}.hex"
+                full_name = f"IAP+APP-{bms_spec}-{software_spec}-{unique_code}_{version_str}_{date}.hex"
         
+        # 显示结果
         result = ""
         # 版本定义部分
         result += "📋 版本定义:\n"
         result += "─" * 50 + "\n"
-        result += f"   硬件版本 (ver_HW): {hw_version}\n"
-        result += f"   固件版本 (ver_FW): {fw_version}\n\n"
+        result += f"   软件版本 (ver_FW): {fw_version}\n\n"
         
         # 文件名生成部分
         result += "📁 生成的文件名:\n"
         result += "─" * 50 + "\n"
-        result += f"   🔧 Boot命名:    {iap_name.strip()}\n"
-        result += f"   📦 升级包:      {app_name.strip()}\n"
-        result += f"   🔄 完整包:      {iap_full_name}\n"
-        result += f"   💾 无OTA固件:   {no_ota_name.strip()}\n\n"
+        result += f"   🔧 Boot命名:    {iap_name}\n"
+        result += f"   📦 升级固件:    {app_name}\n"
+        result += f"   🔄 完整固件:    {full_name}\n\n"
         
         # 配置信息部分
         result += "⚙️ 当前配置:\n"
         result += "─" * 50 + "\n"
-        result += f"   使用场景: {use_case}    电压: {voltage}V    容量: {capacity}Ah\n"
+        if bms_enabled:
+            result += f"   BMS特性: {bms_voltage}V {bms_capacity}Ah → 文件名显示: BMS{bms_voltage}{bms_capacity}\n"
+        else:
+            result += f"   BMS特性: {bms_voltage}V {bms_capacity}Ah → 文件名显示: BMS\n"
+        result += f"   软件特性: {use_case} {voltage}V {capacity}Ah\n"
         result += f"   电芯型号: {cell_model if cell_model != '略' else '无'}\n"
         result += f"   芯片平台: {chip_platform}    产品序号: {product_number}\n"
         result += f"   功能特征: {feature_str if feature_str else '无'}\n"
@@ -476,53 +572,52 @@ class FirmwareNamingTool(QMainWindow):
         """更新格式说明"""
         description = """=== BMS固件命名规范说明 ===
 
-1. 硬件版本定义 (ver_HW):
-   [使用场景][电压V][容量Ah]-[功能特征]-[芯片平台][产品序号]_V[主版本]_[次版本]
-   示例: "T12100-HTS-HT-D01_V1_5"
-   无功能特征时: "T12100-D01_V1_5"
+【固件类型】-【BMS特性】-【软件特性】-【软件版本】
+注：BMS特性始终包含，可通过checkbox控制显示具体电压容量还是只显示"BMS"标识
 
-2. 固件版本定义 (ver_FW):
-   [使用场景][电压][容量]-[功能特征]-[芯片平台][产品序号]_V[主版本]_[次版本]
-   示例: "T12100-HTS-HT-D01_V1_7"
-   无功能特征时: "T12100-D01_V1_7"
+一、版本定义:
+软件版本 (ver_FW): 【使用场景】【电压】【容量】-【功能特征】-【芯片平台】【产品序号】_V【主版本】_【次版本】
+示例: "T12100-HTS-HT-D01_V1_7"
+无功能特征时: "T12100-D01_V1_7"
 
-3. 无OTA固件 (FULL):
-   有电芯型号: FULL_BMS-[使用场景][电压][容量]-[功能特征]-[电芯型号]-[芯片平台][产品序号]_V[主版本]_[次版本]_[修订号]_[日期].hex
-   示例: "FULL_BMS-T12100-HTS-HT-G_N_H10-C02_V1_0_0_20250704.hex"
-   无电芯型号: FULL_BMS-[使用场景][电压][容量]-[功能特征]-[芯片平台][产品序号]_V[主版本]_[次版本]_[修订号]_[日期].hex
-   示例: "FULL_BMS-T12100-HTS-HT-C02_V1_0_0_20250704.hex"
-   无功能特征时: "FULL_BMS-T12100-G_N_H10-D01_V1_0_0_20250704.hex"
+二、固件类型:
+1. Boot命名 (IAP):
+   IAP-【芯片平台】_V【主版本】_【次版本】_【修订号】_【日期】.bin
+   示例: "IAP-D_V1_0_0_20250704.bin"
 
-4. 升级包 (APP):
-   格式与无OTA固件相同，前缀为APP_BMS
-   示例: "APP_BMS-T12100-HTS-HT-G_N_H10-C02_V1_0_0_20250704.hex"
+2. 升级固件 (APP):
+   APP-【BMS特性】-【使用场景】【电压】【容量】-【功能特征】-OTA-【芯片平台】【产品序号】_V【主版本】_【次版本】_【修订号】_【日期】.hex
+   示例: "APP-BMS12100-T12200-HTS-OTA-C02_V1_0_0_20250704.hex"
+   BMS特性checkbox未勾选时: "APP-BMS-T12100-HTS-HT-G_N_H10-OTA-C02_V1_0_0_20250704.hex"
 
-5. Boot命名 (IAP):
-   IAP_BMS-[使用场景][电压][容量]-[功能特征]-[芯片平台]_V[主版本]_[次版本]_[修订号]_[日期].bin
-   示例: "IAP_BMS-T12100-HTS-HT-D01_V1_0_0_20250704.bin"
+3. 完整固件 (IAP+APP):
+   IAP+APP-【BMS特性】-【使用场景】【电压】【容量】-【功能特征】-【芯片平台】【产品序号】_V【主版本】_【次版本】_【修订号】_【日期】.hex
+   示例: "IAP+APP-BMS12100-T12200-HTS-HT-C02_V1_0_0_20250704.hex"
+   无功能特征时: "IAP+APP-BMS-T12100-G_N_H10-D01_V1_0_0_20250704.hex"
 
-6. 完整包 (FULL_OTA):
-   有电芯型号: FULL_OTA_BMS-[使用场景][电压][容量]-[功能特征]-[电芯型号]-[芯片平台][产品序号]_V[主版本]_[次版本]_[修订号]_[日期].bin
-   示例: "FULL_OTA_BMS-T12100-HTS-HT-G_N_H10-C02_V1_0_0_20250704.bin"
-   无电芯型号: FULL_OTA_BMS-[使用场景][电压][容量]-[功能特征]-[芯片平台][产品序号]_V[主版本]_[次版本]_[修订号]_[日期].bin
-   示例: "FULL_OTA_BMS-T12100-HTS-HT-C02_V1_0_0_20250704.bin"
+三、参数说明:
+1. 使用场景: T(普通场景), S(启动电池), GC(高尔夫)
+2. BMS特性: 电压(12/24/36/48V), 容量(50/100/140/165/200/300Ah)
+3. 软件特性: 电压(12/24/36/48V), 容量(50/100/140/165/200/300Ah)
+4. 功能特征: HTS(智能加热), HT(加热), PWR(保电), COM(通信), HTIN(薄款电池), OTA(无线升级), LINK(互联), PARA(并机), MON(屏幕监控)
+5. 芯片平台: C(中微), D(国民)
+6. 产品序号: 01/02/03/04/05...
 
-重要说明:
-- 电芯型号: 选择"略"时不包含在文件名中
-- 芯片平台: C/D (互斥选择)
-- 产品序号: 01/02/03... (该平台的第几款产品)
-- 功能特征优先级: HTS > HT > PWR > COM > THIN
-- 功能特征分隔符: - (连字符)
-- 版本号格式: V[主版本]_[次版本]_[修订号] (用下划线连接)
-- 硬件/固件版本: V[主版本]_[次版本] (用下划线连接)
-- FULL_OTA_BMS: 固件类型标识符，和后面内容用 - 连接
-- 芯片平台、版本字符串和日期: 用 _ 连接
-- 其他地方: 用 - 连接
+四、重要规则:
+- 智能加热HTS和充电加热HT互斥，不能同时存在
+- 功能特征最多6个，超过要去掉不重要的
+- 电芯型号选择"略"时不包含在文件名中
+- BMS特性可通过checkbox控制显示方式：
+  ✓ 未勾选：固件名只显示"BMS"标识
+  ✓ 勾选：固件名显示具体的BMS电压容量值（如"BMS12100"）
+- BMS特性始终在文件名中显示，电压容量选择框始终可见
+- 固件类型内用+连接，表示是一个整体
+- 软件特性内用-连接，表示各种功能
+- 软件版本内用_连接，表示是一个整体
+- 三者之间用-连接
 - 日期格式: YYYYMMDD (如20250704)"""
         
         self.format_text.setPlainText(description)
-    # 以下 generate_names 和 update_format_description 方法与之前版本相同
-    # 由于篇幅限制，此处省略，保持原有逻辑不变
 
 class ConfigDialog(QDialog):
     def __init__(self, config, parent=None):
@@ -541,23 +636,23 @@ class ConfigDialog(QDialog):
         # 配置项编辑区域
         self.tabs = QTabWidget()
         
-        # 电压配置
-        self.voltages_edit = self.create_list_editor("电压选项", self.current_config["voltages"])
-        # 容量配置
-        self.capacities_edit = self.create_list_editor("容量选项", self.current_config["capacities"])
-        # 电芯型号
+        # BMS特性配置
+        self.bms_voltages_edit = self.create_list_editor("BMS电压选项", self.current_config["bms_voltages"])
+        self.bms_capacities_edit = self.create_list_editor("BMS容量选项", self.current_config["bms_capacities"])
+        # 软件特性配置
+        self.voltages_edit = self.create_list_editor("软件电压选项", self.current_config["voltages"])
+        self.capacities_edit = self.create_list_editor("软件容量选项", self.current_config["capacities"])
+        # 其他配置
         self.cell_models_edit = self.create_list_editor("电芯型号", self.current_config["cell_models"])
-        # 使用场景
         self.use_cases_edit = self.create_list_editor("使用场景", self.current_config["use_cases"])
-        # 功能特征
         self.features_edit = self.create_list_editor("功能特征", self.current_config["features"])
-        # 芯片平台
         self.chip_platforms_edit = self.create_list_editor("芯片平台", self.current_config["chip_platforms"])
-        # 产品序号
         self.product_numbers_edit = self.create_list_editor("产品序号", self.current_config["product_numbers"])
         
-        self.tabs.addTab(self.voltages_edit, "电压")
-        self.tabs.addTab(self.capacities_edit, "容量")
+        self.tabs.addTab(self.bms_voltages_edit, "BMS电压")
+        self.tabs.addTab(self.bms_capacities_edit, "BMS容量")
+        self.tabs.addTab(self.voltages_edit, "软件电压")
+        self.tabs.addTab(self.capacities_edit, "软件容量")
         self.tabs.addTab(self.cell_models_edit, "电芯型号")
         self.tabs.addTab(self.use_cases_edit, "使用场景")
         self.tabs.addTab(self.features_edit, "功能特征")
@@ -592,6 +687,8 @@ class ConfigDialog(QDialog):
     
     def get_updated_config(self):
         return {
+            "bms_voltages": self.bms_voltages_edit.findChild(QTextEdit).toPlainText().split(),
+            "bms_capacities": self.bms_capacities_edit.findChild(QTextEdit).toPlainText().split(),
             "voltages": self.voltages_edit.findChild(QTextEdit).toPlainText().split(),
             "capacities": self.capacities_edit.findChild(QTextEdit).toPlainText().split(),
             "cell_models": self.cell_models_edit.findChild(QTextEdit).toPlainText().split(),
