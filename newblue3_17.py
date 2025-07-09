@@ -1167,18 +1167,15 @@ class BluetoothTool(QWidget):
     async def send_query_lock_cmd(self):
         """发送查询加密状态命令 (0x5D)"""
         try:
-            # 构造查询加密命令：00 00 04 01 5D 55 AA 校验和
-            data = bytearray([0x00, 0x00, 0x04, 0x01, 0x5D, 0x55, 0xAA])
-            # 计算校验和
-            checksum = sum(data) & 0xFF
-            data.append(checksum)
+            # 使用send_hex_fill方法构造查询加密命令
+            data = self.text_decode.send_hex_fill(0x5D)
             
             self.display_send_data(data)
             await self.byte_send(data)
             await asyncio.sleep(0.4)
             
             if self.text_decode.legality != ReceveDataStatus.ERR_NOTHING:
-                if self.text_decode.no80_cmd == 0xDD:  # 回复命令码是0xDD
+                if self.text_decode.no80_cmd == 0x5D & 0x7F:  # 回复命令码是0xDD
                     # 检查数据位
                     if hasattr(self.text_decode, 'data_hex') and len(self.text_decode.data_hex) > 0:
                         data_value = self.text_decode.data_hex[0]
@@ -1201,21 +1198,20 @@ class BluetoothTool(QWidget):
     async def send_login_cmd(self, password: str):
         """发送登录命令 (0x5E)"""
         try:
-            # 构造登录命令：00 00 0A 01 5E 55 AA 六位字符密码 校验和
-            data = bytearray([0x00, 0x00, 0x0A, 0x01, 0x5E, 0x55, 0xAA])
-            # 添加6字节密码（ASCII）
+            # 构造密码数据数组
+            password_data = bytearray()
             for char in password:
-                data.append(ord(char))
-            # 计算校验和
-            checksum = sum(data) & 0xFF
-            data.append(checksum)
+                password_data.append(ord(char))
+            
+            # 使用send_hex_fill方法构造登录命令
+            data = self.text_decode.send_hex_fill(0x5E, password_data)
             
             self.display_send_data(data)
             await self.byte_send(data)
             await asyncio.sleep(0.4)
             
             if self.text_decode.legality != ReceveDataStatus.ERR_NOTHING:
-                if self.text_decode.no80_cmd == 0xDE:  # 回复命令码是0xDE
+                if self.text_decode.no80_cmd == 0xDE & 0x7F:  # 回复命令码是0xDE
                     # 检查数据位
                     if hasattr(self.text_decode, 'data_hex') and len(self.text_decode.data_hex) > 0:
                         data_value = self.text_decode.data_hex[0]
@@ -1238,23 +1234,23 @@ class BluetoothTool(QWidget):
     async def send_set_password_cmd(self, password: str):
         """发送设置密码命令 (0x5F)"""
         try:
-            # 构造设置密码命令：00 00 16 01 5F 55 AA 六字节校验符 六位字符密码 校验和
-            data = bytearray([0x00, 0x00, 0x16, 0x01, 0x5F, 0x55, 0xAA])
+            # 构造数据数组：6字节校验码 + 6字节密码
+            set_password_data = bytearray()
             # 添加6字节校验码: 5A 5A 5A A5 A5 A5
-            data.extend([0x5A, 0x5A, 0x5A, 0xA5, 0xA5, 0xA5])
+            set_password_data.extend([0x5A, 0x5A, 0x5A, 0xA5, 0xA5, 0xA5])
             # 添加6字节密码（ASCII）
             for char in password:
-                data.append(ord(char))
-            # 计算校验和
-            checksum = sum(data) & 0xFF
-            data.append(checksum)
+                set_password_data.append(ord(char))
+            
+            # 使用send_hex_fill方法构造设置密码命令
+            data = self.text_decode.send_hex_fill(0x5F, set_password_data)
             
             self.display_send_data(data)
             await self.byte_send(data)
             await asyncio.sleep(0.4)
             
             if self.text_decode.legality != ReceveDataStatus.ERR_NOTHING:
-                if self.text_decode.no80_cmd == 0xDF:  # 回复命令码是0xDF
+                if self.text_decode.no80_cmd == 0xDF & 0x7F:  # 回复命令码是0xDF
                     # 检查数据位
                     if hasattr(self.text_decode, 'data_hex') and len(self.text_decode.data_hex) > 0:
                         data_value = self.text_decode.data_hex[0]
@@ -1277,20 +1273,20 @@ class BluetoothTool(QWidget):
     async def send_reset_password_cmd(self):
         """发送重置密码命令 (0x5C)"""
         try:
-            # 构造重置密码命令：00 00 0D 01 5C 55 AA 六字节校验码 校验和
-            data = bytearray([0x00, 0x00, 0x0D, 0x01, 0x5C, 0x55, 0xAA])
+            # 构造数据数组：6字节校验码
+            reset_data = bytearray()
             # 添加6字节校验码: 5A 5A 5A A5 A5 A5
-            data.extend([0x5A, 0x5A, 0x5A, 0xA5, 0xA5, 0xA5])
-            # 计算校验和
-            checksum = sum(data) & 0xFF
-            data.append(checksum)
+            reset_data.extend([0x5A, 0x5A, 0x5A, 0xA5, 0xA5, 0xA5])
+            
+            # 使用send_hex_fill方法构造重置密码命令
+            data = self.text_decode.send_hex_fill(0x5C, reset_data)
             
             self.display_send_data(data)
             await self.byte_send(data)
             await asyncio.sleep(0.4)
             
             if self.text_decode.legality != ReceveDataStatus.ERR_NOTHING:
-                if self.text_decode.no80_cmd == 0xDC:  # 回复命令码应该是0xDC
+                if self.text_decode.no80_cmd == 0xDC & 0x7F:  # 回复命令码应该是0xDC
                     if self.text_decode.cmd_ack == 0x00:
                         self.blue_write_log("重置密码成功")
                     else:

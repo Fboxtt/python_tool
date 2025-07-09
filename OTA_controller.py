@@ -260,7 +260,7 @@ class TextDecode:
         if self.legality == ERR_NO:
             print(f"slave cmd = 0x{self.cmd:02x} cmd_ack = 0x{self.cmd_ack:02x} cmd_data_len = {self.data_len}")
         return
-    def send_hex_fill(self, cmd_type, data_array = None) -> bytearray:
+    def send_hex_fill(self, cmd_type, data_array = bytearray()) -> bytearray:
         """获取下载数据包
         
         根据命令类型和包ID生成下载数据包:
@@ -278,7 +278,7 @@ class TextDecode:
             生成的数据包字节数组,如果packet_id超出范围则返回None
         """
         send_data_array = bytearray()
-        data_array = bytearray()
+        # data_array = bytearray()
         
         # 构建头部
             
