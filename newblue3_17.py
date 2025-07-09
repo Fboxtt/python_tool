@@ -245,6 +245,8 @@ class BluetoothTool(QWidget):
         self.send_input.setPlaceholderText('输入要发送的数据')
         self.hex_send_checkbox = QCheckBox('16进制发送')
         self.hex_send_checkbox.setChecked(True)
+        self.crlf_send_checkbox = QCheckBox('\\r\\n发送')
+        self.crlf_send_checkbox.setChecked(False)
         self.send_button = QPushButton('发送数据')
         self.send_button.clicked.connect(self.on_send_data_clicked)
         self.send_button.setEnabled(False)  # 初始状态下发送按钮不可用
@@ -257,6 +259,7 @@ class BluetoothTool(QWidget):
         
         self.send_layout.addWidget(self.send_input)
         self.send_layout.addWidget(self.hex_send_checkbox)
+        self.send_layout.addWidget(self.crlf_send_checkbox)
         self.send_layout.addWidget(self.send_button)
         self.send_layout.addWidget(self.register_button)
         self.send_layout.addWidget(self.status_indicator)  # 添加状态指示灯
@@ -458,22 +461,25 @@ class BluetoothTool(QWidget):
                     if not all(c in '0123456789ABCDEFabcdef' for c in hex_data):
                         raise ValueError("Invalid hex string")
                     data_bytes = bytes.fromhex(hex_data)
+                    
+                    # 如果选中了\r\n发送，添加回车换行符
+                    if self.crlf_send_checkbox.isChecked():
+                        data_bytes += b'\r\n'
+                        
                 except ValueError as e:
                     QMessageBox.warning(self, '警告', '无效的16进制数据')
                     return
             else:
                 # 文本发送
-                data_bytes = input_data.encode()
+                send_text = input_data
+                # 如果选中了\r\n发送，添加回车换行符
+                if self.crlf_send_checkbox.isChecked():
+                    send_text += '\r\n'
+                data_bytes = send_text.encode()
 
             await self.byte_send(data_bytes)
-            # 显示发送的数据
-            if self.hex_send_checkbox.isChecked():
-                hex_data = ' '.join([f'{b:02X}' for b in data_bytes])
-                self.blue_write_log(f"发送: {hex_data}")
-                self.display_send_data(data_bytes)
-            else:
-                self.blue_write_log(f"发送: {input_data}")
-                self.display_send_data(input_data)
+            # 显示发送的数据 - 统一使用实际发送的字节数据
+            self.display_send_data(data_bytes)
         except Exception as e:
             QMessageBox.critical(self, '发送失败', str(e))
 

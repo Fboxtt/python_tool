@@ -39,6 +39,11 @@ Scripts
 *.cfg
 
 *.log
-*.json
+# *.json
 *.csv
 *.jpg
+*.spec
+*.png
+*.doc
+*.xls
+*.hex
