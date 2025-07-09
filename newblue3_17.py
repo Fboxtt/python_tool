@@ -1180,9 +1180,9 @@ class BluetoothTool(QWidget):
                     if hasattr(self.text_decode, 'data_hex') and len(self.text_decode.data_hex) > 0:
                         data_value = self.text_decode.data_hex[0]
                         if data_value == 0x00:
-                            self.blue_write_log("查询结果: 未上锁")
+                            self.blue_write_log("查询结果: 有密码")
                         elif data_value == 0x01:
-                            self.blue_write_log("查询结果: 已上锁")
+                            self.blue_write_log("查询结果: 无密码")
                         else:
                             self.blue_write_log(f"查询结果: 未知状态 {data_value:02X}")
                     else:
@@ -1196,7 +1196,7 @@ class BluetoothTool(QWidget):
             self.blue_write_log(f"查询加密状态异常: {str(e)}")
 
     async def send_login_cmd(self, password: str):
-        """发送登录命令 (0x5E)"""
+        """发送登录命令 (0x5F)"""
         try:
             # 构造密码数据数组
             password_data = bytearray()
@@ -1204,14 +1204,14 @@ class BluetoothTool(QWidget):
                 password_data.append(ord(char))
             
             # 使用send_hex_fill方法构造登录命令
-            data = self.text_decode.send_hex_fill(0x5E, password_data)
+            data = self.text_decode.send_hex_fill(0x5F, password_data)
             
             self.display_send_data(data)
             await self.byte_send(data)
             await asyncio.sleep(0.4)
             
             if self.text_decode.legality != ReceveDataStatus.ERR_NOTHING:
-                if self.text_decode.no80_cmd == 0xDE & 0x7F:  # 回复命令码是0xDE
+                if self.text_decode.no80_cmd == 0xDF & 0x7F:  # 回复命令码是0xDF
                     # 检查数据位
                     if hasattr(self.text_decode, 'data_hex') and len(self.text_decode.data_hex) > 0:
                         data_value = self.text_decode.data_hex[0]
@@ -1232,7 +1232,7 @@ class BluetoothTool(QWidget):
             self.blue_write_log(f"登录异常: {str(e)}")
 
     async def send_set_password_cmd(self, password: str):
-        """发送设置密码命令 (0x5F)"""
+        """发送设置密码命令 (0x5E)"""
         try:
             # 构造数据数组：6字节校验码 + 6字节密码
             set_password_data = bytearray()
@@ -1243,14 +1243,14 @@ class BluetoothTool(QWidget):
                 set_password_data.append(ord(char))
             
             # 使用send_hex_fill方法构造设置密码命令
-            data = self.text_decode.send_hex_fill(0x5F, set_password_data)
+            data = self.text_decode.send_hex_fill(0x5E, set_password_data)
             
             self.display_send_data(data)
             await self.byte_send(data)
             await asyncio.sleep(0.4)
             
             if self.text_decode.legality != ReceveDataStatus.ERR_NOTHING:
-                if self.text_decode.no80_cmd == 0xDF & 0x7F:  # 回复命令码是0xDF
+                if self.text_decode.no80_cmd == 0xDE & 0x7F:  # 回复命令码是0xDE
                     # 检查数据位
                     if hasattr(self.text_decode, 'data_hex') and len(self.text_decode.data_hex) > 0:
                         data_value = self.text_decode.data_hex[0]
