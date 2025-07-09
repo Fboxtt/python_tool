@@ -337,6 +337,52 @@ class BluetoothTool(QWidget):
         # 将放电控制部分添加到主布局
         layout.addLayout(discharge_layout)
 
+        # 添加密码管理部分
+        password_layout = QVBoxLayout()
+        
+        # 密码管理标题
+        password_title = QLabel('密码管理')
+        password_title.setFont(QFont('Arial', 12, QFont.Weight.Bold))
+        password_layout.addWidget(password_title)
+        
+        # 密码输入框
+        password_input_layout = QHBoxLayout()
+        self.password_label = QLabel('密码(6位):')
+        self.password_input = QLineEdit()
+        self.password_input.setPlaceholderText('请输入6位密码')
+        self.password_input.setMaxLength(6)
+        password_input_layout.addWidget(self.password_label)
+        password_input_layout.addWidget(self.password_input)
+        password_layout.addLayout(password_input_layout)
+        
+        # 密码管理按钮
+        password_buttons_layout = QHBoxLayout()
+        
+        # 查询加密状态按钮
+        self.query_lock_button = QPushButton('查询加密')
+        self.query_lock_button.clicked.connect(self.on_query_lock_clicked)
+        password_buttons_layout.addWidget(self.query_lock_button)
+        
+        # 登录按钮
+        self.login_button = QPushButton('登录')
+        self.login_button.clicked.connect(self.on_login_clicked)
+        password_buttons_layout.addWidget(self.login_button)
+        
+        # 设置密码按钮
+        self.set_password_button = QPushButton('设置密码')
+        self.set_password_button.clicked.connect(self.on_set_password_clicked)
+        password_buttons_layout.addWidget(self.set_password_button)
+        
+        # 重置密码按钮
+        self.reset_password_button = QPushButton('重置密码')
+        self.reset_password_button.clicked.connect(self.on_reset_password_clicked)
+        password_buttons_layout.addWidget(self.reset_password_button)
+        
+        password_layout.addLayout(password_buttons_layout)
+        
+        # 将密码管理部分添加到主布局
+        layout.addLayout(password_layout)
+
         # 初始化时刷新串口列表
         # self.refresh_serial_ports()
 
@@ -1093,6 +1139,169 @@ class BluetoothTool(QWidget):
         painter.drawEllipse(0, 0, 15, 15)
         painter.end()
         self.status_indicator.setPixmap(pixmap)
+
+    def on_query_lock_clicked(self):
+        """查询加密状态按钮点击处理"""
+        asyncio.create_task(self.send_query_lock_cmd())
+
+    def on_login_clicked(self):
+        """登录按钮点击处理"""
+        password = self.password_input.text()
+        if len(password) != 6:
+            QMessageBox.warning(self, '警告', '密码必须是6位字符')
+            return
+        asyncio.create_task(self.send_login_cmd(password))
+
+    def on_set_password_clicked(self):
+        """设置密码按钮点击处理"""
+        password = self.password_input.text()
+        if len(password) != 6:
+            QMessageBox.warning(self, '警告', '密码必须是6位字符')
+            return
+        asyncio.create_task(self.send_set_password_cmd(password))
+
+    def on_reset_password_clicked(self):
+        """重置密码按钮点击处理"""
+        asyncio.create_task(self.send_reset_password_cmd())
+
+    async def send_query_lock_cmd(self):
+        """发送查询加密状态命令 (0x5D)"""
+        try:
+            # 构造查询加密命令：00 00 04 01 5D 55 AA 校验和
+            data = bytearray([0x00, 0x00, 0x04, 0x01, 0x5D, 0x55, 0xAA])
+            # 计算校验和
+            checksum = sum(data) & 0xFF
+            data.append(checksum)
+            
+            self.display_send_data(data)
+            await self.byte_send(data)
+            await asyncio.sleep(0.4)
+            
+            if self.text_decode.legality != ReceveDataStatus.ERR_NOTHING:
+                if self.text_decode.no80_cmd == 0xDD:  # 回复命令码是0xDD
+                    # 检查数据位
+                    if hasattr(self.text_decode, 'data_hex') and len(self.text_decode.data_hex) > 0:
+                        data_value = self.text_decode.data_hex[0]
+                        if data_value == 0x00:
+                            self.blue_write_log("查询结果: 未上锁")
+                        elif data_value == 0x01:
+                            self.blue_write_log("查询结果: 已上锁")
+                        else:
+                            self.blue_write_log(f"查询结果: 未知状态 {data_value:02X}")
+                    else:
+                        self.blue_write_log("查询加密状态成功，但无数据")
+                else:
+                    self.blue_write_log("查询加密状态失败: 命令码不匹配")
+            else:
+                self.blue_write_log("查询加密状态失败: 无响应")
+                
+        except Exception as e:
+            self.blue_write_log(f"查询加密状态异常: {str(e)}")
+
+    async def send_login_cmd(self, password: str):
+        """发送登录命令 (0x5E)"""
+        try:
+            # 构造登录命令：00 00 0A 01 5E 55 AA 六位字符密码 校验和
+            data = bytearray([0x00, 0x00, 0x0A, 0x01, 0x5E, 0x55, 0xAA])
+            # 添加6字节密码（ASCII）
+            for char in password:
+                data.append(ord(char))
+            # 计算校验和
+            checksum = sum(data) & 0xFF
+            data.append(checksum)
+            
+            self.display_send_data(data)
+            await self.byte_send(data)
+            await asyncio.sleep(0.4)
+            
+            if self.text_decode.legality != ReceveDataStatus.ERR_NOTHING:
+                if self.text_decode.no80_cmd == 0xDE:  # 回复命令码是0xDE
+                    # 检查数据位
+                    if hasattr(self.text_decode, 'data_hex') and len(self.text_decode.data_hex) > 0:
+                        data_value = self.text_decode.data_hex[0]
+                        if data_value == 0x02:
+                            self.blue_write_log("登录成功: 密码正确")
+                        elif data_value == 0x03:
+                            self.blue_write_log("登录失败: 密码错误")
+                        else:
+                            self.blue_write_log(f"登录结果: 未知状态 {data_value:02X}")
+                    else:
+                        self.blue_write_log("登录命令发送成功，但无数据")
+                else:
+                    self.blue_write_log("登录失败: 命令码不匹配")
+            else:
+                self.blue_write_log("登录失败: 无响应")
+                
+        except Exception as e:
+            self.blue_write_log(f"登录异常: {str(e)}")
+
+    async def send_set_password_cmd(self, password: str):
+        """发送设置密码命令 (0x5F)"""
+        try:
+            # 构造设置密码命令：00 00 16 01 5F 55 AA 六字节校验符 六位字符密码 校验和
+            data = bytearray([0x00, 0x00, 0x16, 0x01, 0x5F, 0x55, 0xAA])
+            # 添加6字节校验码: 5A 5A 5A A5 A5 A5
+            data.extend([0x5A, 0x5A, 0x5A, 0xA5, 0xA5, 0xA5])
+            # 添加6字节密码（ASCII）
+            for char in password:
+                data.append(ord(char))
+            # 计算校验和
+            checksum = sum(data) & 0xFF
+            data.append(checksum)
+            
+            self.display_send_data(data)
+            await self.byte_send(data)
+            await asyncio.sleep(0.4)
+            
+            if self.text_decode.legality != ReceveDataStatus.ERR_NOTHING:
+                if self.text_decode.no80_cmd == 0xDF:  # 回复命令码是0xDF
+                    # 检查数据位
+                    if hasattr(self.text_decode, 'data_hex') and len(self.text_decode.data_hex) > 0:
+                        data_value = self.text_decode.data_hex[0]
+                        if data_value == 0x04:
+                            self.blue_write_log("设置密码成功")
+                        elif data_value == 0x05:
+                            self.blue_write_log("设置密码错误")
+                        else:
+                            self.blue_write_log(f"设置密码结果: 未知状态 {data_value:02X}")
+                    else:
+                        self.blue_write_log("设置密码命令发送成功，但无数据")
+                else:
+                    self.blue_write_log("设置密码失败: 命令码不匹配")
+            else:
+                self.blue_write_log("设置密码失败: 无响应")
+                
+        except Exception as e:
+            self.blue_write_log(f"设置密码异常: {str(e)}")
+
+    async def send_reset_password_cmd(self):
+        """发送重置密码命令 (0x5C)"""
+        try:
+            # 构造重置密码命令：00 00 0D 01 5C 55 AA 六字节校验码 校验和
+            data = bytearray([0x00, 0x00, 0x0D, 0x01, 0x5C, 0x55, 0xAA])
+            # 添加6字节校验码: 5A 5A 5A A5 A5 A5
+            data.extend([0x5A, 0x5A, 0x5A, 0xA5, 0xA5, 0xA5])
+            # 计算校验和
+            checksum = sum(data) & 0xFF
+            data.append(checksum)
+            
+            self.display_send_data(data)
+            await self.byte_send(data)
+            await asyncio.sleep(0.4)
+            
+            if self.text_decode.legality != ReceveDataStatus.ERR_NOTHING:
+                if self.text_decode.no80_cmd == 0xDC:  # 回复命令码应该是0xDC
+                    if self.text_decode.cmd_ack == 0x00:
+                        self.blue_write_log("重置密码成功")
+                    else:
+                        self.blue_write_log(f"重置密码失败: ACK {self.text_decode.cmd_ack:02X}")
+                else:
+                    self.blue_write_log("重置密码失败: 命令码不匹配")
+            else:
+                self.blue_write_log("重置密码失败: 无响应")
+                
+        except Exception as e:
+            self.blue_write_log(f"重置密码异常: {str(e)}")
 
 widgets = None
 
