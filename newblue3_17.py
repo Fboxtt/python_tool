@@ -1180,9 +1180,11 @@ class BluetoothTool(QWidget):
                     if hasattr(self.text_decode, 'data_hex') and len(self.text_decode.data_hex) > 0:
                         data_value = self.text_decode.data_hex[0]
                         if data_value == 0x00:
-                            self.blue_write_log("查询结果: 有密码")
-                        elif data_value == 0x01:
                             self.blue_write_log("查询结果: 无密码")
+                        elif data_value == 0x01:
+                            self.blue_write_log("查询结果: 有密码，未登录")
+                        elif data_value == 0x02:
+                            self.blue_write_log("查询结果: 有密码，已登录")
                         else:
                             self.blue_write_log(f"查询结果: 未知状态 {data_value:02X}")
                     else:
@@ -1215,9 +1217,9 @@ class BluetoothTool(QWidget):
                     # 检查数据位
                     if hasattr(self.text_decode, 'data_hex') and len(self.text_decode.data_hex) > 0:
                         data_value = self.text_decode.data_hex[0]
-                        if data_value == 0x02:
+                        if data_value == 0x03:
                             self.blue_write_log("登录成功: 密码正确")
-                        elif data_value == 0x03:
+                        elif data_value == 0x04:
                             self.blue_write_log("登录失败: 密码错误")
                         else:
                             self.blue_write_log(f"登录结果: 未知状态 {data_value:02X}")
@@ -1254,9 +1256,9 @@ class BluetoothTool(QWidget):
                     # 检查数据位
                     if hasattr(self.text_decode, 'data_hex') and len(self.text_decode.data_hex) > 0:
                         data_value = self.text_decode.data_hex[0]
-                        if data_value == 0x04:
+                        if data_value == 0x05:
                             self.blue_write_log("设置密码成功")
-                        elif data_value == 0x05:
+                        elif data_value == 0x06:
                             self.blue_write_log("设置密码错误")
                         else:
                             self.blue_write_log(f"设置密码结果: 未知状态 {data_value:02X}")
