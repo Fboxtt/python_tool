@@ -282,7 +282,7 @@ class FirmwareNamingTool(QMainWindow):
         parent_layout.addWidget(group)
 
     def init_feature_group(self, parent_layout):
-        self.group = QGroupBox("功能特征（最多6个，HTS和HT互斥）")
+        self.group = QGroupBox("功能特征（最多6个，HTS和HT互斥，LINK与MON和COM互斥）")
         layout = QHBoxLayout()
         
         # 设置更紧密的间距
@@ -401,6 +401,7 @@ class FirmwareNamingTool(QMainWindow):
         # 重新添加复选框
         for feature in self.config["features"]:
             cb = QCheckBox(feature)
+            cb.stateChanged.connect(self.on_feature_changed)
             layout.addWidget(cb)
             self.feature_checks.append(cb)
         
@@ -425,6 +426,18 @@ class FirmwareNamingTool(QMainWindow):
         # 检查OTA状态，控制产品序号显示
         ota_selected = "OTA" in selected_features
         self.product_container.setVisible(ota_selected)
+        
+        # 检查LINK状态，控制MON和COM的可用性
+        link_selected = "LINK" in selected_features
+        for cb in self.feature_checks:
+            if cb.text() in ["MON", "COM"]:
+                if link_selected:
+                    # 如果选中了LINK，取消并禁用MON和COM
+                    cb.setChecked(False)
+                    cb.setEnabled(False)
+                else:
+                    # 如果没有选中LINK，重新启用MON和COM
+                    cb.setEnabled(True)
         
         # 检查HTS和HT互斥
         if "HTS" in selected_features and "HT" in selected_features:
@@ -624,6 +637,7 @@ class FirmwareNamingTool(QMainWindow):
 
 四、重要规则:
 - 智能加热HTS和充电加热HT互斥，不能同时存在
+- LINK功能与MON和COM互斥，选中LINK时MON和COM自动禁用
 - 功能特征最多6个，超过要去掉不重要的
 - 电芯型号选择"略"时不包含在文件名中
 - BMS特性可通过checkbox控制显示方式：
