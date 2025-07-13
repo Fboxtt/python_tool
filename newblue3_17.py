@@ -27,7 +27,8 @@ from hex_model import HexFileModel
 from OTA_controller import OtaController
 from OTA_controller import TextDecode
 from OTA_controller import ReceveDataStatus,BmsCmdType,ComStatus,DownloadErr
-from struct_model import HexParserApp
+from struct_model import HexParserApp, get_write_command_code, can_command_be_written, STRUCT_FORMATS, STRUCT_VARIABLES, get_write_command_from_read
+import struct
 
 from ui_main import Ui_Form
 
@@ -1502,6 +1503,12 @@ class load_ui_dynamically(QMainWindow):
         try:
             # 初始化日志管理器
             self.logger = LogManager.get_instance()
+            
+            # 初始化当前数据来源
+            self.current_data_source = None
+            
+            # 初始化命令信息标签（稍后会创建）
+            self.command_info_label = None
 
             # SET AS GLOBAL WIDGETS
             # ///////////////////////////////////////////////////////////////
@@ -1553,10 +1560,14 @@ class load_ui_dynamically(QMainWindow):
             self.setFixedSize(1100,600)
             self.bit_window = QWidget()
             
+            # 创建命令信息显示标签
+            self.command_info_label = QLabel('当前命令: 无')
+            self.command_info_label.setStyleSheet("QLabel { color: blue; font-weight: bold; }")
+            
             # 创建按钮布局
             button_layout = QHBoxLayout()
             self.test_pushButton = QPushButton('test_hide')
-            self.send_modify_button = QPushButton('打包修改值')
+            self.send_modify_button = QPushButton('发送修改值')
             self.clear_modify_button = QPushButton('清空修改值')
             
             button_layout.addWidget(self.test_pushButton)
@@ -1581,6 +1592,7 @@ class load_ui_dynamically(QMainWindow):
             
             # 创建主布局
             self.bit_layout = QVBoxLayout()
+            self.bit_layout.addWidget(self.command_info_label)
             self.bit_layout.addLayout(button_layout)
             self.bit_layout.addWidget(self.bit_table_view)
             self.bit_window.setLayout(self.bit_layout)
@@ -1591,7 +1603,7 @@ class load_ui_dynamically(QMainWindow):
             
             # 连接按钮信号
             self.test_pushButton.clicked.connect(self.test_open_close_bitwidows)
-            self.send_modify_button.clicked.connect(self.send_modified_values)  # 打包修改值
+            self.send_modify_button.clicked.connect(self.send_modified_values)  # 发送修改值
             self.clear_modify_button.clicked.connect(self.clear_modified_values)
             
             self.bit_window.setWindowTitle('烧录标志位')
@@ -1669,6 +1681,30 @@ class load_ui_dynamically(QMainWindow):
     def get_dict_from_receive_data(self, header:str, dict_data:dict):
         """从结构模型中获取字典，并按列打印到窗口"""
         widgets.mainWindowTextEdit.clear()
+        
+        # 从接收字符串中提取纯命令名
+        # header 格式: "RX->,bluetooth,L-12100BNNA70-A88888,PC_GET_BMS"
+        # 需要提取最后的命令名部分
+        if ',' in header:
+            command_name = header.split(',')[-1]  # 提取最后一部分
+        else:
+            command_name = header
+        
+        # 保存当前数据来源，用于发送修改值时确定命令
+        self.current_data_source = command_name
+        
+        self.bluetooth_tool.blue_write_log(f"提取的命令名: {command_name}")
+        
+        # 更新BitWindow的命令信息显示
+        if hasattr(self, 'command_info_label') and self.command_info_label:
+            write_cmd_name = get_write_command_from_read(command_name)
+            if write_cmd_name:
+                self.command_info_label.setText(f"当前命令: {command_name} → {write_cmd_name}")
+                self.command_info_label.setStyleSheet("QLabel { color: green; font-weight: bold; }")
+            else:
+                self.command_info_label.setText(f"当前命令: {command_name} (只读)")
+                self.command_info_label.setStyleSheet("QLabel { color: red; font-weight: bold; }")
+        
         # 构建列格式化字符串
         formatted_text = ""
         for category, items in dict_data.items():
@@ -1684,7 +1720,8 @@ class load_ui_dynamically(QMainWindow):
             formatted_text += "\n"
         # 显示到窗口
         widgets.mainWindowTextEdit.append(formatted_text)
-        self.bluetooth_tool.blue_write_log(f"{header},{dict_data}")
+        self.bluetooth_tool.blue_write_log(f"接收到数据: {header}")
+        self.bluetooth_tool.blue_write_log(f"命令名: {command_name}")
         csv_data_str = ""
         try:
             for lst in dict_data.values():
@@ -1805,43 +1842,195 @@ class load_ui_dynamically(QMainWindow):
             self.logger.write_log(f"部分更新测试失败: {e}")
             traceback.print_exc()
 
-    def send_modified_values(self):
-        """获取修改的值并返回打包数据"""
+    def parse_hex_or_decimal_value(self, value_str):
+        """
+        解析十六进制或十进制值，支持负数
+        
+        Args:
+            value_str (str): 要解析的值字符串，如 '100', '0x64', '0x-186A0', '-0x186A0'
+            
+        Returns:
+            int: 解析后的整数值
+        """
         try:
+            # 使用 int(value, 0) 来自动检测进制，支持大部分格式
+            return int(value_str, 0)
+        except ValueError:
+            # 处理特殊的负数十六进制格式
+            if value_str.startswith('0x-'):
+                # 处理 '0x-186A0' 格式
+                hex_part = value_str[3:]  # 移除 '0x-'
+                return -int(hex_part, 16)
+            elif value_str.startswith('-0x'):
+                # 处理 '-0x186A0' 格式
+                hex_part = value_str[3:]  # 移除 '-0x'
+                return -int(hex_part, 16)
+            else:
+                # 最后尝试直接转换
+                return int(value_str)
+
+    def send_modified_values(self):
+        """获取修改的值并发送到设备"""
+        try:
+            self.bluetooth_tool.blue_write_log("=== 开始发送修改值流程 ===")
+            
             modified_data = self.bit_table_model.get_modified_data()
             
             if not modified_data:
-                self.logger.write_log("没有需要打包的修改值")
+                self.bluetooth_tool.blue_write_log("没有需要发送的修改值")
+                self.logger.write_log("没有需要发送的修改值")
                 return []
             
-            self.logger.write_log(f"准备打包 {len(modified_data)} 个修改值:")
+            self.bluetooth_tool.blue_write_log(f"检测到 {len(modified_data)} 个修改值")
             
-            # 构建打包数据列表
-            packed_data = []
+            # 检查当前数据来源
+            if not self.current_data_source:
+                self.bluetooth_tool.blue_write_log("错误：无法确定当前数据来源")
+                self.logger.write_log("错误：无法确定当前数据来源")
+                return []
             
-            for row, param_name, current_value, write_value in modified_data:
-                self.logger.write_log(f"  {param_name}: {current_value} -> {write_value}")
+            self.bluetooth_tool.blue_write_log(f"当前数据来源: {self.current_data_source}")
+            
+            # 检查是否可以写入
+            if not can_command_be_written(self.current_data_source):
+                self.bluetooth_tool.blue_write_log(f"错误：命令 {self.current_data_source} 不支持写入")
+                self.logger.write_log(f"错误：命令 {self.current_data_source} 不支持写入")
+                return []
+            
+            # 获取写入命令名称和代码
+            write_cmd_name = get_write_command_from_read(self.current_data_source)
+            write_cmd_code = get_write_command_code(self.current_data_source)
+            if write_cmd_code is None:
+                self.bluetooth_tool.blue_write_log(f"错误：无法获取 {self.current_data_source} 的写入命令代码")
+                self.logger.write_log(f"错误：无法获取 {self.current_data_source} 的写入命令代码")
+                return []
+            
+            self.bluetooth_tool.blue_write_log(f"读取命令: {self.current_data_source}")
+            self.bluetooth_tool.blue_write_log(f"写入命令: {write_cmd_name}")
+            self.bluetooth_tool.blue_write_log(f"写入命令代码: 0x{write_cmd_code:02X}")
+            
+            # 更新BitWindow显示正在发送的命令
+            self.command_info_label.setText(f"正在发送: {self.current_data_source} → {write_cmd_name}")
+            self.command_info_label.setStyleSheet("QLabel { color: orange; font-weight: bold; }")
+            
+            # 创建一个完整的数据数组来重新构造结构体
+            # 获取当前数据来源的格式和变量列表
+            format_string = STRUCT_FORMATS.get(self.current_data_source)
+            variables = STRUCT_VARIABLES.get(self.current_data_source)
+            
+            if not format_string or not variables:
+                self.bluetooth_tool.blue_write_log(f"错误：无法获取 {self.current_data_source} 的格式信息")
+                self.logger.write_log(f"错误：无法获取 {self.current_data_source} 的格式信息")
+                return []
+            
+            self.bluetooth_tool.blue_write_log(f"数据格式: {format_string}")
+            self.bluetooth_tool.blue_write_log(f"变量数量: {len(variables)}")
+            
+            # 创建值数组，初始化为当前值
+            values = []
+            self.bluetooth_tool.blue_write_log("开始构造数据包:")
+            
+            for i, var_name in enumerate(variables):
+                current_hex_value = self.bit_table_model._data[i][1] if i < len(self.bit_table_model._data) else '0x00'
                 
-                # 构造数据包（这里先简单构造，具体格式后续讨论）
-                data_packet = {
-                    'row': row,
-                    'param_name': param_name,
-                    'current_value': current_value,
-                    'write_value': write_value,
-                    'hex_value': self.bit_table_model._data[row][1] if row < len(self.bit_table_model._data) else '',  # 原始十六进制值
-                }
-                packed_data.append(data_packet)
+                # 检查是否有修改值
+                modified_value = None
+                for row, param_name, current_value, write_value in modified_data:
+                    if param_name == var_name and write_value.strip():
+                        modified_value = write_value
+                        break
                 
-            self.logger.write_log(f"打包完成，共 {len(packed_data)} 个数据包")
+                if modified_value:
+                    try:
+                        # 尝试解析修改值
+                        int_value = self.parse_hex_or_decimal_value(modified_value)
+                        values.append(int_value)
+                        self.bluetooth_tool.blue_write_log(f"  {var_name}: {current_hex_value} -> {modified_value} (0x{int_value:X})")
+                        self.logger.write_log(f"  {var_name}: {current_hex_value} -> {modified_value} (0x{int_value:X})")
+                    except ValueError as e:
+                        self.bluetooth_tool.blue_write_log(f"  警告：无法解析 {var_name} 的值 '{modified_value}' ({e})，使用当前值")
+                        self.logger.write_log(f"  警告：无法解析 {var_name} 的值 '{modified_value}' ({e})，使用当前值")
+                        # 使用当前值
+                        try:
+                            int_value = self.parse_hex_or_decimal_value(current_hex_value)
+                        except ValueError as e2:
+                            self.bluetooth_tool.blue_write_log(f"  错误：无法解析当前值 '{current_hex_value}' ({e2})，使用 0")
+                            int_value = 0
+                        values.append(int_value)
+                else:
+                    # 使用当前值
+                    try:
+                        int_value = self.parse_hex_or_decimal_value(current_hex_value)
+                    except ValueError as e:
+                        self.bluetooth_tool.blue_write_log(f"  错误：无法解析当前值 '{current_hex_value}' ({e})，使用 0")
+                        int_value = 0
+                    
+                    values.append(int_value)
+                    self.bluetooth_tool.blue_write_log(f"  {var_name}: {current_hex_value} (不变)")
             
-            # 可选：打包完成后清空修改值
-            # self.bit_table_model.clear_write_values()
+            self.bluetooth_tool.blue_write_log(f"最终数据值: {values}")
             
-            return packed_data
-            
+            # 使用 struct 模块打包数据
+            try:
+                packed_binary_data = struct.pack(format_string, *values)
+                self.bluetooth_tool.blue_write_log(f"数据打包成功，共 {len(packed_binary_data)} 字节")
+                self.bluetooth_tool.blue_write_log(f"打包后的原始数据: {packed_binary_data.hex()}")
+                self.logger.write_log(f"数据打包成功，共 {len(packed_binary_data)} 字节")
+                
+                # 使用 send_hex_fill 发送数据
+                send_data = self.bluetooth_tool.text_decode.send_hex_fill(write_cmd_code, packed_binary_data)
+                self.bluetooth_tool.blue_write_log(f"构造发送数据包: {send_data.hex()}")
+                self.logger.write_log(f"发送数据: {send_data.hex()}")
+                
+                # 异步发送数据
+                async def send_data_async():
+                    try:
+                        self.bluetooth_tool.blue_write_log("开始发送数据包...")
+                        await self.bluetooth_tool.byte_send(send_data)
+                        self.bluetooth_tool.display_send_data(send_data)
+                        self.bluetooth_tool.blue_write_log("数据发送成功")
+                        self.logger.write_log("数据发送成功")
+                        
+                        # 更新BitWindow显示发送成功
+                        self.command_info_label.setText(f"发送成功: {self.current_data_source} → {write_cmd_name}")
+                        self.command_info_label.setStyleSheet("QLabel { color: green; font-weight: bold; }")
+                        
+                        # 发送成功后清空修改值
+                        self.bit_table_model.clear_write_values()
+                        
+                    except Exception as e:
+                        self.bluetooth_tool.blue_write_log(f"数据发送失败: {e}")
+                        self.logger.write_log(f"数据发送失败: {e}")
+                        traceback.print_exc()
+                        
+                        # 更新BitWindow显示发送失败
+                        self.command_info_label.setText(f"发送失败: {self.current_data_source} → {write_cmd_name}")
+                        self.command_info_label.setStyleSheet("QLabel { color: red; font-weight: bold; }")
+                
+                # 使用 asyncio 创建任务
+                asyncio.create_task(send_data_async())
+                
+                return modified_data
+                
+            except struct.error as e:
+                self.bluetooth_tool.blue_write_log(f"数据打包失败: {e}")
+                self.logger.write_log(f"数据打包失败: {e}")
+                
+                # 更新BitWindow显示打包失败
+                if hasattr(self, 'command_info_label') and self.command_info_label:
+                    self.command_info_label.setText(f"打包失败: {self.current_data_source}")
+                    self.command_info_label.setStyleSheet("QLabel { color: red; font-weight: bold; }")
+                return []
+                
         except Exception as e:
-            self.logger.write_log(f"打包修改值失败: {e}")
+            self.bluetooth_tool.blue_write_log(f"发送修改值失败: {e}")
+            self.logger.write_log(f"发送修改值失败: {e}")
             traceback.print_exc()
+            
+            # 更新BitWindow显示流程失败
+            if hasattr(self, 'command_info_label') and self.command_info_label:
+                self.command_info_label.setText(f"流程失败: {self.current_data_source if self.current_data_source else '无'}")
+                self.command_info_label.setStyleSheet("QLabel { color: red; font-weight: bold; }")
             return []
     
     def clear_modified_values(self):

@@ -28,7 +28,7 @@ STRUCT_FORMATS = {
         "HH"
         "HHHHHHHHHHHHHHHH"
         "HhHhHhHhHhHh"
-        "HHHHH",
+        "HHHHHHHH",
     "PC_GET_OCP_DELAYTIME": "<HHHH",
     "PC_GET_CELL_CAP_PARA": "<LL",
     "PC_GET_MOSHTDATA": "<HHHH",
@@ -200,7 +200,108 @@ config_data = {
     "STRUCT_COMMANDS": STRUCT_COMMANDS
 }
 
+# 写入读出对应关系管理
+WRITE_READ_COMMAND_MAPPING = {
+    # 写入命令 : 读取命令
+    "PC_SET_KB": "PC_GET_KB",
+    "PC_SET_BMS": "PC_GET_BMS", 
+    "PC_SET_OCP_DELAYTIME": "PC_GET_OCP_DELAYTIME",
+    "PC_SET_CELL_CAP_PARA": "PC_GET_CELL_CAP_PARA",
+    "PC_SET_LIFE_PARA": "PC_GET_LIFE_PARA",
+    "PC_SET_MOSHTDATA": "PC_GET_MOSHTDATA",
+}
 
+# 读取写入对应关系管理（反向映射）
+READ_WRITE_COMMAND_MAPPING = {
+    # 读取命令 : 写入命令
+    "PC_GET_KB": "PC_SET_KB",
+    "PC_GET_BMS": "PC_SET_BMS",
+    "PC_GET_OCP_DELAYTIME": "PC_SET_OCP_DELAYTIME", 
+    "PC_GET_CELL_CAP_PARA": "PC_SET_CELL_CAP_PARA",
+    "PC_GET_LIFE_PARA": "PC_SET_LIFE_PARA",
+    "PC_GET_MOSHTDATA": "PC_SET_MOSHTDATA",
+}
+
+def get_write_command_from_read(read_command_name):
+    """
+    根据读取命令名称获取对应的写入命令名称
+    
+    Args:
+        read_command_name (str): 读取命令名称，如 "PC_GET_LIFE_PARA"
+    
+    Returns:
+        str: 对应的写入命令名称，如 "PC_SET_LIFE_PARA"，如果没有找到则返回 None
+    """
+    return READ_WRITE_COMMAND_MAPPING.get(read_command_name, None)
+
+def get_read_command_from_write(write_command_name):
+    """
+    根据写入命令名称获取对应的读取命令名称
+    
+    Args:
+        write_command_name (str): 写入命令名称，如 "PC_SET_LIFE_PARA"
+    
+    Returns:
+        str: 对应的读取命令名称，如 "PC_GET_LIFE_PARA"，如果没有找到则返回 None
+    """
+    return WRITE_READ_COMMAND_MAPPING.get(write_command_name, None)
+
+def get_write_command_code(read_command_name):
+    """
+    根据读取命令名称获取对应的写入命令代码
+    
+    Args:
+        read_command_name (str): 读取命令名称，如 "PC_GET_LIFE_PARA"
+    
+    Returns:
+        int: 对应的写入命令代码，如 0x40，如果没有找到则返回 None
+    """
+    write_command_name = get_write_command_from_read(read_command_name)
+    if write_command_name and write_command_name in STRUCT_COMMANDS:
+        return STRUCT_COMMANDS[write_command_name]
+    return None
+
+def get_read_command_code(write_command_name):
+    """
+    根据写入命令名称获取对应的读取命令代码
+    
+    Args:
+        write_command_name (str): 写入命令名称，如 "PC_SET_LIFE_PARA"
+    
+    Returns:
+        int: 对应的读取命令代码，如 0x41，如果没有找到则返回 None
+    """
+    read_command_name = get_read_command_from_write(write_command_name)
+    if read_command_name and read_command_name in STRUCT_COMMANDS:
+        return STRUCT_COMMANDS[read_command_name]
+    return None
+
+def can_command_be_written(read_command_name):
+    """
+    检查某个读取命令是否有对应的写入命令
+    
+    Args:
+        read_command_name (str): 读取命令名称
+    
+    Returns:
+        bool: 如果有对应的写入命令返回 True，否则返回 False
+    """
+    return read_command_name in READ_WRITE_COMMAND_MAPPING
+
+def get_all_writable_commands():
+    """
+    获取所有可写入的命令对应关系
+    
+    Returns:
+        dict: 所有可写入的命令对应关系字典
+    """
+    return READ_WRITE_COMMAND_MAPPING.copy()
+
+# 更新配置数据，包含写入读出对应关系
+config_data.update({
+    "WRITE_READ_COMMAND_MAPPING": WRITE_READ_COMMAND_MAPPING,
+    "READ_WRITE_COMMAND_MAPPING": READ_WRITE_COMMAND_MAPPING
+})
 
 class HexParserApp(QMainWindow):
     decode_data_ok_signal = pyqtSignal(int,dict)
