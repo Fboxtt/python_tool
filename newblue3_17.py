@@ -10,9 +10,9 @@ import random
 from PyQt6.QtCore import QTimer  # 导入 QTimer
 from PyQt6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QPushButton, QListWidget, QLabel, QMessageBox, QTextEdit, QLineEdit, QHBoxLayout,
-    QCheckBox, QFileDialog, QComboBox, QGridLayout, QMainWindow, QSplashScreen, QSizePolicy
+    QCheckBox, QFileDialog, QComboBox, QGridLayout, QMainWindow, QSplashScreen, QSizePolicy, QTableView, QHeaderView, QAbstractItemView
 )
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QAbstractTableModel, QModelIndex
 from PyQt6.QtGui import QPixmap, QFont, QColor, QPainter
 from bleak import BleakScanner, BleakClient
 from qasync import QEventLoop, asyncSlot
@@ -30,6 +30,128 @@ from OTA_controller import ReceveDataStatus,BmsCmdType,ComStatus,DownloadErr
 from struct_model import HexParserApp
 
 from ui_main import Ui_Form
+
+class BitFlagsTableModel(QAbstractTableModel):
+    def __init__(self, data=None, parent=None):
+        super().__init__(parent)
+        self._data = data if data is not None else []
+        self._headers = ['参数名', '数值']
+    
+    def data(self, index, role):
+        if not index.isValid():
+            return None
+        
+        if role == Qt.ItemDataRole.DisplayRole:
+            row = index.row()
+            col = index.column()
+            if row < len(self._data):
+                if col == 0:
+                    return self._data[row][0]  # 参数名
+                elif col == 1:
+                    return self._data[row][2]  # 数值
+        return None
+    
+    def rowCount(self, parent=QModelIndex()):
+        return len(self._data)
+    
+    def columnCount(self, parent=QModelIndex()):
+        return 2
+    
+    def headerData(self, section, orientation, role):
+        if role == Qt.ItemDataRole.DisplayRole:
+            if orientation == Qt.Orientation.Horizontal:
+                return self._headers[section]
+            else:
+                return str(section + 1)
+        return None
+    
+    def update_data(self, data):
+        """完全更新所有数据（重置模型）"""
+        self.beginResetModel()
+        self._data = data
+        self.endResetModel()
+    
+    def update_row(self, row, row_data):
+        """更新指定行的数据"""
+        if 0 <= row < len(self._data):
+            self._data[row] = row_data
+            # 通知视图该行的数据已更改
+            left_index = self.createIndex(row, 0)
+            right_index = self.createIndex(row, self.columnCount() - 1)
+            self.dataChanged.emit(left_index, right_index)
+            return True
+        return False
+    
+    def update_cell(self, row, col, value):
+        """更新指定单元格的数据"""
+        if 0 <= row < len(self._data) and 0 <= col < self.columnCount():
+            if col == 0:
+                # 更新参数名
+                self._data[row] = (value, self._data[row][1], self._data[row][2])
+            elif col == 1:
+                # 更新数值（假设原数据格式为 (name, hex_value, decimal_value)）
+                self._data[row] = (self._data[row][0], self._data[row][1], value)
+            
+            # 通知视图该单元格的数据已更改
+            index = self.createIndex(row, col)
+            self.dataChanged.emit(index, index)
+            return True
+        return False
+    
+    def update_partial_data(self, updates):
+        """批量更新部分数据
+        updates: 字典，格式为 {row_index: new_row_data} 或 {(row, col): new_value}
+        """
+        changed_rows = set()
+        
+        for key, value in updates.items():
+            if isinstance(key, int):
+                # 更新整行
+                if 0 <= key < len(self._data):
+                    self._data[key] = value
+                    changed_rows.add(key)
+            elif isinstance(key, tuple) and len(key) == 2:
+                # 更新单个单元格
+                row, col = key
+                if self.update_cell(row, col, value):
+                    changed_rows.add(row)
+        
+        # 批量通知视图更改
+        for row in changed_rows:
+            left_index = self.createIndex(row, 0)
+            right_index = self.createIndex(row, self.columnCount() - 1)
+            self.dataChanged.emit(left_index, right_index)
+    
+    def append_row(self, row_data):
+        """添加新行"""
+        row = len(self._data)
+        self.beginInsertRows(QModelIndex(), row, row)
+        self._data.append(row_data)
+        self.endInsertRows()
+    
+    def remove_row(self, row):
+        """删除指定行"""
+        if 0 <= row < len(self._data):
+            self.beginRemoveRows(QModelIndex(), row, row)
+            del self._data[row]
+            self.endRemoveRows()
+            return True
+        return False
+    
+    def find_row_by_name(self, param_name):
+        """根据参数名查找行索引"""
+        for i, row_data in enumerate(self._data):
+            if row_data[0] == param_name:
+                return i
+        return -1
+    
+    def update_value_by_name(self, param_name, new_value):
+        """根据参数名更新数值"""
+        row = self.find_row_by_name(param_name)
+        if row >= 0:
+            return self.update_cell(row, 1, new_value)
+        return False
+
 # class MainWindow(QMainWindow):
 #     """主窗口（一级窗口）"""
 #     def __init__(self):
@@ -1360,16 +1482,33 @@ class load_ui_dynamically(QMainWindow):
             # 在一级窗口上再创建一个qwidget用来显示一些标志位
             # self.setGeometry(0, 0, 900, 600)
             self.setFixedSize(1100,600)
-            self.bit_window = QWidget(self)
+            self.bit_window = QWidget()
             self.test_pushButton = QPushButton('test_hide')
-            # self.test_pushButton.setGeometry(10, 10, 100, 100)
-            self.bit_layout = QGridLayout()
-            self.bit_layout.setVerticalSpacing(1)
-            self.bit_layout.setHorizontalSpacing(10)
-            self.bit_layout.addWidget(self.test_pushButton,0,0)
+            
+            # 创建QTableView和模型
+            self.bit_table_view = QTableView()
+            self.bit_table_model = BitFlagsTableModel()
+            self.bit_table_view.setModel(self.bit_table_model)
+            
+            # 设置表格属性
+            self.bit_table_view.setAlternatingRowColors(True)
+            self.bit_table_view.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+            self.bit_table_view.horizontalHeader().setStretchLastSection(True)
+            
+            # 设置列宽
+            self.bit_table_view.setColumnWidth(0, 150)  # 参数名列宽
+            self.bit_table_view.setColumnWidth(1, 100)  # 数值列宽
+            
+            # 创建布局
+            self.bit_layout = QVBoxLayout()
+            self.bit_layout.addWidget(self.test_pushButton)
+            self.bit_layout.addWidget(self.bit_table_view)
             self.bit_window.setLayout(self.bit_layout)
+            
+            # 保留原有的标签列表（可能其他地方还在使用）
             self.key_label_list = []
             self.value_label_list = []
+            
             self.test_pushButton.clicked.connect(self.test_open_close_bitwidows)
             self.bit_window.setWindowTitle('烧录标志位')
             self.bit_window.setGeometry(620, 10, 300, 600)
@@ -1387,28 +1526,38 @@ class load_ui_dynamically(QMainWindow):
             self.bit_window.show()
             self.test_pushButton.setText('test_hide')
     def visualize_bit_flags(self,data: list):
-        row = 0
-        clomn = 0
         try:
-            for i,unit in enumerate(data):
-                print(f'i = {i} len(list) = {len(self.key_label_list)} tuple = {len(unit)}',end = '')
-                # print(f"len(value_label_list) = {len(self.value_label_list)}")
-                print(f'row = {row} clomn = {clomn}')
-                if i >= len(self.key_label_list):
-                    self.key_label_list.append(QLabel(f'{unit[0]}'))
-                    self.value_label_list.append(QLabel(f'{unit[2]}'))
-                    self.bit_layout.addWidget(self.key_label_list[i],row,clomn)
-                    self.bit_layout.addWidget(self.value_label_list[i],row,clomn+1)
+            # 检查是否是第一次加载数据或数据长度发生变化
+            if len(self.bit_table_model._data) != len(data):
+                # 数据结构变化，需要完全重置
+                self.bit_table_model.update_data(data)
+                self.logger.write_log(f"完全更新标志位数据，共 {len(data)} 条记录")
+            else:
+                # 逐项比较，只更新有变化的数据
+                updates = {}
+                for i, new_unit in enumerate(data):
+                    old_unit = self.bit_table_model._data[i]
+                    # 检查参数名或数值是否有变化
+                    if old_unit[0] != new_unit[0] or old_unit[2] != new_unit[2]:
+                        updates[i] = new_unit
+                
+                if updates:
+                    # 有数据变化，进行部分更新
+                    self.bit_table_model.update_partial_data(updates)
+                    self.logger.write_log(f"部分更新标志位数据，更新了 {len(updates)} 条记录")
                 else:
-                    self.key_label_list[i].setText(f'{unit[0]}')
-                    self.value_label_list[i].setText(f'{unit[2]}')
-                row+=1
-                if row >= 30:
-                    row = 0
-                    clomn+=2
+                    # 没有数据变化，无需更新
+                    pass
+            
+            # 调试信息
+            for i, unit in enumerate(data):
+                print(f'i = {i} tuple = {len(unit)} - {unit[0]}: {unit[2]}')
+                
         except Exception as e:
             self.logger.write_log(f"bit windows写入失败: {e}")
             traceback.print_exc()
+            # 出错时回退到完全更新
+            self.bit_table_model.update_data(data)
         pass
     def disconnect_device(self):
         """断开连接"""
@@ -1537,6 +1686,34 @@ class load_ui_dynamically(QMainWindow):
         
         # 如果没有连接需要断开，接受事件并正常关闭
         event.accept()
+
+    def test_partial_update_examples(self):
+        """测试部分更新功能的示例方法"""
+        try:
+            # 示例1: 更新单个参数的值
+            self.bit_table_model.update_value_by_name("ulPackV", "6600")
+            
+            # 示例2: 更新指定行的数据
+            new_row_data = ("usRemainAH", "0x0158", "344")
+            self.bit_table_model.update_row(24, new_row_data)
+            
+            # 示例3: 更新单个单元格
+            self.bit_table_model.update_cell(33, 1, "4")  # 更新SOC百分比
+            
+            # 示例4: 批量更新多个数据
+            updates = {
+                19: ("sTemp[0]", "0x1B", "27"),  # 更新温度1
+                20: ("sTemp[1]", "0x1C", "28"),  # 更新温度2
+                (33, 1): "5",  # 更新SOC百分比到5%
+                (34, 1): "99"  # 更新SOH百分比到99%
+            }
+            self.bit_table_model.update_partial_data(updates)
+            
+            self.logger.write_log("部分更新测试完成")
+            
+        except Exception as e:
+            self.logger.write_log(f"部分更新测试失败: {e}")
+            traceback.print_exc()
 
 
 
