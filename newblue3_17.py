@@ -35,27 +35,51 @@ class BitFlagsTableModel(QAbstractTableModel):
     def __init__(self, data=None, parent=None):
         super().__init__(parent)
         self._data = data if data is not None else []
-        self._headers = ['参数名', '数值']
+        self._write_values = {}  # 存储写入值的字典，key为行索引，value为写入值
+        self._headers = ['参数名', '当前值', '写入值']
     
     def data(self, index, role):
         if not index.isValid():
             return None
         
-        if role == Qt.ItemDataRole.DisplayRole:
-            row = index.row()
-            col = index.column()
+        row = index.row()
+        col = index.column()
+        
+        if role == Qt.ItemDataRole.DisplayRole or role == Qt.ItemDataRole.EditRole:
             if row < len(self._data):
                 if col == 0:
                     return self._data[row][0]  # 参数名
                 elif col == 1:
-                    return self._data[row][2]  # 数值
+                    return self._data[row][2]  # 当前值
+                elif col == 2:
+                    # 写入值：只显示用户设置的值，没有设置则为空
+                    return self._write_values.get(row, "")
         return None
+    
+    def setData(self, index, value, role):
+        """设置数据，仅允许编辑写入值列"""
+        if role == Qt.ItemDataRole.EditRole:
+            row = index.row()
+            col = index.column()
+            
+            if col == 2 and 0 <= row < len(self._data):  # 只能编辑写入值列
+                self._write_values[row] = str(value)
+                self.dataChanged.emit(index, index)
+                return True
+        return False
+    
+    def flags(self, index):
+        """设置单元格标志，写入值列可编辑"""
+        flags = Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable
+        if index.column() == 2:  # 写入值列可编辑
+            flags |= Qt.ItemFlag.ItemIsEditable
+        return flags
     
     def rowCount(self, parent=QModelIndex()):
         return len(self._data)
     
     def columnCount(self, parent=QModelIndex()):
-        return 2
+        return 3  # 现在是3列
     
     def headerData(self, section, orientation, role):
         if role == Qt.ItemDataRole.DisplayRole:
@@ -69,6 +93,8 @@ class BitFlagsTableModel(QAbstractTableModel):
         """完全更新所有数据（重置模型）"""
         self.beginResetModel()
         self._data = data
+        # 清空写入值，或者保留已有的写入值
+        # self._write_values.clear()  # 如果想清空所有写入值，取消注释这行
         self.endResetModel()
     
     def update_row(self, row, row_data):
@@ -84,12 +110,12 @@ class BitFlagsTableModel(QAbstractTableModel):
     
     def update_cell(self, row, col, value):
         """更新指定单元格的数据"""
-        if 0 <= row < len(self._data) and 0 <= col < self.columnCount():
+        if 0 <= row < len(self._data) and 0 <= col < 2:  # 只能更新前两列的原始数据
             if col == 0:
                 # 更新参数名
                 self._data[row] = (value, self._data[row][1], self._data[row][2])
             elif col == 1:
-                # 更新数值（假设原数据格式为 (name, hex_value, decimal_value)）
+                # 更新当前值（假设原数据格式为 (name, hex_value, decimal_value)）
                 self._data[row] = (self._data[row][0], self._data[row][1], value)
             
             # 通知视图该单元格的数据已更改
@@ -134,6 +160,17 @@ class BitFlagsTableModel(QAbstractTableModel):
         if 0 <= row < len(self._data):
             self.beginRemoveRows(QModelIndex(), row, row)
             del self._data[row]
+            # 同时删除对应的写入值
+            if row in self._write_values:
+                del self._write_values[row]
+            # 重新整理写入值的索引
+            new_write_values = {}
+            for old_row, value in self._write_values.items():
+                if old_row > row:
+                    new_write_values[old_row - 1] = value
+                else:
+                    new_write_values[old_row] = value
+            self._write_values = new_write_values
             self.endRemoveRows()
             return True
         return False
@@ -150,6 +187,38 @@ class BitFlagsTableModel(QAbstractTableModel):
         row = self.find_row_by_name(param_name)
         if row >= 0:
             return self.update_cell(row, 1, new_value)
+        return False
+    
+    def get_write_values(self):
+        """获取所有写入值"""
+        return self._write_values.copy()
+    
+    def get_modified_data(self):
+        """获取有写入值的数据列表，返回格式：[(row, param_name, current_value, write_value), ...]"""
+        modified_data = []
+        for row, write_value in self._write_values.items():
+            if row < len(self._data) and write_value != "":  # 只返回真正有写入值的数据
+                param_name = self._data[row][0]
+                current_value = self._data[row][2]
+                modified_data.append((row, param_name, current_value, write_value))
+        return modified_data
+    
+    def clear_write_values(self):
+        """清空所有写入值"""
+        self._write_values.clear()
+        # 通知视图写入值列需要更新
+        if len(self._data) > 0:
+            top_left = self.createIndex(0, 2)
+            bottom_right = self.createIndex(len(self._data) - 1, 2)
+            self.dataChanged.emit(top_left, bottom_right)
+    
+    def set_write_value(self, row, value):
+        """设置指定行的写入值"""
+        if 0 <= row < len(self._data):
+            self._write_values[row] = str(value)
+            index = self.createIndex(row, 2)
+            self.dataChanged.emit(index, index)
+            return True
         return False
 
 # class MainWindow(QMainWindow):
@@ -1483,7 +1552,17 @@ class load_ui_dynamically(QMainWindow):
             # self.setGeometry(0, 0, 900, 600)
             self.setFixedSize(1100,600)
             self.bit_window = QWidget()
+            
+            # 创建按钮布局
+            button_layout = QHBoxLayout()
             self.test_pushButton = QPushButton('test_hide')
+            self.send_modify_button = QPushButton('打包修改值')
+            self.clear_modify_button = QPushButton('清空修改值')
+            
+            button_layout.addWidget(self.test_pushButton)
+            button_layout.addWidget(self.send_modify_button)
+            button_layout.addWidget(self.clear_modify_button)
+            button_layout.addStretch()  # 添加弹性空间
             
             # 创建QTableView和模型
             self.bit_table_view = QTableView()
@@ -1495,13 +1574,14 @@ class load_ui_dynamically(QMainWindow):
             self.bit_table_view.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
             self.bit_table_view.horizontalHeader().setStretchLastSection(True)
             
-            # 设置列宽
-            self.bit_table_view.setColumnWidth(0, 150)  # 参数名列宽
-            self.bit_table_view.setColumnWidth(1, 100)  # 数值列宽
+            # 设置列宽 - 现在是3列
+            self.bit_table_view.setColumnWidth(0, 120)  # 参数名列宽
+            self.bit_table_view.setColumnWidth(1, 80)   # 当前值列宽
+            self.bit_table_view.setColumnWidth(2, 80)   # 写入值列宽
             
-            # 创建布局
+            # 创建主布局
             self.bit_layout = QVBoxLayout()
-            self.bit_layout.addWidget(self.test_pushButton)
+            self.bit_layout.addLayout(button_layout)
             self.bit_layout.addWidget(self.bit_table_view)
             self.bit_window.setLayout(self.bit_layout)
             
@@ -1509,9 +1589,13 @@ class load_ui_dynamically(QMainWindow):
             self.key_label_list = []
             self.value_label_list = []
             
+            # 连接按钮信号
             self.test_pushButton.clicked.connect(self.test_open_close_bitwidows)
+            self.send_modify_button.clicked.connect(self.send_modified_values)  # 打包修改值
+            self.clear_modify_button.clicked.connect(self.clear_modified_values)
+            
             self.bit_window.setWindowTitle('烧录标志位')
-            self.bit_window.setGeometry(620, 10, 300, 600)
+            self.bit_window.setGeometry(620, 10, 320, 600)  # 增加窗口宽度以适应3列
             self.bit_window.show()
         except Exception as e:
             self.logger.write_log(f"加载UI文件失败: {e}")
@@ -1550,8 +1634,8 @@ class load_ui_dynamically(QMainWindow):
                     pass
             
             # 调试信息
-            for i, unit in enumerate(data):
-                print(f'i = {i} tuple = {len(unit)} - {unit[0]}: {unit[2]}')
+            # for i, unit in enumerate(data):
+            #     print(f'i = {i} tuple = {len(unit)} - {unit[0]}: {unit[2]}')
                 
         except Exception as e:
             self.logger.write_log(f"bit windows写入失败: {e}")
@@ -1690,32 +1774,97 @@ class load_ui_dynamically(QMainWindow):
     def test_partial_update_examples(self):
         """测试部分更新功能的示例方法"""
         try:
-            # 示例1: 更新单个参数的值
+            # 示例1: 更新单个参数的当前值
             self.bit_table_model.update_value_by_name("ulPackV", "6600")
             
-            # 示例2: 更新指定行的数据
+            # 示例2: 更新指定行的当前数据
             new_row_data = ("usRemainAH", "0x0158", "344")
             self.bit_table_model.update_row(24, new_row_data)
             
-            # 示例3: 更新单个单元格
-            self.bit_table_model.update_cell(33, 1, "4")  # 更新SOC百分比
+            # 示例3: 设置写入值（用户想要修改的值）
+            self.bit_table_model.set_write_value(0, "6700")  # 设置第0行的写入值
+            self.set_write_value_by_name("usSOC_Percent", "5")  # 根据参数名设置写入值
+            self.set_write_value_by_name("sTemp[0]", "28")     # 设置温度写入值
             
-            # 示例4: 批量更新多个数据
+            # 示例4: 批量更新多个当前数据
             updates = {
-                19: ("sTemp[0]", "0x1B", "27"),  # 更新温度1
-                20: ("sTemp[1]", "0x1C", "28"),  # 更新温度2
-                (33, 1): "5",  # 更新SOC百分比到5%
-                (34, 1): "99"  # 更新SOH百分比到99%
+                19: ("sTemp[0]", "0x1B", "27"),  # 更新温度1的当前值
+                20: ("sTemp[1]", "0x1C", "28"),  # 更新温度2的当前值
             }
             self.bit_table_model.update_partial_data(updates)
             
-            self.logger.write_log("部分更新测试完成")
+            # 示例5: 获取修改的数据
+            modified_data = self.bit_table_model.get_modified_data()
+            self.logger.write_log(f"当前有 {len(modified_data)} 个参数被修改:")
+            for row, param_name, current_value, write_value in modified_data:
+                self.logger.write_log(f"  {param_name}: {current_value} -> {write_value}")
+            
+            self.logger.write_log("部分更新和写入值测试完成")
             
         except Exception as e:
             self.logger.write_log(f"部分更新测试失败: {e}")
             traceback.print_exc()
 
-
+    def send_modified_values(self):
+        """获取修改的值并返回打包数据"""
+        try:
+            modified_data = self.bit_table_model.get_modified_data()
+            
+            if not modified_data:
+                self.logger.write_log("没有需要打包的修改值")
+                return []
+            
+            self.logger.write_log(f"准备打包 {len(modified_data)} 个修改值:")
+            
+            # 构建打包数据列表
+            packed_data = []
+            
+            for row, param_name, current_value, write_value in modified_data:
+                self.logger.write_log(f"  {param_name}: {current_value} -> {write_value}")
+                
+                # 构造数据包（这里先简单构造，具体格式后续讨论）
+                data_packet = {
+                    'row': row,
+                    'param_name': param_name,
+                    'current_value': current_value,
+                    'write_value': write_value,
+                    'hex_value': self.bit_table_model._data[row][1] if row < len(self.bit_table_model._data) else '',  # 原始十六进制值
+                }
+                packed_data.append(data_packet)
+                
+            self.logger.write_log(f"打包完成，共 {len(packed_data)} 个数据包")
+            
+            # 可选：打包完成后清空修改值
+            # self.bit_table_model.clear_write_values()
+            
+            return packed_data
+            
+        except Exception as e:
+            self.logger.write_log(f"打包修改值失败: {e}")
+            traceback.print_exc()
+            return []
+    
+    def clear_modified_values(self):
+        """清空所有修改的写入值"""
+        try:
+            self.bit_table_model.clear_write_values()
+            self.logger.write_log("已清空所有修改值")
+        except Exception as e:
+            self.logger.write_log(f"清空修改值失败: {e}")
+            traceback.print_exc()
+    
+    def set_write_value_by_name(self, param_name, value):
+        """根据参数名设置写入值"""
+        try:
+            row = self.bit_table_model.find_row_by_name(param_name)
+            if row >= 0:
+                return self.bit_table_model.set_write_value(row, value)
+            else:
+                self.logger.write_log(f"未找到参数: {param_name}")
+                return False
+        except Exception as e:
+            self.logger.write_log(f"设置写入值失败: {e}")
+            return False
 
 # 程序入口
 if __name__ == '__main__':
