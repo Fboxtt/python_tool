@@ -438,7 +438,7 @@ class BluetoothTool(QWidget):
         # 波特率设置
         self.baud_label = QLabel('波特率:')
         self.baud_combo = QComboBox()
-        self.baud_combo.addItems(['9600', '18000','18600', '19200', '38400', '57600', '115200'])
+        self.baud_combo.addItems(['9600', '13333','18000','18600', '19200', '38400', '57600', '115200'])
         self.baud_combo.setCurrentText('19200')
         param_layout.addWidget(self.baud_label, 1, 0)
         param_layout.addWidget(self.baud_combo, 1, 1)
@@ -863,19 +863,53 @@ class BluetoothTool(QWidget):
             rssi_threshold = -100  # 默认值，显示所有设备
 
         try:
-            # 设置扫描时间为3秒
-            devices = await BleakScanner.discover(timeout=2.0)  # 单位是秒
+            # 设置扫描时间为2秒，并获取广告数据
+            discovered_devices = await BleakScanner.discover(timeout=2.0, return_adv=True)
         except Exception as e:
             # QMessageBox.critical(self, '扫描失败', str(e))
             self.blue_write_log(f"扫描失败 {str(e)}")
             traceback.print_exc()
             return
-        
+
         self.device_list.clear()
-        for device in devices:
+        for device, advertisement_data in discovered_devices.values():
             # 只显示有名字且信号强度符合要求的设备
-            if device.name and device.rssi > rssi_threshold:
-                self.device_list.addItem(f"{device.name} - {device.address} (RSSI: {device.rssi})")
+            if device.name and advertisement_data.rssi > rssi_threshold:
+                self.device_list.addItem(f"{device.name} - {device.address} (RSSI: {advertisement_data.rssi})")
+                # 获取更有用的设备信息
+                device_info = f"发现设备: {device.name} - {device.address} - (RSSI: {advertisement_data.rssi})"
+                
+                # 尝试获取广告数据中的有用信息
+                try:
+                    metadata_info = []
+                    
+                    # 解析服务UUID
+                    if advertisement_data.service_uuids:
+                        uuids = list(advertisement_data.service_uuids)
+                        metadata_info.append(f"服务UUID: {uuids}")
+                    
+                    # 解析厂商数据
+                    if advertisement_data.manufacturer_data:
+                        for company_id, data in advertisement_data.manufacturer_data.items():
+                            # 转换厂商ID为十六进制
+                            hex_id = f"0x{company_id:04X}"
+                            # 转换数据为十六进制字符串
+                            hex_data = data.hex().upper() if data else "空"
+                            # 尝试解析为ASCII（如果可能）
+                            try:
+                                ascii_data = data.decode('ascii', errors='ignore')
+                                ascii_info = f" (ASCII: '{ascii_data}')" if ascii_data.isprintable() else ""
+                            except:
+                                ascii_info = ""
+                            
+                            metadata_info.append(f"厂商数据: ID={hex_id}, 数据={hex_data}{ascii_info}")
+                    
+                    if metadata_info:
+                        device_info += f" - {'; '.join(metadata_info)}"
+                except Exception as ex:
+                    self.blue_write_log(f"解析广告数据失败: {ex}")
+                
+                self.blue_write_log(device_info)
         
         self.label.setText('发现的蓝牙设备:')
 
