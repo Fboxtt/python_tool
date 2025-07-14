@@ -26,17 +26,17 @@ STRUCT_FORMATS = {
         "hh",
     "PC_GET_KB": "<"
         "HH"
-        "HHHHHHHHHHHHHHHH"
+        "HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH"
         "HhHhHhHhHhHh"
-        "HHHHHHHH",
+        "HHHHHHHHHHHHHHH",
     "PC_GET_OCP_DELAYTIME": "<HHHH",
     "PC_GET_CELL_CAP_PARA": "<LL",
     "PC_GET_MOSHTDATA": "<HHHH",
     "PC_GET_LIFE_PARA": "<HHLLL",
     "PC_GET_SBS": "<LL"  # ulPackV, ulBattV
-        "HHHHHHHHHHHHHHHH"  # usCellV[CELL_COUNT]
+        "HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH"  # usCellV[CELL_COUNT]
         "l"  # lCurrent
-        "hhhhh"  # sTemp[TEMP_COUNT]
+        "hhhhhhhhhhhhhhh"  # sTemp[TEMP_COUNT]
         "HHH"  # usRemainAH, usFccAH, usBiaAH
         "LLLLL"  # ulOtherInfo, ulAlarmStatus, ulProtectStatus, ulFaultStatus, ulBalanceStatus
         "HH"  # usBattStatus, usSOC_Percent
@@ -85,14 +85,14 @@ STRUCT_VARIABLES = {
     ],
     "PC_GET_KB": [
         "usPackVK", "usBattVK",
-        *[f"usCellVK[{i}]" for i in range(16)],
+        *[f"usCellVK[{i}]" for i in range(32)],
         "usChgCurrK", "sChgCurrB",
         "usDisCurrK", "sDisCurrB",
         "usChgCurrSK", "sChgCurrSB",
         "usDisCurrSK", "sDisCurrSB",
         "usChgCurrSSK", "sChgCurrSSB",
         "usDisCurrSSK", "sDisCurrSSB",
-        *[f"usTempK[{i}]" for i in range(8)]
+        *[f"usTempK[{i}]" for i in range(15)]
     ],
     "PC_GET_OCP_DELAYTIME": [
         "ChgDelayCount_1C", "ChgDelayCount_2C",
@@ -110,9 +110,9 @@ STRUCT_VARIABLES = {
     ],
     "PC_GET_SBS": [
         "ulPackV", "ulBattV",
-        *[f"usCellV[{i}]" for i in range(16)],
+        *[f"usCellV[{i}]" for i in range(32)],
         "lCurrent",
-        *[f"sTemp[{i}]" for i in range(5)],
+        *[f"sTemp[{i}]" for i in range(15)],
         "usRemainAH", "usFccAH", "usBiaAH",
         "ulOtherInfo", "ulAlarmStatus", "ulProtectStatus", "ulFaultStatus", "ulBalanceStatus",
         "usBattStatus", "usSOC_Percent",
