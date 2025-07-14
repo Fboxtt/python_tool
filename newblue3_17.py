@@ -35,9 +35,60 @@ from ui_main import Ui_Form
 class BitFlagsTableModel(QAbstractTableModel):
     def __init__(self, data=None, parent=None):
         super().__init__(parent)
-        self._data = data if data is not None else []
-        self._write_values = {}  # 存储写入值的字典，key为行索引，value为写入值
-        self._headers = ['参数名', '当前值', '写入值']
+        self._original_data = data if data is not None else []
+        self._write_values = {}  # 存储写入值的字典，key为原始行索引，value为写入值
+        self._columns = 9  # 9列显示：3组参数
+        self._max_rows_per_column = 25  # 每列组最大行数
+        self._headers = ['参数名1', '当前值1', '写入值1', '参数名2', '当前值2', '写入值2', '参数名3', '当前值3', '写入值3']
+        self._organized_data = []  # 重新组织后的数据
+        self._organize_data()
+    
+    def _organize_data(self):
+        """重新组织数据，超过25行时分成新的列组"""
+        self._organized_data = []
+        data_len = len(self._original_data)
+        
+        if data_len == 0:
+            return
+        
+        # 计算需要的行数
+        max_rows = min(self._max_rows_per_column, data_len)
+        
+        # 创建行数据
+        for row in range(max_rows):
+            row_data = [''] * self._columns
+            
+            # 填充第一列组 (columns 0-2)
+            if row < data_len:
+                row_data[0] = self._original_data[row][0]  # 参数名
+                row_data[1] = self._original_data[row][2]  # 当前值
+                row_data[2] = self._write_values.get(row, "")  # 写入值
+            
+            # 填充第二列组 (columns 3-5)
+            second_group_idx = row + self._max_rows_per_column
+            if second_group_idx < data_len:
+                row_data[3] = self._original_data[second_group_idx][0]  # 参数名
+                row_data[4] = self._original_data[second_group_idx][2]  # 当前值
+                row_data[5] = self._write_values.get(second_group_idx, "")  # 写入值
+            
+            # 填充第三列组 (columns 6-8)
+            third_group_idx = row + 2 * self._max_rows_per_column
+            if third_group_idx < data_len:
+                row_data[6] = self._original_data[third_group_idx][0]  # 参数名
+                row_data[7] = self._original_data[third_group_idx][2]  # 当前值
+                row_data[8] = self._write_values.get(third_group_idx, "")  # 写入值
+            
+            self._organized_data.append(row_data)
+    
+    def _get_original_index(self, row, col):
+        """根据表格位置获取原始数据索引"""
+        if col in [0, 1, 2]:  # 第一列组
+            return row
+        elif col in [3, 4, 5]:  # 第二列组
+            return row + self._max_rows_per_column
+        elif col in [6, 7, 8]:  # 第三列组
+            return row + 2 * self._max_rows_per_column
+        return -1
     
     def data(self, index, role):
         if not index.isValid():
@@ -47,14 +98,8 @@ class BitFlagsTableModel(QAbstractTableModel):
         col = index.column()
         
         if role == Qt.ItemDataRole.DisplayRole or role == Qt.ItemDataRole.EditRole:
-            if row < len(self._data):
-                if col == 0:
-                    return self._data[row][0]  # 参数名
-                elif col == 1:
-                    return self._data[row][2]  # 当前值
-                elif col == 2:
-                    # 写入值：只显示用户设置的值，没有设置则为空
-                    return self._write_values.get(row, "")
+            if row < len(self._organized_data) and col < self._columns:
+                return self._organized_data[row][col]
         return None
     
     def setData(self, index, value, role):
@@ -63,24 +108,29 @@ class BitFlagsTableModel(QAbstractTableModel):
             row = index.row()
             col = index.column()
             
-            if col == 2 and 0 <= row < len(self._data):  # 只能编辑写入值列
-                self._write_values[row] = str(value)
-                self.dataChanged.emit(index, index)
-                return True
+            # 只能编辑写入值列 (2, 5, 8)
+            if col in [2, 5, 8] and row < len(self._organized_data):
+                original_idx = self._get_original_index(row, col)
+                if 0 <= original_idx < len(self._original_data):
+                    self._write_values[original_idx] = str(value)
+                    self._organized_data[row][col] = str(value)
+                    self.dataChanged.emit(index, index)
+                    return True
         return False
     
     def flags(self, index):
         """设置单元格标志，写入值列可编辑"""
         flags = Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable
-        if index.column() == 2:  # 写入值列可编辑
+        col = index.column()
+        if col in [2, 5, 8]:  # 写入值列可编辑
             flags |= Qt.ItemFlag.ItemIsEditable
         return flags
     
     def rowCount(self, parent=QModelIndex()):
-        return len(self._data)
+        return len(self._organized_data)
     
     def columnCount(self, parent=QModelIndex()):
-        return 3  # 现在是3列
+        return self._columns
     
     def headerData(self, section, orientation, role):
         if role == Qt.ItemDataRole.DisplayRole:
@@ -93,35 +143,35 @@ class BitFlagsTableModel(QAbstractTableModel):
     def update_data(self, data):
         """完全更新所有数据（重置模型）"""
         self.beginResetModel()
-        self._data = data
-        # 清空写入值，或者保留已有的写入值
-        # self._write_values.clear()  # 如果想清空所有写入值，取消注释这行
+        self._original_data = data
+        self._organize_data()
         self.endResetModel()
     
     def update_row(self, row, row_data):
         """更新指定行的数据"""
-        if 0 <= row < len(self._data):
-            self._data[row] = row_data
+        if 0 <= row < len(self._original_data):
+            self._original_data[row] = row_data
+            self._organize_data()
             # 通知视图该行的数据已更改
-            left_index = self.createIndex(row, 0)
-            right_index = self.createIndex(row, self.columnCount() - 1)
-            self.dataChanged.emit(left_index, right_index)
+            self.beginResetModel()
+            self.endResetModel()
             return True
         return False
     
     def update_cell(self, row, col, value):
         """更新指定单元格的数据"""
-        if 0 <= row < len(self._data) and 0 <= col < 2:  # 只能更新前两列的原始数据
+        if 0 <= row < len(self._original_data) and 0 <= col < 2:  # 只能更新前两列的原始数据
             if col == 0:
                 # 更新参数名
-                self._data[row] = (value, self._data[row][1], self._data[row][2])
+                self._original_data[row] = (value, self._original_data[row][1], self._original_data[row][2])
             elif col == 1:
                 # 更新当前值（假设原数据格式为 (name, hex_value, decimal_value)）
-                self._data[row] = (self._data[row][0], self._data[row][1], value)
+                self._original_data[row] = (self._original_data[row][0], self._original_data[row][1], value)
             
+            self._organize_data()
             # 通知视图该单元格的数据已更改
-            index = self.createIndex(row, col)
-            self.dataChanged.emit(index, index)
+            self.beginResetModel()
+            self.endResetModel()
             return True
         return False
     
@@ -129,38 +179,39 @@ class BitFlagsTableModel(QAbstractTableModel):
         """批量更新部分数据
         updates: 字典，格式为 {row_index: new_row_data} 或 {(row, col): new_value}
         """
-        changed_rows = set()
+        changed = False
         
         for key, value in updates.items():
             if isinstance(key, int):
                 # 更新整行
-                if 0 <= key < len(self._data):
-                    self._data[key] = value
-                    changed_rows.add(key)
+                if 0 <= key < len(self._original_data):
+                    self._original_data[key] = value
+                    changed = True
             elif isinstance(key, tuple) and len(key) == 2:
                 # 更新单个单元格
                 row, col = key
                 if self.update_cell(row, col, value):
-                    changed_rows.add(row)
+                    changed = True
         
         # 批量通知视图更改
-        for row in changed_rows:
-            left_index = self.createIndex(row, 0)
-            right_index = self.createIndex(row, self.columnCount() - 1)
-            self.dataChanged.emit(left_index, right_index)
+        if changed:
+            self._organize_data()
+            self.beginResetModel()
+            self.endResetModel()
     
     def append_row(self, row_data):
         """添加新行"""
-        row = len(self._data)
+        row = len(self._original_data)
         self.beginInsertRows(QModelIndex(), row, row)
-        self._data.append(row_data)
+        self._original_data.append(row_data)
+        self._organize_data()
         self.endInsertRows()
     
     def remove_row(self, row):
         """删除指定行"""
-        if 0 <= row < len(self._data):
+        if 0 <= row < len(self._original_data):
             self.beginRemoveRows(QModelIndex(), row, row)
-            del self._data[row]
+            del self._original_data[row]
             # 同时删除对应的写入值
             if row in self._write_values:
                 del self._write_values[row]
@@ -172,13 +223,14 @@ class BitFlagsTableModel(QAbstractTableModel):
                 else:
                     new_write_values[old_row] = value
             self._write_values = new_write_values
+            self._organize_data()
             self.endRemoveRows()
             return True
         return False
     
     def find_row_by_name(self, param_name):
         """根据参数名查找行索引"""
-        for i, row_data in enumerate(self._data):
+        for i, row_data in enumerate(self._original_data):
             if row_data[0] == param_name:
                 return i
         return -1
@@ -198,27 +250,27 @@ class BitFlagsTableModel(QAbstractTableModel):
         """获取有写入值的数据列表，返回格式：[(row, param_name, current_value, write_value), ...]"""
         modified_data = []
         for row, write_value in self._write_values.items():
-            if row < len(self._data) and write_value != "":  # 只返回真正有写入值的数据
-                param_name = self._data[row][0]
-                current_value = self._data[row][2]
+            if row < len(self._original_data) and write_value != "":  # 只返回真正有写入值的数据
+                param_name = self._original_data[row][0]
+                current_value = self._original_data[row][2]
                 modified_data.append((row, param_name, current_value, write_value))
         return modified_data
     
     def clear_write_values(self):
         """清空所有写入值"""
         self._write_values.clear()
+        self._organize_data()
         # 通知视图写入值列需要更新
-        if len(self._data) > 0:
-            top_left = self.createIndex(0, 2)
-            bottom_right = self.createIndex(len(self._data) - 1, 2)
-            self.dataChanged.emit(top_left, bottom_right)
+        self.beginResetModel()
+        self.endResetModel()
     
     def set_write_value(self, row, value):
         """设置指定行的写入值"""
-        if 0 <= row < len(self._data):
+        if 0 <= row < len(self._original_data):
             self._write_values[row] = str(value)
-            index = self.createIndex(row, 2)
-            self.dataChanged.emit(index, index)
+            self._organize_data()
+            self.beginResetModel()
+            self.endResetModel()
             return True
         return False
 
@@ -1566,11 +1618,9 @@ class load_ui_dynamically(QMainWindow):
             
             # 创建按钮布局
             button_layout = QHBoxLayout()
-            self.test_pushButton = QPushButton('test_hide')
             self.send_modify_button = QPushButton('发送修改值')
             self.clear_modify_button = QPushButton('清空修改值')
             
-            button_layout.addWidget(self.test_pushButton)
             button_layout.addWidget(self.send_modify_button)
             button_layout.addWidget(self.clear_modify_button)
             button_layout.addStretch()  # 添加弹性空间
@@ -1583,12 +1633,49 @@ class load_ui_dynamically(QMainWindow):
             # 设置表格属性
             self.bit_table_view.setAlternatingRowColors(True)
             self.bit_table_view.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-            self.bit_table_view.horizontalHeader().setStretchLastSection(True)
+            self.bit_table_view.horizontalHeader().setStretchLastSection(False)
             
-            # 设置列宽 - 现在是3列
-            self.bit_table_view.setColumnWidth(0, 120)  # 参数名列宽
-            self.bit_table_view.setColumnWidth(1, 80)   # 当前值列宽
-            self.bit_table_view.setColumnWidth(2, 80)   # 写入值列宽
+            # 设置列宽 - 现在是9列
+            column_widths = [120, 80, 80, 120, 80, 80, 120, 80, 80]
+            for i, width in enumerate(column_widths):
+                self.bit_table_view.setColumnWidth(i, width)
+            
+            # 设置更紧凑的行间距
+            self.bit_table_view.verticalHeader().setDefaultSectionSize(20)  # 默认行高设为20
+            self.bit_table_view.verticalHeader().setMinimumSectionSize(18)  # 最小行高设为18
+            
+            # 添加样式表以区分不同的列组
+            self.bit_table_view.setStyleSheet("""
+                QTableView::item {
+                    border: 1px solid #cccccc;
+                    padding: 3px;
+                }
+                QTableView::item:selected {
+                    background-color: #3399ff;
+                    color: white;
+                }
+                QHeaderView::section {
+                    background-color: #f0f0f0;
+                    border: 1px solid #cccccc;
+                    padding: 4px;
+                    font-weight: bold;
+                }
+                QHeaderView::section:nth-child(1),
+                QHeaderView::section:nth-child(2),
+                QHeaderView::section:nth-child(3) {
+                    background-color: #e8f4f8;
+                }
+                QHeaderView::section:nth-child(4),
+                QHeaderView::section:nth-child(5),
+                QHeaderView::section:nth-child(6) {
+                    background-color: #f8f8e8;
+                }
+                QHeaderView::section:nth-child(7),
+                QHeaderView::section:nth-child(8),
+                QHeaderView::section:nth-child(9) {
+                    background-color: #f8e8f8;
+                }
+            """)
             
             # 创建主布局
             self.bit_layout = QVBoxLayout()
@@ -1602,29 +1689,20 @@ class load_ui_dynamically(QMainWindow):
             self.value_label_list = []
             
             # 连接按钮信号
-            self.test_pushButton.clicked.connect(self.test_open_close_bitwidows)
             self.send_modify_button.clicked.connect(self.send_modified_values)  # 发送修改值
             self.clear_modify_button.clicked.connect(self.clear_modified_values)
             
             self.bit_window.setWindowTitle('烧录标志位')
-            self.bit_window.setGeometry(620, 10, 320, 600)  # 增加窗口宽度以适应3列
+            self.bit_window.setGeometry(620, 10, 880, 600)  # 增加窗口宽度以适应9列
             self.bit_window.show()
         except Exception as e:
             self.logger.write_log(f"加载UI文件失败: {e}")
             traceback.print_exc()
             # return None
-    def test_open_close_bitwidows(self):
-        # 实际使用需要删掉
-        if self.test_pushButton.text() == "test_hide":
-            self.bit_window.hide()
-            self.test_pushButton.setText('test_show')
-        else:
-            self.bit_window.show()
-            self.test_pushButton.setText('test_hide')
     def visualize_bit_flags(self,data: list):
         try:
             # 检查是否是第一次加载数据或数据长度发生变化
-            if len(self.bit_table_model._data) != len(data):
+            if len(self.bit_table_model._original_data) != len(data):
                 # 数据结构变化，需要完全重置
                 self.bit_table_model.update_data(data)
                 self.logger.write_log(f"完全更新标志位数据，共 {len(data)} 条记录")
@@ -1632,7 +1710,7 @@ class load_ui_dynamically(QMainWindow):
                 # 逐项比较，只更新有变化的数据
                 updates = {}
                 for i, new_unit in enumerate(data):
-                    old_unit = self.bit_table_model._data[i]
+                    old_unit = self.bit_table_model._original_data[i]
                     # 检查参数名或数值是否有变化
                     if old_unit[0] != new_unit[0] or old_unit[2] != new_unit[2]:
                         updates[i] = new_unit
@@ -1807,40 +1885,6 @@ class load_ui_dynamically(QMainWindow):
         
         # 如果没有连接需要断开，接受事件并正常关闭
         event.accept()
-
-    def test_partial_update_examples(self):
-        """测试部分更新功能的示例方法"""
-        try:
-            # 示例1: 更新单个参数的当前值
-            self.bit_table_model.update_value_by_name("ulPackV", "6600")
-            
-            # 示例2: 更新指定行的当前数据
-            new_row_data = ("usRemainAH", "0x0158", "344")
-            self.bit_table_model.update_row(24, new_row_data)
-            
-            # 示例3: 设置写入值（用户想要修改的值）
-            self.bit_table_model.set_write_value(0, "6700")  # 设置第0行的写入值
-            self.set_write_value_by_name("usSOC_Percent", "5")  # 根据参数名设置写入值
-            self.set_write_value_by_name("sTemp[0]", "28")     # 设置温度写入值
-            
-            # 示例4: 批量更新多个当前数据
-            updates = {
-                19: ("sTemp[0]", "0x1B", "27"),  # 更新温度1的当前值
-                20: ("sTemp[1]", "0x1C", "28"),  # 更新温度2的当前值
-            }
-            self.bit_table_model.update_partial_data(updates)
-            
-            # 示例5: 获取修改的数据
-            modified_data = self.bit_table_model.get_modified_data()
-            self.logger.write_log(f"当前有 {len(modified_data)} 个参数被修改:")
-            for row, param_name, current_value, write_value in modified_data:
-                self.logger.write_log(f"  {param_name}: {current_value} -> {write_value}")
-            
-            self.logger.write_log("部分更新和写入值测试完成")
-            
-        except Exception as e:
-            self.logger.write_log(f"部分更新测试失败: {e}")
-            traceback.print_exc()
 
     def parse_hex_or_decimal_value(self, value_str):
         """
