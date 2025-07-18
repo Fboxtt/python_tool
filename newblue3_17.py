@@ -334,6 +334,7 @@ class BluetoothTool(QWidget):
         self.serial_receive_task = None #串口接收任务对象
         self.program_task = None #烧录任务对象
         self.task_flag = False
+        self.device_name_to_address = {}  # 设备名到地址的映射
         self.initUI()
         self.hex_model = HexFileModel()
         self.text_decode = TextDecode()
@@ -603,12 +604,12 @@ class BluetoothTool(QWidget):
         password_buttons_layout = QHBoxLayout()
         
         # 查询加密状态按钮
-        self.query_lock_button = QPushButton('查询加密')
+        self.query_lock_button = QPushButton('查询状态(扫描)')
         self.query_lock_button.clicked.connect(self.on_query_lock_clicked)
         password_buttons_layout.addWidget(self.query_lock_button)
         
-        # 登录按钮
-        self.login_button = QPushButton('登录')
+        # 验证密码按钮
+        self.login_button = QPushButton('验证密码')
         self.login_button.clicked.connect(self.on_login_clicked)
         password_buttons_layout.addWidget(self.login_button)
         
@@ -617,8 +618,8 @@ class BluetoothTool(QWidget):
         self.set_password_button.clicked.connect(self.on_set_password_clicked)
         password_buttons_layout.addWidget(self.set_password_button)
         
-        # 重置密码按钮
-        self.reset_password_button = QPushButton('重置密码')
+        # 取消密码按钮
+        self.reset_password_button = QPushButton('取消密码')
         self.reset_password_button.clicked.connect(self.on_reset_password_clicked)
         password_buttons_layout.addWidget(self.reset_password_button)
         
@@ -872,44 +873,88 @@ class BluetoothTool(QWidget):
             return
 
         self.device_list.clear()
+        self.device_name_to_address.clear()  # 清空设备映射
         for device, advertisement_data in discovered_devices.values():
             # 只显示有名字且信号强度符合要求的设备
             if device.name and advertisement_data.rssi > rssi_threshold:
-                self.device_list.addItem(f"{device.name} - {device.address} (RSSI: {advertisement_data.rssi})")
-                # 获取更有用的设备信息
-                device_info = f"发现设备: {device.name} - {device.address} - (RSSI: {advertisement_data.rssi})"
-                
-                # 尝试获取广告数据中的有用信息
-                try:
-                    metadata_info = []
-                    
-                    # 解析服务UUID
-                    if advertisement_data.service_uuids:
-                        uuids = list(advertisement_data.service_uuids)
-                        metadata_info.append(f"服务UUID: {uuids}")
-                    
-                    # 解析厂商数据
-                    if advertisement_data.manufacturer_data:
-                        for company_id, data in advertisement_data.manufacturer_data.items():
-                            # 转换厂商ID为十六进制
-                            hex_id = f"0x{company_id:04X}"
-                            # 转换数据为十六进制字符串
-                            hex_data = data.hex().upper() if data else "空"
-                            # 尝试解析为ASCII（如果可能）
-                            try:
-                                ascii_data = data.decode('ascii', errors='ignore')
-                                ascii_info = f" (ASCII: '{ascii_data}')" if ascii_data.isprintable() else ""
-                            except:
-                                ascii_info = ""
+                # 检查密码功能状态
+                password_status_short = ""
+                if advertisement_data.manufacturer_data:
+                    for company_id, data in advertisement_data.manufacturer_data.items():
+                        if len(data) >= 2:
+                            second_last_byte = data[-2]  # 倒数第二个字节
+                            last_byte = data[-1]         # 最后一个字节
                             
-                            metadata_info.append(f"厂商数据: ID={hex_id}, 数据={hex_data}{ascii_info}")
-                    
-                    if metadata_info:
-                        device_info += f" - {'; '.join(metadata_info)}"
-                except Exception as ex:
-                    self.blue_write_log(f"解析广告数据失败: {ex}")
+                            if second_last_byte == 0x50:  # 支持密码功能
+                                if last_byte == 0x00:
+                                    password_status_short = " [密码:未设置]"
+                                elif last_byte == 0x01:
+                                    password_status_short = " [密码:已设置]"
+                                else:
+                                    password_status_short = f" [密码:未知{last_byte:02X}]"
+                                break  # 找到了就退出循环
                 
-                self.blue_write_log(device_info)
+                # 保存设备名到地址的映射
+                self.device_name_to_address[device.name] = device.address
+                
+                # 添加到设备列表，去掉地址显示，添加密码状态
+                self.device_list.addItem(f"{device.name} (RSSI: {advertisement_data.rssi}){password_status_short}")
+                # 获取更有用的设备信息
+                # device_info = f"发现设备: {device.name} - {device.address} - (RSSI: {advertisement_data.rssi})"
+                
+                # # 尝试获取广告数据中的有用信息
+                # try:
+                #     metadata_info = []
+                    
+                #     # 解析服务UUID
+                #     if advertisement_data.service_uuids:
+                #         uuids = list(advertisement_data.service_uuids)
+                #         metadata_info.append(f"服务UUID: {uuids}")
+                    
+                #     # 解析厂商数据
+                #     if advertisement_data.manufacturer_data:
+                #         for company_id, data in advertisement_data.manufacturer_data.items():
+                #             # 转换厂商ID为十六进制
+                #             hex_id = f"0x{company_id:04X}"
+                            
+                #             # 转换数据为十六进制字符串
+                #             hex_data = data.hex().upper() if data else "空"
+                #             # 尝试解析为ASCII（如果可能）
+                #             try:
+                #                 ascii_data = data.decode('ascii', errors='ignore')
+                #                 ascii_info = f" (ASCII: '{ascii_data}')" if ascii_data.isprintable() else ""
+                #             except:
+                #                 ascii_info = ""
+                            
+                #             # 检查密码状态：查看最后两个字节
+                #             password_status = ""
+                            
+                #             # 判断逻辑：检查最后两个字节
+                #             # 倒数第二个字节为0x50 → 支持密码功能
+                #             # 最后一个字节：0x00=未设置，0x01=已设置
+                            
+                #             if len(data) >= 2:
+                #                 second_last_byte = data[-2]  # 倒数第二个字节
+                #                 last_byte = data[-1]         # 最后一个字节
+                                
+                #                 if second_last_byte == 0x50:  # 支持密码功能
+                #                     if last_byte == 0x00:
+                #                         password_status = " [支持密码，未设置]"
+                #                     elif last_byte == 0x01:
+                #                         password_status = " [支持密码，已设置]"
+                #                     else:
+                #                         password_status = f" [支持密码，状态未知:0x{last_byte:02X}]"
+                #             else:
+                #                 password_status = " [数据长度不足]"
+                            
+                #             # metadata_info.append(f"厂商数据: ID={hex_id}, 数据={hex_data}{ascii_info}{password_status}")
+                    
+                #     if metadata_info:
+                #         device_info += f" - {'; '.join(metadata_info)}"
+                # except Exception as ex:
+                #     self.blue_write_log(f"解析广告数据失败: {ex}")
+                
+                # self.blue_write_log(device_info)
         
         self.label.setText('发现的蓝牙设备:')
 
@@ -917,7 +962,15 @@ class BluetoothTool(QWidget):
         """异步方法，连接蓝牙设备"""
         selected_device = self.device_list.currentItem()
         if selected_device:
-            device_address = selected_device.text().split(' - ')[1].split(' (')[0]  # 提取设备地址
+            # 从显示文本中提取设备名
+            device_text = selected_device.text()
+            device_name = device_text.split(' (RSSI:')[0]  # 提取设备名
+            
+            # 通过设备名查找地址
+            device_address = self.device_name_to_address.get(device_name)
+            if not device_address:
+                QMessageBox.warning(self, '警告', '无法找到设备地址，请重新扫描')
+                return
             try:
                 self.client = BleakClient(device_address)
                 await self.client.connect()
@@ -933,7 +986,7 @@ class BluetoothTool(QWidget):
                 self.send_button.setEnabled(True)
                 # 开始监听数据
                 if self.client and self.client.is_connected:
-                    self.device_name = selected_device.text().split(' - ')[0]
+                    self.device_name = device_name  # 使用之前提取的设备名
                     await self.client.start_notify("0000ffe1-0000-1000-8000-00805f9b34fb", self.on_data_received)
                 QTimer.singleShot(1000, self.send_find_version_cmd)
             except Exception as e:
@@ -1097,26 +1150,93 @@ class BluetoothTool(QWidget):
         # 在这里处理完整的数据包
         # self.blue_write_log(f"Received complete data packet: {self.received_data_buffer}")
     
-        # 处理数据
-        print("3收完数据")
-        self.text_decode.split_data(self.received_data_buffer)
-        if self.text_decode.have_hex:
-            # self.blue_write_log(f"发送信号给数据解析模块")
-            struct_name,dict_data = self.hex_parser.decode_cmd_hex_data(self.text_decode.no80_cmd,bytes(self.text_decode.data_hex))
-            print("4解析完数据")
-            if dict_data:
-                header = f"RX->,{self.commu_type},{self.device_name},{struct_name}"
-                """csv记录监控数据"""
-                """外部窗口展示 监控数据 |字典数据|纯参数数据|"""
-                self.decode_data_ok_signal.emit(header,dict_data) 
-                print("5发射完字典")
-                # 发射到函数 get_dict_from_receive_data (str,dict)
+        # 先检查是否是新的密码命令响应格式
+        if self.check_new_password_response(self.received_data_buffer):
+            # 处理新的密码命令响应
+            self.handle_new_password_response(self.received_data_buffer)
+        else:
+            # 处理普通数据
+            print("3收完数据")
+            self.text_decode.split_data(self.received_data_buffer)
+            if self.text_decode.have_hex:
+                # self.blue_write_log(f"发送信号给数据解析模块")
+                struct_name,dict_data = self.hex_parser.decode_cmd_hex_data(self.text_decode.no80_cmd,bytes(self.text_decode.data_hex))
+                print("4解析完数据")
+                if dict_data:
+                    header = f"RX->,{self.commu_type},{self.device_name},{struct_name}"
+                    """csv记录监控数据"""
+                    """外部窗口展示 监控数据 |字典数据|纯参数数据|"""
+                    self.decode_data_ok_signal.emit(header,dict_data) 
+                    print("5发射完字典")
+                    # 发射到函数 get_dict_from_receive_data (str,dict)
         """log记录调试数据"""
         """内部窗口展示 调试数据 |hex数据|字符串数据|"""
         self.display_received_data(self.received_data_buffer)
         print("6显示完数据")
         # 清空缓冲区
         self.received_data_buffer.clear()
+
+    def check_new_password_response(self, data):
+        """检查是否是新的密码命令响应格式"""
+        if len(data) < 5:
+            return False
+        
+        # 检查帧头和帧尾
+        if data[0] == 0xFB and data[-1] == 0xBB:
+            cmd_code = data[1]
+            # 检查是否是密码相关命令的响应
+            if cmd_code in [0x01, 0x02, 0x03]:
+                return True
+        
+        return False
+
+    def handle_new_password_response(self, data):
+        """处理新的密码命令响应"""
+        try:
+            success, result = self.parse_new_password_response(data)
+            
+            if not success:
+                self.blue_write_log(f"密码命令响应解析失败: {result}")
+                return
+            
+            cmd_code = result["cmd_code"]
+            content = result["content"]
+            
+            if cmd_code == 0x01:  # 验证密码响应
+                if len(content) >= 1:
+                    if content[0] == 0x00:
+                        self.blue_write_log("密码验证失败: 密码错误")
+                    elif content[0] == 0x01:
+                        self.blue_write_log("密码验证成功: 密码正确")
+                    else:
+                        self.blue_write_log(f"密码验证响应: 未知状态 {content[0]:02X}")
+                else:
+                    self.blue_write_log("密码验证响应: 数据长度不足")
+                    
+            elif cmd_code == 0x02:  # 设置密码响应
+                if len(content) >= 1:
+                    if content[0] == 0x00:
+                        self.blue_write_log("设置密码失败")
+                    elif content[0] == 0x01:
+                        self.blue_write_log("设置密码成功")
+                    else:
+                        self.blue_write_log(f"设置密码响应: 未知状态 {content[0]:02X}")
+                else:
+                    self.blue_write_log("设置密码响应: 数据长度不足")
+                    
+            elif cmd_code == 0x03:  # 取消密码响应
+                if len(content) >= 1:
+                    if content[0] == 0x00:
+                        self.blue_write_log("取消密码失败")
+                    elif content[0] == 0x01:
+                        self.blue_write_log("取消密码成功")
+                    else:
+                        self.blue_write_log(f"取消密码响应: 未知状态 {content[0]:02X}")
+                else:
+                    self.blue_write_log("取消密码响应: 数据长度不足")
+                    
+        except Exception as e:
+            self.blue_write_log(f"处理密码命令响应异常: {str(e)}")
 
     def on_select_hex_file(self):
         """选择HEX文件并解析"""
@@ -1419,28 +1539,30 @@ class BluetoothTool(QWidget):
         self.status_indicator.setPixmap(pixmap)
 
     def on_query_lock_clicked(self):
-        """查询加密状态按钮点击处理"""
-        asyncio.create_task(self.send_query_lock_cmd())
+        """查询加密状态按钮点击处理 - 暂时保留旧功能"""
+        # 注释：查询功能现在通过广播数据中的密码状态字段实现
+        self.blue_write_log("提示: 密码状态可通过设备扫描时的广播数据查看 [无密码]/[有密码] 标识")
+        # asyncio.create_task(self.send_query_lock_cmd())
 
     def on_login_clicked(self):
-        """登录按钮点击处理"""
+        """登录按钮点击处理 - 使用新的验证密码命令"""
         password = self.password_input.text()
         if len(password) != 6:
             QMessageBox.warning(self, '警告', '密码必须是6位字符')
             return
-        asyncio.create_task(self.send_login_cmd(password))
+        asyncio.create_task(self.send_verify_password_cmd(password))
 
     def on_set_password_clicked(self):
-        """设置密码按钮点击处理"""
+        """设置密码按钮点击处理 - 使用新的设置密码命令"""
         password = self.password_input.text()
         if len(password) != 6:
             QMessageBox.warning(self, '警告', '密码必须是6位字符')
             return
-        asyncio.create_task(self.send_set_password_cmd(password))
+        asyncio.create_task(self.send_set_password_cmd_new(password))
 
     def on_reset_password_clicked(self):
-        """重置密码按钮点击处理"""
-        asyncio.create_task(self.send_reset_password_cmd())
+        """重置密码按钮点击处理 - 使用新的取消密码命令"""
+        asyncio.create_task(self.send_cancel_password_cmd())
 
     async def send_query_lock_cmd(self):
         """发送查询加密状态命令 (0x5D)"""
@@ -1578,6 +1700,88 @@ class BluetoothTool(QWidget):
                 
         except Exception as e:
             self.blue_write_log(f"重置密码异常: {str(e)}")
+
+    # ==================== 新的加密命令实现 ====================
+    
+    def construct_new_password_cmd(self, cmd_code, data_bytes):
+        """构造新的密码命令包"""
+        # 新的帧格式：0xFB + 指令号 + 内容长度 + 内容 + 0xBB
+        cmd_packet = bytearray()
+        cmd_packet.append(0xFB)  # 帧头
+        cmd_packet.append(cmd_code)  # 指令号
+        cmd_packet.append(len(data_bytes))  # 内容长度
+        cmd_packet.extend(data_bytes)  # 内容
+        cmd_packet.append(0xBB)  # 帧尾
+        return cmd_packet
+    
+    def parse_new_password_response(self, data):
+        """解析新的密码命令响应"""
+        if len(data) < 5:
+            return False, "响应数据长度不足"
+        
+        if data[0] != 0xFB or data[-1] != 0xBB:
+            return False, "响应帧格式错误"
+        
+        cmd_code = data[1]
+        content_length = data[2]
+        content = data[3:3+content_length]
+        
+        return True, {"cmd_code": cmd_code, "content": content}
+
+    async def send_verify_password_cmd(self, password: str):
+        """发送验证密码命令 (新格式)"""
+        try:
+            # 构造6字节密码数据
+            password_data = bytearray()
+            for char in password:
+                password_data.append(ord(char))
+            
+            # 构造命令包：0xFB 0x01 0x06 + 6字节密码 + 0xBB
+            cmd_packet = self.construct_new_password_cmd(0x01, password_data)
+            
+            self.display_send_data(cmd_packet)
+            await self.byte_send(cmd_packet)
+            
+            # 解析响应（这里需要在数据接收处理中添加新的解析逻辑）
+            self.blue_write_log("验证密码命令已发送，等待响应...")
+            
+        except Exception as e:
+            self.blue_write_log(f"验证密码异常: {str(e)}")
+
+    async def send_set_password_cmd_new(self, password: str):
+        """发送设置密码命令 (新格式)"""
+        try:
+            # 构造6字节密码数据
+            password_data = bytearray()
+            for char in password:
+                password_data.append(ord(char))
+            
+            # 构造命令包：0xFB 0x02 0x06 + 6字节密码 + 0xBB
+            cmd_packet = self.construct_new_password_cmd(0x02, password_data)
+            
+            self.display_send_data(cmd_packet)
+            await self.byte_send(cmd_packet)
+            self.blue_write_log("设置密码命令已发送，等待响应...")
+            
+        except Exception as e:
+            self.blue_write_log(f"设置密码异常: {str(e)}")
+
+    async def send_cancel_password_cmd(self):
+        """发送取消密码命令 (新格式)"""
+        try:
+            # 构造数据：0x01
+            cancel_data = bytearray([0x01])
+            
+            # 构造命令包：0xFB 0x03 0x01 0x01 + 0xBB
+            cmd_packet = self.construct_new_password_cmd(0x03, cancel_data)
+            
+            self.display_send_data(cmd_packet)
+            await self.byte_send(cmd_packet)
+            
+            self.blue_write_log("取消密码命令已发送，等待响应...")
+            
+        except Exception as e:
+            self.blue_write_log(f"取消密码异常: {str(e)}")
 
 widgets = None
 
