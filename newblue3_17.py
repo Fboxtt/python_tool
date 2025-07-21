@@ -582,6 +582,22 @@ class BluetoothTool(QWidget):
         # 将放电控制部分添加到主布局
         layout.addLayout(discharge_layout)
 
+        # 添加充电控制部分
+        charge_layout = QHBoxLayout()
+        
+        # 打开充电按钮
+        self.open_charge_button = QPushButton('打开充电')
+        self.open_charge_button.clicked.connect(self.on_open_charge_clicked)
+        charge_layout.addWidget(self.open_charge_button)
+        
+        # 关闭充电按钮
+        self.close_charge_button = QPushButton('关闭充电')
+        self.close_charge_button.clicked.connect(self.on_close_charge_clicked)
+        charge_layout.addWidget(self.close_charge_button)
+        
+        # 将充电控制部分添加到主布局
+        layout.addLayout(charge_layout)
+
         # 添加密码管理部分
         password_layout = QVBoxLayout()
         
@@ -1448,6 +1464,18 @@ class BluetoothTool(QWidget):
         """处理关闭放电按钮点击事件"""
         # 发送关闭放电的指令数据
         bytedata = bytes([0x00,0x00,0x04,0x01,0x0D,0x55,0xaa,0x11])
+        self.send_command(bytedata)
+
+    def on_open_charge_clicked(self):
+        """处理打开充电按钮点击事件"""
+        # 发送打开充电的指令数据
+        bytedata = bytes([0x00,0x00,0x04,0x01,0x0A,0x55,0xaa,0x0E])
+        self.send_command(bytedata)
+
+    def on_close_charge_clicked(self):
+        """处理关闭充电按钮点击事件"""
+        # 发送关闭充电的指令数据
+        bytedata = bytes([0x00,0x00,0x04,0x01,0x0B,0x55,0xaa,0x0F])
         self.send_command(bytedata)
 
     def send_command(self, command:bytes):
