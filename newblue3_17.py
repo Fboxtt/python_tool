@@ -598,6 +598,57 @@ class BluetoothTool(QWidget):
         # 将充电控制部分添加到主布局
         layout.addLayout(charge_layout)
 
+        # 添加RT控制部分
+        rt_layout = QVBoxLayout()
+        
+        # RT控制标题
+        rt_title = QLabel('RT控制')
+        rt_title.setFont(QFont('Arial', 12, QFont.Weight.Bold))
+        rt_layout.addWidget(rt_title)
+        
+        # RT使能按钮行
+        rt_enable_layout = QHBoxLayout()
+        
+        # RT0使能按钮
+        self.rt0_enable_button = QPushButton('RT0使能')
+        self.rt0_enable_button.clicked.connect(self.on_rt0_enable_clicked)
+        rt_enable_layout.addWidget(self.rt0_enable_button)
+        
+        # RT1使能按钮
+        self.rt1_enable_button = QPushButton('RT1使能')
+        self.rt1_enable_button.clicked.connect(self.on_rt1_enable_clicked)
+        rt_enable_layout.addWidget(self.rt1_enable_button)
+        
+        # RT2使能按钮
+        self.rt2_enable_button = QPushButton('RT2使能')
+        self.rt2_enable_button.clicked.connect(self.on_rt2_enable_clicked)
+        rt_enable_layout.addWidget(self.rt2_enable_button)
+        
+        rt_layout.addLayout(rt_enable_layout)
+        
+        # RT关闭按钮行
+        rt_disable_layout = QHBoxLayout()
+        
+        # RT0关闭按钮
+        self.rt0_disable_button = QPushButton('RT0关闭')
+        self.rt0_disable_button.clicked.connect(self.on_rt0_disable_clicked)
+        rt_disable_layout.addWidget(self.rt0_disable_button)
+        
+        # RT1关闭按钮
+        self.rt1_disable_button = QPushButton('RT1关闭')
+        self.rt1_disable_button.clicked.connect(self.on_rt1_disable_clicked)
+        rt_disable_layout.addWidget(self.rt1_disable_button)
+        
+        # RT2关闭按钮
+        self.rt2_disable_button = QPushButton('RT2关闭')
+        self.rt2_disable_button.clicked.connect(self.on_rt2_disable_clicked)
+        rt_disable_layout.addWidget(self.rt2_disable_button)
+        
+        rt_layout.addLayout(rt_disable_layout)
+        
+        # 将RT控制部分添加到主布局
+        layout.addLayout(rt_layout)
+
         # 添加密码管理部分
         password_layout = QVBoxLayout()
         
@@ -1477,6 +1528,42 @@ class BluetoothTool(QWidget):
         # 发送关闭充电的指令数据
         bytedata = bytes([0x00,0x00,0x04,0x01,0x0B,0x55,0xaa,0x0F])
         self.send_command(bytedata)
+
+    def on_rt0_enable_clicked(self):
+        """处理RT0使能按钮点击事件"""
+        # 发送RT0使能指令 (0x31)
+        self.send_command(self.text_decode.send_hex_fill(0x31))
+        self.blue_write_log("发送RT0使能指令")
+
+    def on_rt1_enable_clicked(self):
+        """处理RT1使能按钮点击事件"""
+        # 发送RT1使能指令 (0x32)
+        self.send_command(self.text_decode.send_hex_fill(0x32))
+        self.blue_write_log("发送RT1使能指令")
+
+    def on_rt2_enable_clicked(self):
+        """处理RT2使能按钮点击事件"""
+        # 发送RT2使能指令 (0x33)
+        self.send_command(self.text_decode.send_hex_fill(0x33))
+        self.blue_write_log("发送RT2使能指令")
+
+    def on_rt0_disable_clicked(self):
+        """处理RT0关闭按钮点击事件"""
+        # 发送RT0关闭指令 (0x34)
+        self.send_command(self.text_decode.send_hex_fill(0x34))
+        self.blue_write_log("发送RT0关闭指令")
+
+    def on_rt1_disable_clicked(self):
+        """处理RT1关闭按钮点击事件"""
+        # 发送RT1关闭指令 (0x35)
+        self.send_command(self.text_decode.send_hex_fill(0x35))
+        self.blue_write_log("发送RT1关闭指令")
+
+    def on_rt2_disable_clicked(self):
+        """处理RT2关闭按钮点击事件"""
+        # 发送RT2关闭指令 (0x36)
+        self.send_command(self.text_decode.send_hex_fill(0x36))
+        self.blue_write_log("发送RT2关闭指令")
 
     def send_command(self, command:bytes):
         """发送指令数据"""
