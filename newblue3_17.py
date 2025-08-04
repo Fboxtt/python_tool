@@ -854,13 +854,8 @@ class BluetoothTool(QWidget):
             # 16进制显示
             reve_data = ' '.join([f'{b:02X}' for b in data])
         else:
-            # 文本显示
-            try:
-                print(type(data),'|||',data)
-                reve_data = data.decode('utf-8')
-            except UnicodeDecodeError:
-                # 如果无法解码为文本，则显示16进制
-                reve_data = ' '.join([f'{b:02X}' for b in data])  
+            # 文本显示，无法解码的字符显示为乱码
+            reve_data = data.decode('utf-8', errors='replace')  
         self.blue_write_log(f"RX->,{self.commu_type},{self.device_name},cmd,{reve_data}")
     def display_send_data(self, input_data):
         """显示接收到的数据，根据16进制显示选项决定显示格式"""
@@ -877,11 +872,8 @@ class BluetoothTool(QWidget):
             if isinstance(input_data, str):
                 send_data = input_data
             else:
-                try:
-                    send_data = input_data.decode('utf-8')
-                except UnicodeDecodeError:
-                    # 如果无法解码为文本，则显示16进制
-                    send_data = ' '.join([f'{b:02X}' for b in input_data])
+                # 无法解码的字符显示为乱码
+                send_data = input_data.decode('utf-8', errors='replace')
         self.blue_write_log(f"TX->,{self.commu_type},{self.device_name},cmd,{send_data}")
 
     def on_scan_devices_clicked(self):
