@@ -604,22 +604,22 @@ class BluetoothTool(QWidget):
         password_buttons_layout = QHBoxLayout()
         
         # 查询加密状态按钮
-        self.query_lock_button = QPushButton('查询状态(扫描)')
+        self.query_lock_button = QPushButton('🔍 查看状态(扫描)')
         self.query_lock_button.clicked.connect(self.on_query_lock_clicked)
         password_buttons_layout.addWidget(self.query_lock_button)
         
         # 验证密码按钮
-        self.login_button = QPushButton('验证密码')
+        self.login_button = QPushButton('🔐 验证密码(0x01)')
         self.login_button.clicked.connect(self.on_login_clicked)
         password_buttons_layout.addWidget(self.login_button)
         
         # 设置密码按钮
-        self.set_password_button = QPushButton('设置密码')
+        self.set_password_button = QPushButton('⚙️ 设置密码(0x02)')
         self.set_password_button.clicked.connect(self.on_set_password_clicked)
         password_buttons_layout.addWidget(self.set_password_button)
         
         # 取消密码按钮
-        self.reset_password_button = QPushButton('取消密码')
+        self.reset_password_button = QPushButton('🗑️ 取消密码(0x03)')
         self.reset_password_button.clicked.connect(self.on_reset_password_clicked)
         password_buttons_layout.addWidget(self.reset_password_button)
         
@@ -1150,10 +1150,18 @@ class BluetoothTool(QWidget):
         # 在这里处理完整的数据包
         # self.blue_write_log(f"Received complete data packet: {self.received_data_buffer}")
     
-        # 先检查是否是新的密码命令响应格式
-        if self.check_new_password_response(self.received_data_buffer):
+        # 先检查是否收到NOAUTH响应
+        if self.check_noauth_response(self.received_data_buffer):
+            # 已经在check_noauth_response中处理了日志，这里直接返回
+            pass
+        # 检查是否是新的密码命令响应格式
+        elif self.check_new_password_response(self.received_data_buffer):
             # 处理新的密码命令响应
-            self.handle_new_password_response(self.received_data_buffer)
+            success, result = self.parse_new_password_response(self.received_data_buffer)
+            if success:
+                self.handle_new_password_response(result["cmd_code"], result["content"])
+            else:
+                self.blue_write_log(f"密码命令响应解析失败: {result}")
         else:
             # 处理普通数据
             print("3收完数据")
@@ -1190,53 +1198,7 @@ class BluetoothTool(QWidget):
         
         return False
 
-    def handle_new_password_response(self, data):
-        """处理新的密码命令响应"""
-        try:
-            success, result = self.parse_new_password_response(data)
-            
-            if not success:
-                self.blue_write_log(f"密码命令响应解析失败: {result}")
-                return
-            
-            cmd_code = result["cmd_code"]
-            content = result["content"]
-            
-            if cmd_code == 0x01:  # 验证密码响应
-                if len(content) >= 1:
-                    if content[0] == 0x00:
-                        self.blue_write_log("密码验证失败: 密码错误")
-                    elif content[0] == 0x01:
-                        self.blue_write_log("密码验证成功: 密码正确")
-                    else:
-                        self.blue_write_log(f"密码验证响应: 未知状态 {content[0]:02X}")
-                else:
-                    self.blue_write_log("密码验证响应: 数据长度不足")
-                    
-            elif cmd_code == 0x02:  # 设置密码响应
-                if len(content) >= 1:
-                    if content[0] == 0x00:
-                        self.blue_write_log("设置密码失败")
-                    elif content[0] == 0x01:
-                        self.blue_write_log("设置密码成功")
-                    else:
-                        self.blue_write_log(f"设置密码响应: 未知状态 {content[0]:02X}")
-                else:
-                    self.blue_write_log("设置密码响应: 数据长度不足")
-                    
-            elif cmd_code == 0x03:  # 取消密码响应
-                if len(content) >= 1:
-                    if content[0] == 0x00:
-                        self.blue_write_log("取消密码失败")
-                    elif content[0] == 0x01:
-                        self.blue_write_log("取消密码成功")
-                    else:
-                        self.blue_write_log(f"取消密码响应: 未知状态 {content[0]:02X}")
-                else:
-                    self.blue_write_log("取消密码响应: 数据长度不足")
-                    
-        except Exception as e:
-            self.blue_write_log(f"处理密码命令响应异常: {str(e)}")
+
 
     def on_select_hex_file(self):
         """选择HEX文件并解析"""
@@ -1727,6 +1689,54 @@ class BluetoothTool(QWidget):
         content = data[3:3+content_length]
         
         return True, {"cmd_code": cmd_code, "content": content}
+    
+    def handle_new_password_response(self, cmd_code, content):
+        """处理新协议密码命令响应"""
+        if len(content) < 1:
+            self.blue_write_log("响应内容为空")
+            return
+            
+        result_code = content[0]
+        
+        if cmd_code == 0x01:  # 验证密码响应
+            if result_code == 0x00:
+                self.blue_write_log("❌ 密码错误")
+            elif result_code == 0x01:
+                self.blue_write_log("✅ 密码正确")
+            elif result_code == 0x02:
+                self.blue_write_log("ℹ️ 设备没有设置密码")
+            else:
+                self.blue_write_log(f"验证密码: 未知响应 {result_code:02X}")
+                
+        elif cmd_code == 0x02:  # 设置密码响应
+            if result_code == 0x00:
+                self.blue_write_log("❌ 设置密码失败")
+            elif result_code == 0x01:
+                self.blue_write_log("✅ 设置密码成功")
+            else:
+                self.blue_write_log(f"设置密码: 未知响应 {result_code:02X}")
+                
+        elif cmd_code == 0x03:  # 取消密码响应
+            if result_code == 0x00:
+                self.blue_write_log("❌ 取消密码失败")
+            elif result_code == 0x01:
+                self.blue_write_log("✅ 取消密码成功")
+            else:
+                self.blue_write_log(f"取消密码: 未知响应 {result_code:02X}")
+        else:
+            self.blue_write_log(f"未知密码命令响应: {cmd_code:02X}")
+            
+    def check_noauth_response(self, data):
+        """检查是否收到NOAUTH响应"""
+        try:
+            if isinstance(data, (bytes, bytearray)):
+                data_str = data.decode('utf-8', errors='ignore')
+                if "NOAUTH" in data_str:
+                    self.blue_write_log("🔒 设备返回NOAUTH - 请先验证密码后再发送数据")
+                    return True
+        except:
+            pass
+        return False
 
     async def send_verify_password_cmd(self, password: str):
         """发送验证密码命令 (新格式)"""
