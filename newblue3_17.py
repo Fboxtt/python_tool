@@ -1193,7 +1193,7 @@ class BluetoothTool(QWidget):
         if data[0] == 0xFB and data[-1] == 0xBB:
             cmd_code = data[1]
             # 检查是否是密码相关命令的响应
-            if cmd_code in [0x01, 0x02, 0x03]:
+            if cmd_code in [0x01, 0x02, 0x03, 0x04]:
                 return True
         
         return False
@@ -1503,8 +1503,7 @@ class BluetoothTool(QWidget):
     def on_query_lock_clicked(self):
         """查询加密状态按钮点击处理 - 暂时保留旧功能"""
         # 注释：查询功能现在通过广播数据中的密码状态字段实现
-        self.blue_write_log("提示: 密码状态可通过设备扫描时的广播数据查看 [无密码]/[有密码] 标识")
-        # asyncio.create_task(self.send_query_lock_cmd())
+        asyncio.create_task(self.send_search_password_cmd())
 
     def on_login_clicked(self):
         """登录按钮点击处理 - 使用新的验证密码命令"""
@@ -1723,6 +1722,14 @@ class BluetoothTool(QWidget):
                 self.blue_write_log("✅ 取消密码成功")
             else:
                 self.blue_write_log(f"取消密码: 未知响应 {result_code:02X}")
+                
+        elif cmd_code == 0x04:  # 查询密码状态响应
+            if result_code == 0x00:
+                self.blue_write_log("ℹ️ 设备未设置密码")
+            elif result_code == 0x01:
+                self.blue_write_log("🔒 设备已设置密码")
+            else:
+                self.blue_write_log(f"查询密码状态: 未知响应 {result_code:02X}")
         else:
             self.blue_write_log(f"未知密码命令响应: {cmd_code:02X}")
             
@@ -1738,6 +1745,22 @@ class BluetoothTool(QWidget):
             pass
         return False
 
+    async def send_search_password_cmd(self):
+        """发送取消密码命令 (新格式)"""
+        try:
+            # 构造数据：0x01
+            cancel_data = bytearray([0x01])
+            
+            # 构造命令包：0xFB 0x03 0x01 0x01 + 0xBB
+            cmd_packet = self.construct_new_password_cmd(0x04, cancel_data)
+            
+            self.display_send_data(cmd_packet)
+            await self.byte_send(cmd_packet)
+            
+            self.blue_write_log("查询密码命令已发送，等待响应...")
+            
+        except Exception as e:
+            self.blue_write_log(f"查询密码异常: {str(e)}")
     async def send_verify_password_cmd(self, password: str):
         """发送验证密码命令 (新格式)"""
         try:
