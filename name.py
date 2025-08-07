@@ -521,7 +521,6 @@ class FirmwareNamingTool(QMainWindow):
         rev_ver = self.rev_ver_spin.value()
         fix_ver = self.fix_ver_spin.value()
         version_str = f"V{main_ver}_{rev_ver}_{fix_ver}"
-        
         # 获取日期
         date = self.date_edit.date().toString("yyyyMMdd")
         
@@ -536,9 +535,9 @@ class FirmwareNamingTool(QMainWindow):
         
         # 生成软件版本定义 (ver_FW)
         if feature_str:
-            fw_version = f"{software_spec}-{feature_str}-{unique_code}_V{main_ver}_{rev_ver}"
+            fw_version = f"{software_spec}-{feature_str}-{unique_code}_V{main_ver}.{rev_ver}"
         else:
-            fw_version = f"{software_spec}-{unique_code}_V{main_ver}_{rev_ver}"
+            fw_version = f"{software_spec}-{unique_code}_V{main_ver}.{rev_ver}"
         
         # 判断是否包含电芯型号
         include_cell_model = cell_model != "略"
@@ -550,19 +549,19 @@ class FirmwareNamingTool(QMainWindow):
         # 始终包含BMS特性标识
         if include_cell_model:
             if feature_str:
-                # 升级固件: APP-【BMS特性】-【使用场景】【电压】【容量】-【功能特征】-【电芯型号】-OTA-【芯片平台】【产品序号】_V【主版本】_【次版本】_【修订号】_【日期】
-                app_name = f"APP-{bms_spec}-{software_spec}-{feature_str}-{cell_model}-OTA-{unique_code}_{version_str}_{date}"
+                # 升级固件: APP-【BMS特性】-【使用场景】【电压】【容量】-【功能特征】-【电芯型号】-【芯片平台】【产品序号】_V【主版本】_【次版本】_【修订号】_【日期】
+                app_name = f"APP-{bms_spec}-{software_spec}-{feature_str}-{cell_model}-{unique_code}_{version_str}_{date}"
                 # 完整固件: IAP+APP-【BMS特性】-【使用场景】【电压】【容量】-【功能特征】-【电芯型号】-【芯片平台】【产品序号】_V【主版本】_【次版本】_【修订号】_【日期】
                 full_name = f"IAP+APP-{bms_spec}-{software_spec}-{feature_str}-{cell_model}-{unique_code}_{version_str}_{date}"
             else:
-                app_name = f"APP-{bms_spec}-{software_spec}-{cell_model}-OTA-{unique_code}_{version_str}_{date}"
+                app_name = f"APP-{bms_spec}-{software_spec}-{cell_model}-{unique_code}_{version_str}_{date}"
                 full_name = f"IAP+APP-{bms_spec}-{software_spec}-{cell_model}-{unique_code}_{version_str}_{date}"
         else:
             if feature_str:
-                app_name = f"APP-{bms_spec}-{software_spec}-{feature_str}-OTA-{unique_code}_{version_str}_{date}"
+                app_name = f"APP-{bms_spec}-{software_spec}-{feature_str}-{unique_code}_{version_str}_{date}"
                 full_name = f"IAP+APP-{bms_spec}-{software_spec}-{feature_str}-{unique_code}_{version_str}_{date}"
             else:
-                app_name = f"APP-{bms_spec}-{software_spec}-OTA-{unique_code}_{version_str}_{date}"
+                app_name = f"APP-{bms_spec}-{software_spec}-{unique_code}_{version_str}_{date}"
                 full_name = f"IAP+APP-{bms_spec}-{software_spec}-{unique_code}_{version_str}_{date}"
         
         # 显示结果
@@ -608,9 +607,9 @@ class FirmwareNamingTool(QMainWindow):
 
 一、版本定义:
 软件版本 (ver_FW): 【使用场景】【电压】【容量】-【功能特征】-【芯片平台】【产品序号】_V【主版本】_【次版本】
-示例: "T12100-HTS-HT-D01_V1_7" (选中OTA时)
+示例: "T12100-HTS-HT-OTA-D01_V1_7" (选中OTA时)
 示例: "T12100-HTS-HT-D_V1_7" (未选中OTA时)
-无功能特征时: "T12100-D01_V1_7" (选中OTA时) 或 "T12100-D_V1_7" (未选中OTA时)
+无功能特征时: "T12100-OTA-D01_V1_7" (选中OTA时) 或 "T12100-D_V1_7" (未选中OTA时)
 
 二、固件类型:
 1. Boot命名 (IAP):
@@ -618,13 +617,13 @@ class FirmwareNamingTool(QMainWindow):
    示例: "IAP-D_V1_0_0_20250704"
 
 2. 升级固件 (APP):
-   APP-【BMS特性】-【使用场景】【电压】【容量】-【功能特征】-OTA-【芯片平台】【产品序号】_V【主版本】_【次版本】_【修订号】_【日期】
+   APP-【BMS特性】-【使用场景】【电压】【容量】-【功能特征】-【芯片平台】【产品序号】_V【主版本】_【次版本】_【修订号】_【日期】
    示例: "APP-BMS12100-T12200-HTS-OTA-C02_V1_0_0_20250704" (选中OTA时)
-   示例: "APP-BMS-T12100-HTS-HT-G_N_H10-OTA-C_V1_0_0_20250704" (未选中OTA时)
+   示例: "APP-BMS-T12100-HTS-HT-G_N_H10-C_V1_0_0_20250704" (未选中OTA时)
 
 3. 完整固件 (IAP+APP):
    IAP+APP-【BMS特性】-【使用场景】【电压】【容量】-【功能特征】-【芯片平台】【产品序号】_V【主版本】_【次版本】_【修订号】_【日期】
-   示例: "IAP+APP-BMS12100-T12200-HTS-HT-C02_V1_0_0_20250704" (选中OTA时)
+   示例: "IAP+APP-BMS12100-T12200-HTS-OTA-HT-C02_V1_0_0_20250704" (选中OTA时)
    示例: "IAP+APP-BMS-T12100-G_N_H10-D_V1_0_0_20250704" (未选中OTA时)
 
 三、参数说明:
