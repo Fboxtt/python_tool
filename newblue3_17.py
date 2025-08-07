@@ -582,6 +582,22 @@ class BluetoothTool(QWidget):
         # 将放电控制部分添加到主布局
         layout.addLayout(discharge_layout)
 
+        # 添加版本查询控制部分
+        version_layout = QHBoxLayout()
+        
+        # 0x71版本查询按钮
+        self.version_query_button = QPushButton('查询版本号(0x71)')
+        self.version_query_button.clicked.connect(self.send_find_version_cmd)
+        version_layout.addWidget(self.version_query_button)
+        
+        # 0x16版本查询按钮
+        self.version16_query_button = QPushButton('查询16版本号(0x16)')
+        self.version16_query_button.clicked.connect(self.send_ver_cmd_16)
+        version_layout.addWidget(self.version16_query_button)
+        
+        # 将版本查询控制部分添加到主布局
+        layout.addLayout(version_layout)
+
         # 添加密码管理部分
         password_layout = QVBoxLayout()
         
@@ -1423,6 +1439,10 @@ class BluetoothTool(QWidget):
     def send_find_version_cmd(self):
         """发送版本号查询命令"""
         self.send_command(self.text_decode.send_hex_fill(0x71))
+    
+    def send_ver_cmd_16(self):
+        """发送0x16版本号查询命令"""
+        self.send_command(self.text_decode.send_hex_fill(0x16))
 
     def on_batch_program_clicked(self):
         """同步方法，批量烧录100次"""

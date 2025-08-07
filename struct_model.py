@@ -41,6 +41,11 @@ STRUCT_FORMATS = {
         "LLLLL"  # ulOtherInfo, ulAlarmStatus, ulProtectStatus, ulFaultStatus, ulBalanceStatus
         "HH"  # usBattStatus, usSOC_Percent
         "LLL",  # ulSOH_Percent, ulDisTimes, ulTotalDisAH
+    "PC_GET_VER": "<"
+        "HHHH"    # usMajorVer, usMinorVer, usRevision, usCompileYear
+        "BB"      # ucCompileMonth, ucCompileDay
+        "30s"     # cHWversion (30 bytes)
+        "40s",    # cFuncVersion (40 bytes)
     "PC_GET_INF": "<"
         "HHHHBBBB"  # TVER: bootVer
         "HHHHBBBB"  # TVER: app_Ver
@@ -117,6 +122,11 @@ STRUCT_VARIABLES = {
         "ulOtherInfo", "ulAlarmStatus", "ulProtectStatus", "ulFaultStatus", "ulBalanceStatus",
         "usBattStatus", "usSOC_Percent",
         "ulSOH_Percent", "ulDisTimes", "ulTotalDisAH"
+    ],
+    "PC_GET_VER": [
+        "usMajorVer", "usMinorVer", "usRevision", "usCompileYear",
+        "ucCompileMonth", "ucCompileDay",
+        "cHWversion", "cFuncVersion"
     ],
     "PC_GET_INF": [
         "bootVer.usMajorVer", "bootVer.usMinorVer", "bootVer.usRevision", "bootVer.usYear", "bootVer.ucMonth", "bootVer.ucDay","bootVer.reserved","bootVer.reserved",
@@ -505,7 +515,7 @@ class HexParserApp(QMainWindow):
                     break
             
             for i, (var_name, value) in enumerate(zip(STRUCT_VARIABLES[struct_name], values)):
-                if var_name == "icName":
+                if var_name in ["icName", "cHWversion", "cFuncVersion"]:
                     # 检查value的类型并相应处理
                     if isinstance(value, bytes):
                         # 如果已经是bytes类型，直接解码
@@ -514,15 +524,20 @@ class HexParserApp(QMainWindow):
                         hex_bytes = ''.join([f"{b:02X}" for b in value])
                         hex_byte_array.append(hex_bytes)
                     else:
-                        # 如果不是bytes类型，从原始数据中提取
-                        # 假设icName是15字节长度，并且在数据中的位置可以计算
-                        # 这里我们需要找到icName在data_bytes中的偏移量
-                        # 一个简单的方法是从结尾往前数16字节（15字节icName + 1字节writableArea + 4字节pcAddr）
-                        icname_bytes = data_bytes[-20:-5]  # 从末尾往前15字节
-                        str_value = icname_bytes.decode('utf-8', errors='replace').rstrip('\x00')
-                        dec_values.append(str_value)
-                        hex_bytes = ''.join([f"{b:02X}" for b in icname_bytes])
-                        hex_byte_array.append(hex_bytes)
+                        # 如果不是bytes类型，从原始数据中提取（主要针对icName的特殊情况）
+                        if var_name == "icName":
+                            # 假设icName是15字节长度，并且在数据中的位置可以计算
+                            # 这里我们需要找到icName在data_bytes中的偏移量
+                            # 一个简单的方法是从结尾往前数16字节（15字节icName + 1字节writableArea + 4字节pcAddr）
+                            icname_bytes = data_bytes[-20:-5]  # 从末尾往前15字节
+                            str_value = icname_bytes.decode('utf-8', errors='replace').rstrip('\x00')
+                            dec_values.append(str_value)
+                            hex_bytes = ''.join([f"{b:02X}" for b in icname_bytes])
+                            hex_byte_array.append(hex_bytes)
+                        else:
+                            # 对于其他字符串字段，直接转换为字符串
+                            dec_values.append(str(value))
+                            hex_byte_array.append(str(value))
                 else:
                     # 处理数值字段
                     if isinstance(value, int):
@@ -585,6 +600,39 @@ if __name__ == "__main__":
     print("Parsed Data:")
     for var_name, hex_val, dec_val in parsed_data["PC_GET_INF"]:
         print(f"{var_name}: {hex_val} | {dec_val}")
+
+    # 测试PC_GET_VER (0x16)
+    print("\n" + "="*50)
+    print("测试 PC_GET_VER (0x16) 解析:")
+    print("="*50)
+    
+    # 创建PC_GET_VER测试数据
+    ver_test_data = bytearray([
+        0x01, 0x00,  # usMajorVer: 1
+        0x02, 0x00,  # usMinorVer: 2  
+        0x03, 0x00,  # usRevision: 3
+        0xE7, 0x07,  # usCompileYear: 2023
+        0x0C,        # ucCompileMonth: 12
+        0x19,        # ucCompileDay: 25
+    ])
+    
+    # 添加硬件版本字符串 (30字节)
+    hw_version = b"BMS_HW_V1.0\x00" + b"\x00" * 18  # 补齐到30字节
+    ver_test_data.extend(hw_version)
+    
+    # 添加功能版本字符串 (40字节) 
+    func_version = b"BMS_FUNC_V2.0_BUILD_20231225\x00" + b"\x00" * 11  # 补齐到40字节
+    ver_test_data.extend(func_version)
+    
+    # 解析PC_GET_VER测试数据
+    ver_struct_name, ver_parsed_data = window.decode_cmd_hex_data(0x16, ver_test_data)
+    print(f"Struct Name: {ver_struct_name}")
+    if ver_parsed_data:
+        print("Parsed Data:")
+        for var_name, hex_val, dec_val in ver_parsed_data["PC_GET_VER"]:
+            print(f"{var_name:<20}: {hex_val:<15} | {dec_val}")
+    else:
+        print("解析失败")
 
     window.show()
     sys.exit(app.exec())
