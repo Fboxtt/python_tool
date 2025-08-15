@@ -18,7 +18,7 @@ class ConfigManager:
             "voltages": ["12", "24", "36", "48"],
             "capacities": ["50", "100", "140", "165", "200", "300"],
             "cell_models": ["略", "G_N_H10", "L_F_H20", "P_C_H50", "A_K_H100"],
-            "use_cases": ["T", "S", "GC"],
+            "use_cases": ["T", "ST", "GC"],
             "features": ["HTS", "HT", "PWR", "COM", "HTIN", "OTA", "LINK", "PARA", "MON"],
             "chip_platforms": ["C", "D"],
             "product_numbers": ["01", "02", "03", "04", "05"]
@@ -30,7 +30,7 @@ class ConfigManager:
             "voltages": "软件特性电压值（单位：V）",
             "capacities": "软件特性容量值（单位：Ah）",
             "cell_models": "支持的电芯型号",
-            "use_cases": "使用场景（T: 普通场景，S: 启动电池，GC: 高尔夫）",
+            "use_cases": "使用场景（T: 普通场景，ST: 启动电池，GC: 高尔夫）",
             "features": "功能特征（HTS: 智能加热，HT: 加热，PWR: 保电，COM: 通信，HTIN: 薄款电池，OTA: 无线升级，LINK: 互联，PARA: 并机，MON: 屏幕监控）",
             "chip_platforms": "芯片平台（C: 中微，D: 国民）",
             "product_numbers": "产品序号（01/02等代表该平台的第几款产品）"
@@ -627,7 +627,7 @@ class FirmwareNamingTool(QMainWindow):
    示例: "IAP+APP-BMS-T12100-G_N_H10-D_V1_0_0_20250704" (未选中OTA时)
 
 三、参数说明:
-1. 使用场景: T(普通场景), S(启动电池), GC(高尔夫)
+1. 使用场景: T(普通场景), ST(启动电池), GC(高尔夫)
 2. BMS特性: 电压(12/24/36/48V), 容量(50/100/140/165/200/300Ah)
 3. 软件特性: 电压(12/24/36/48V), 容量(50/100/140/165/200/300Ah)
 4. 功能特征: HTS(智能加热), HT(加热), PWR(保电), COM(通信), HTIN(薄款电池), OTA(无线升级), LINK(互联), PARA(并机), MON(屏幕监控)
