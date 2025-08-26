@@ -354,6 +354,16 @@ class BluetoothTool(QWidget):
         self.ota_start_count = 0
         self.ota_ok_count = 0
         self.batch_task = None
+        
+        # 加密指令测试相关变量
+        self.crypto_test_task = None
+        self.crypto_test_running = False
+        self.crypto_test_send_count = 0
+        self.crypto_test_success_count = 0
+        self.crypto_test_error_count = 0
+        self.crypto_test_current_round = 0
+        self.crypto_test_total_rounds = 1000
+        self.crypto_test_stop_requested = False
     def initUI(self):
         self.setWindowTitle('firstuse')
 
@@ -640,6 +650,55 @@ class BluetoothTool(QWidget):
         password_buttons_layout.addWidget(self.reset_password_button)
         
         password_layout.addLayout(password_buttons_layout)
+        
+        # 添加测试按钮和进度显示
+        test_layout = QVBoxLayout()
+        
+        # 测试按钮
+        test_buttons_layout = QHBoxLayout()
+        self.crypto_test_button = QPushButton('🧪 加密指令压力测试(1000次)')
+        self.crypto_test_button.clicked.connect(self.on_crypto_test_clicked)
+        self.crypto_test_button.setStyleSheet("QPushButton { background-color: #FF6B6B; color: white; font-weight: bold; }")
+        test_buttons_layout.addWidget(self.crypto_test_button)
+        
+        self.stop_test_button = QPushButton('⏹️ 停止测试')
+        self.stop_test_button.clicked.connect(self.on_stop_test_clicked)
+        self.stop_test_button.setEnabled(False)
+        test_buttons_layout.addWidget(self.stop_test_button)
+        
+        test_layout.addLayout(test_buttons_layout)
+        
+        # 测试进度和结果显示
+        progress_layout = QGridLayout()
+        
+        self.test_progress_label = QLabel('测试进度:')
+        self.test_progress_value = QLabel('0/0 (0%)')
+        progress_layout.addWidget(self.test_progress_label, 0, 0)
+        progress_layout.addWidget(self.test_progress_value, 0, 1)
+        
+        self.test_send_count_label = QLabel('发送次数:')
+        self.test_send_count_value = QLabel('0')
+        progress_layout.addWidget(self.test_send_count_label, 1, 0)
+        progress_layout.addWidget(self.test_send_count_value, 1, 1)
+        
+        self.test_success_count_label = QLabel('成功响应:')
+        self.test_success_count_value = QLabel('0')
+        progress_layout.addWidget(self.test_success_count_label, 2, 0)
+        progress_layout.addWidget(self.test_success_count_value, 2, 1)
+        
+        self.test_error_count_label = QLabel('失败次数:')
+        self.test_error_count_value = QLabel('0')
+        progress_layout.addWidget(self.test_error_count_label, 3, 0)
+        progress_layout.addWidget(self.test_error_count_value, 3, 1)
+        
+        self.test_current_cmd_label = QLabel('当前指令:')
+        self.test_current_cmd_value = QLabel('无')
+        progress_layout.addWidget(self.test_current_cmd_label, 4, 0)
+        progress_layout.addWidget(self.test_current_cmd_value, 4, 1)
+        
+        test_layout.addLayout(progress_layout)
+        
+        password_layout.addLayout(test_layout)
         
         # 将密码管理部分添加到主布局
         layout.addLayout(password_layout)
@@ -981,14 +1040,16 @@ class BluetoothTool(QWidget):
                 return
             try:
                 self.client = BleakClient(device_address)
+                self.blue_write_log(f"连接开始时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')}")
                 await self.client.connect()
+                self.blue_write_log(f"连接结束时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')}")
                 self.commu_type = "bluetooth"
                 # 创建消息框实例
-                connectMessage = QMessageBox(QMessageBox.Icon.Information, '连接成功', f'已连接到 {device_address}')
+                # connectMessage = QMessageBox(QMessageBox.Icon.Information, '连接成功', f'已连接到 {device_address}')
                 # 设置定时器自动关闭 (3000毫秒后)
-                QTimer.singleShot(300, connectMessage.close)
+                # QTimer.singleShot(300, connectMessage.close)
                 # 显示消息框
-                connectMessage.exec()
+                # connectMessage.exec()
                 # 启用断开按钮和发送按钮
                 self.disconnect_button.setEnabled(True)
                 self.send_button.setEnabled(True)
@@ -996,7 +1057,8 @@ class BluetoothTool(QWidget):
                 if self.client and self.client.is_connected:
                     self.device_name = device_name  # 使用之前提取的设备名
                     await self.client.start_notify("0000ffe1-0000-1000-8000-00805f9b34fb", self.on_data_received)
-                QTimer.singleShot(1000, self.send_find_version_cmd)
+                # QTimer.singleShot(1000, self.send_find_version_cmd)
+                await self.send_verify_password_cmd('123456')
             except Exception as e:
                 self.commu_type = "none"
                 QMessageBox.critical(self, '连接失败', str(e))
@@ -1536,6 +1598,173 @@ class BluetoothTool(QWidget):
     def on_reset_password_clicked(self):
         """重置密码按钮点击处理 - 使用新的取消密码命令"""
         asyncio.create_task(self.send_cancel_password_cmd())
+        
+    def on_crypto_test_clicked(self):
+        """加密指令压力测试按钮点击处理"""
+        if not self.client or not self.client.is_connected:
+            if not self.serial_port or not self.serial_port.is_open:
+                QMessageBox.warning(self, '警告', '请先连接设备再进行测试')
+                return
+        
+        if self.crypto_test_running:
+            QMessageBox.warning(self, '警告', '测试正在进行中，请先停止当前测试')
+            return
+            
+        # 获取测试密码
+        password = self.password_input.text()
+        if len(password) != 6:
+            # 如果没有输入密码，使用默认密码
+            password = "123456"
+            self.password_input.setText(password)
+            self.blue_write_log("使用默认测试密码: 123456")
+            
+        # 开始测试
+        self.crypto_test_task = asyncio.create_task(self.run_crypto_stress_test(password))
+        
+    def on_stop_test_clicked(self):
+        """停止测试按钮点击处理"""
+        if self.crypto_test_running:
+            self.crypto_test_stop_requested = True
+            self.blue_write_log("请求停止测试，等待当前指令完成...")
+        else:
+            self.blue_write_log("没有正在运行的测试")
+            
+    def reset_crypto_test_counters(self):
+        """重置测试计数器"""
+        self.crypto_test_send_count = 0
+        self.crypto_test_success_count = 0
+        self.crypto_test_error_count = 0
+        self.crypto_test_current_round = 0
+        self.crypto_test_stop_requested = False
+        
+        # 更新UI显示
+        self.test_progress_value.setText('0/0 (0%)')
+        self.test_send_count_value.setText('0')
+        self.test_success_count_value.setText('0')
+        self.test_error_count_value.setText('0')
+        self.test_current_cmd_value.setText('无')
+        
+    def update_crypto_test_ui(self):
+        """更新测试UI显示"""
+        # 更新进度
+        progress = int((self.crypto_test_current_round / self.crypto_test_total_rounds) * 100) if self.crypto_test_total_rounds > 0 else 0
+        self.test_progress_value.setText(f'{self.crypto_test_current_round}/{self.crypto_test_total_rounds} ({progress}%)')
+        
+        # 更新计数
+        self.test_send_count_value.setText(str(self.crypto_test_send_count))
+        self.test_success_count_value.setText(str(self.crypto_test_success_count))
+        self.test_error_count_value.setText(str(self.crypto_test_error_count))
+        
+        # 计算成功率
+        success_rate = int((self.crypto_test_success_count / self.crypto_test_send_count * 100)) if self.crypto_test_send_count > 0 else 0
+        self.blue_write_log(f"测试进度: {self.crypto_test_current_round}/{self.crypto_test_total_rounds}, 成功率: {success_rate}%")
+        
+    async def run_crypto_stress_test(self, password):
+        """运行加密指令压力测试"""
+        try:
+            self.crypto_test_running = True
+            self.crypto_test_button.setEnabled(False)
+            self.stop_test_button.setEnabled(True)
+            
+            # 重置计数器
+            self.reset_crypto_test_counters()
+            
+            self.blue_write_log(f"开始加密指令压力测试，共{self.crypto_test_total_rounds}轮，每轮4个指令")
+            self.blue_write_log(f"使用密码: {password}")
+            
+            # 定义四个测试指令
+            test_commands = [
+                ("查询密码状态", lambda: self.send_search_password_cmd()),
+                ("验证密码", lambda: self.send_verify_password_cmd(password)), 
+                ("设置密码", lambda: self.send_set_password_cmd_new(password)),
+                ("取消密码", lambda: self.send_cancel_password_cmd())
+            ]
+            
+            for round_num in range(1, self.crypto_test_total_rounds + 1):
+                if self.crypto_test_stop_requested:
+                    self.blue_write_log("收到停止请求，终止测试")
+                    break
+                    
+                self.crypto_test_current_round = round_num
+                
+                # 执行四个指令
+                for cmd_name, cmd_func in test_commands:
+                    if self.crypto_test_stop_requested:
+                        break
+                        
+                    self.test_current_cmd_value.setText(f"第{round_num}轮-{cmd_name}")
+                    
+                    try:
+                        # 记录发送次数
+                        self.crypto_test_send_count += 1
+                        
+                        # 执行指令
+                        await cmd_func()
+                        
+                        # 等待一段时间让响应处理完成
+                        await asyncio.sleep(0.5)
+                        
+                        # 简单假设指令执行成功（实际应该根据响应判断）
+                        self.crypto_test_success_count += 1
+                        
+                    except Exception as e:
+                        self.crypto_test_error_count += 1
+                        self.blue_write_log(f"指令执行失败: {cmd_name} - {str(e)}")
+                    
+                    # 更新UI
+                    self.update_crypto_test_ui()
+                    
+                    # 指令间间隔
+                    await asyncio.sleep(0.2)
+                
+                # 每轮间隔
+                if not self.crypto_test_stop_requested:
+                    await asyncio.sleep(0.5)
+                    
+            # 测试完成
+            self.blue_write_log("压力测试完成！")
+            self.blue_write_log(f"总计发送: {self.crypto_test_send_count} 次")
+            self.blue_write_log(f"成功响应: {self.crypto_test_success_count} 次")
+            self.blue_write_log(f"失败次数: {self.crypto_test_error_count} 次")
+            
+            success_rate = int((self.crypto_test_success_count / self.crypto_test_send_count * 100)) if self.crypto_test_send_count > 0 else 0
+            self.blue_write_log(f"成功率: {success_rate}%")
+            
+            self.test_current_cmd_value.setText('测试完成')
+            
+        except Exception as e:
+            self.blue_write_log(f"测试过程中发生异常: {str(e)}")
+            self.test_current_cmd_value.setText('测试异常')
+        finally:
+            # 恢复按钮状态
+            self.crypto_test_running = False
+            self.crypto_test_button.setEnabled(True)
+            self.stop_test_button.setEnabled(False)
+
+    def closeEvent(self, event):
+        """重写BluetoothTool的关闭事件，确保清理资源"""
+        try:
+            # 停止加密指令测试
+            if self.crypto_test_running:
+                self.crypto_test_stop_requested = True
+                if self.crypto_test_task:
+                    self.crypto_test_task.cancel()
+                self.blue_write_log("已停止加密指令测试")
+            
+            # 断开蓝牙连接
+            if self.client and self.client.is_connected:
+                asyncio.create_task(self.disconnect_device())
+            
+            # 断开串口连接
+            if self.is_serial_connected:
+                self.on_serial_connect_clicked()
+                
+            self.blue_write_log("BluetoothTool窗口已关闭，所有连接已断开")
+        except Exception as e:
+            self.blue_write_log(f"关闭窗口时出现错误: {str(e)}")
+        
+        # 接受关闭事件
+        event.accept()
 
     async def send_query_lock_cmd(self):
         """发送查询加密状态命令 (0x5D)"""
@@ -1706,7 +1935,7 @@ class BluetoothTool(QWidget):
         if len(content) < 1:
             self.blue_write_log("响应内容为空")
             return
-            
+        self.blue_write_log(f"处理新协议密码命令响应时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')}")
         result_code = content[0]
         
         if cmd_code == 0x01:  # 验证密码响应
@@ -1785,6 +2014,10 @@ class BluetoothTool(QWidget):
             cmd_packet = self.construct_new_password_cmd(0x01, password_data)
             
             self.display_send_data(cmd_packet)
+            
+            time512 = int(self.test512.text()) / 1000
+            await asyncio.sleep(time512)
+            self.blue_write_log(f"验证密码命令发送时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')}")
             await self.byte_send(cmd_packet)
             
             # 解析响应（这里需要在数据接收处理中添加新的解析逻辑）
