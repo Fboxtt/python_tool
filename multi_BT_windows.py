@@ -63,11 +63,13 @@ class BluetoothManager(QThread):
                 device_list = []
                 for device in devices:
                     if device.name:  # 只显示有名称的设备
-                        device_list.append({
-                            'address': device.address,
-                            'name': device.name,
-                            'rssi': device.rssi
-                        })
+                        # 只显示以D、L、R开头的蓝牙设备
+                        if device.name.upper().startswith(('D', 'L', 'R')):
+                            device_list.append({
+                                'address': device.address,
+                                'name': device.name,
+                                'rssi': device.rssi
+                            })
                 self.signals.devices_found.emit(device_list)
                 await asyncio.sleep(2)  # 每2秒扫描一次
             except Exception as e:
