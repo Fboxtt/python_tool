@@ -129,52 +129,102 @@ class BluetoothDeviceCard(QFrame):
     def setup_ui(self):
         """设置卡片UI"""
         self.setFrameStyle(QFrame.Shape.Box)
+        self.setFixedSize(300, 210)  # 固定卡片大小，进一步增加尺寸以适应大字体
         self.setStyleSheet("""
-            QFrame {
+            BluetoothDeviceCard {
                 border: 2px solid #cccccc;
-                border-radius: 10px;
+                border-radius: 8px;
                 background-color: #f9f9f9;
-                margin: 5px;
-                padding: 10px;
+                margin: 3px;
+                padding: 8px;
             }
-            QFrame:hover {
+            BluetoothDeviceCard:hover {
                 border-color: #4CAF50;
                 background-color: #f0f8ff;
             }
+            QLabel {
+                background-color: transparent;
+                border: none;
+            }
         """)
         
-        layout = QVBoxLayout()
+        # 主布局 - 垂直布局
+        main_layout = QVBoxLayout()
+        main_layout.setContentsMargins(12, 12, 12, 12)
+        main_layout.setSpacing(8)
         
-        # 设备名称标签
-        self.name_label = QLabel(self.name)
+        # 顶部区域 - 设备名称和状态
+        top_layout = QHBoxLayout()
+        top_layout.setSpacing(5)
+        
+        # 设备名称标签（截断长名称）
+        display_name = self.name if len(self.name) <= 18 else self.name[:15] + "..."
+        self.name_label = QLabel(display_name)
         self.name_label.setFont(QFont("Arial", 12, QFont.Weight.Bold))
-        self.name_label.setStyleSheet("color: #333333; margin-bottom: 5px;")
-        
-        # 设备地址标签
-        self.address_label = QLabel(f"地址: {self.address}")
-        self.address_label.setFont(QFont("Arial", 9))
-        self.address_label.setStyleSheet("color: #666666;")
-        
-        # 信号强度标签
-        if self.rssi:
-            self.rssi_label = QLabel(f"信号强度: {self.rssi} dBm")
-            self.rssi_label.setFont(QFont("Arial", 9))
-            self.rssi_label.setStyleSheet("color: #666666;")
+        self.name_label.setStyleSheet("color: #000000; background-color: transparent; border: none;")
+        self.name_label.setToolTip(self.name)  # 完整名称作为工具提示
         
         # 连接状态标签
-        self.status_label = QLabel("未连接")
-        self.status_label.setFont(QFont("Arial", 10))
-        self.status_label.setStyleSheet("color: #ff6b6b; font-weight: bold;")
+        self.status_label = QLabel("●")
+        self.status_label.setFont(QFont("Arial", 14))
+        self.status_label.setStyleSheet("color: #ff0000; font-weight: bold; background-color: transparent; border: none;")
+        self.status_label.setFixedWidth(20)
+        self.status_label.setToolTip("连接状态")
         
-        # 连接按钮
+        top_layout.addWidget(self.name_label)
+        top_layout.addStretch()
+        top_layout.addWidget(self.status_label)
+        
+        # 信息区域 - 地址和信号强度
+        info_layout = QVBoxLayout()
+        info_layout.setSpacing(6)
+        
+        # 信号强度显示（优先显示）
+        if self.rssi:
+            rssi_text = f"信号: {self.rssi}dBm"
+            # 根据信号强度设置颜色
+            if self.rssi > -50:
+                rssi_color = "#4CAF50"  # 强信号-绿色
+            elif self.rssi > -70:
+                rssi_color = "#FF9800"  # 中等信号-橙色
+            else:
+                rssi_color = "#f44336"  # 弱信号-红色
+                
+            self.rssi_label = QLabel(rssi_text)
+            self.rssi_label.setFont(QFont("Arial", 13, QFont.Weight.Bold))
+            self.rssi_label.setStyleSheet(f"color: {rssi_color}; font-weight: bold; background-color: transparent; border: none;")
+            info_layout.addWidget(self.rssi_label)
+        
+        # 设备地址标签（显示简化地址）
+        short_address = self.address[-8:] if len(self.address) > 8 else self.address
+        self.address_label = QLabel(f"地址: {short_address}")
+        self.address_label.setFont(QFont("Arial", 12, QFont.Weight.Bold))
+        self.address_label.setStyleSheet("color: #000000; font-weight: bold; background-color: transparent; border: none;")
+        self.address_label.setToolTip(f"完整地址: {self.address}")
+        info_layout.addWidget(self.address_label)
+        
+        # 预留扩展区域
+        self.extension_layout = QHBoxLayout()
+        self.extension_layout.setSpacing(5)
+        
+        # 预留空间标签（可用于显示额外信息）
+        self.info_label = QLabel("")
+        self.info_label.setFont(QFont("Arial", 12, QFont.Weight.Bold))
+        self.info_label.setStyleSheet("color: #333333; background-color: transparent; border: none;")
+        self.info_label.setFixedHeight(20)
+        self.extension_layout.addWidget(self.info_label)
+        
+        # 连接按钮 - 更紧凑的设计
         self.connect_button = QPushButton("连接")
+        self.connect_button.setFixedHeight(36)
+        self.connect_button.setFont(QFont("Arial", 13, QFont.Weight.Bold))
         self.connect_button.setStyleSheet("""
             QPushButton {
                 background-color: #4CAF50;
                 color: white;
                 border: none;
-                border-radius: 5px;
-                padding: 8px 16px;
+                border-radius: 4px;
+                padding: 4px 12px;
                 font-weight: bold;
             }
             QPushButton:hover {
@@ -186,15 +236,14 @@ class BluetoothDeviceCard(QFrame):
         """)
         self.connect_button.clicked.connect(self.on_connect_clicked)
         
-        # 添加组件到布局
-        layout.addWidget(self.name_label)
-        layout.addWidget(self.address_label)
-        if self.rssi:
-            layout.addWidget(self.rssi_label)
-        layout.addWidget(self.status_label)
-        layout.addWidget(self.connect_button)
+        # 组装布局
+        main_layout.addLayout(top_layout)
+        main_layout.addLayout(info_layout)
+        main_layout.addLayout(self.extension_layout)
+        main_layout.addStretch()  # 推送按钮到底部
+        main_layout.addWidget(self.connect_button)
         
-        self.setLayout(layout)
+        self.setLayout(main_layout)
     
     def on_connect_clicked(self):
         """处理连接按钮点击"""
@@ -203,20 +252,51 @@ class BluetoothDeviceCard(QFrame):
         else:
             self.connect_requested.emit(self.address)
     
+    def set_extension_info(self, info_text: str, color: str = "#333333"):
+        """设置扩展区域信息"""
+        self.info_label.setText(info_text)
+        self.info_label.setStyleSheet(f"color: {color}; font-weight: bold; background-color: transparent; border: none;")
+    
+    def add_extension_widget(self, widget):
+        """添加扩展组件到预留区域"""
+        self.extension_layout.addWidget(widget)
+    
+    def clear_extension_area(self):
+        """清空扩展区域"""
+        # 清除所有扩展组件
+        for i in reversed(range(self.extension_layout.count())):
+            item = self.extension_layout.itemAt(i)
+            if item.widget() != self.info_label:  # 保留info_label
+                widget = item.widget()
+                self.extension_layout.removeWidget(widget)
+                widget.deleteLater()
+        
+        # 重置info_label
+        self.info_label.setText("")
+        self.info_label.setStyleSheet("color: #333333; background-color: transparent; border: none;")
+    
     def set_connected(self, connected: bool):
         """设置连接状态"""
         self.is_connected = connected
         if connected:
-            self.status_label.setText("已连接")
-            self.status_label.setStyleSheet("color: #4CAF50; font-weight: bold;")
+            # 更新状态指示器为绿色圆点
+            self.status_label.setText("●")
+            self.status_label.setStyleSheet("color: #00AA00; font-weight: bold; background-color: transparent; border: none;")
+            self.status_label.setToolTip("已连接")
+            
+            # 更新扩展区域显示连接信息
+            self.info_label.setText("已连接")
+            self.info_label.setStyleSheet("color: #00AA00; font-weight: bold; background-color: transparent; border: none;")
+            
+            # 更新连接按钮
             self.connect_button.setText("断开")
             self.connect_button.setStyleSheet("""
                 QPushButton {
                     background-color: #f44336;
                     color: white;
                     border: none;
-                    border-radius: 5px;
-                    padding: 8px 16px;
+                    border-radius: 4px;
+                    padding: 4px 12px;
                     font-weight: bold;
                 }
                 QPushButton:hover {
@@ -226,27 +306,41 @@ class BluetoothDeviceCard(QFrame):
                     background-color: #c1170a;
                 }
             """)
+            
             # 已连接的设备卡片样式
             self.setStyleSheet("""
-                QFrame {
+                BluetoothDeviceCard {
                     border: 2px solid #4CAF50;
-                    border-radius: 10px;
+                    border-radius: 8px;
                     background-color: #e8f5e8;
-                    margin: 5px;
-                    padding: 10px;
+                    margin: 3px;
+                    padding: 8px;
+                }
+                QLabel {
+                    background-color: transparent;
+                    border: none;
+                    color: #000000;
                 }
             """)
         else:
-            self.status_label.setText("未连接")
-            self.status_label.setStyleSheet("color: #ff6b6b; font-weight: bold;")
+            # 更新状态指示器为红色圆点
+            self.status_label.setText("●")
+            self.status_label.setStyleSheet("color: #ff0000; font-weight: bold; background-color: transparent; border: none;")
+            self.status_label.setToolTip("未连接")
+            
+            # 清空扩展区域信息
+            self.info_label.setText("")
+            self.info_label.setStyleSheet("color: #333333; background-color: transparent; border: none;")
+            
+            # 更新连接按钮
             self.connect_button.setText("连接")
             self.connect_button.setStyleSheet("""
                 QPushButton {
                     background-color: #4CAF50;
                     color: white;
                     border: none;
-                    border-radius: 5px;
-                    padding: 8px 16px;
+                    border-radius: 4px;
+                    padding: 4px 12px;
                     font-weight: bold;
                 }
                 QPushButton:hover {
@@ -256,18 +350,24 @@ class BluetoothDeviceCard(QFrame):
                     background-color: #3d8b40;
                 }
             """)
+            
             # 未连接的设备卡片样式
             self.setStyleSheet("""
-                QFrame {
+                BluetoothDeviceCard {
                     border: 2px solid #cccccc;
-                    border-radius: 10px;
+                    border-radius: 8px;
                     background-color: #f9f9f9;
-                    margin: 5px;
-                    padding: 10px;
+                    margin: 3px;
+                    padding: 8px;
                 }
-                QFrame:hover {
+                BluetoothDeviceCard:hover {
                     border-color: #4CAF50;
                     background-color: #f0f8ff;
+                }
+                QLabel {
+                    background-color: transparent;
+                    border: none;
+                    color: #000000;
                 }
             """)
 
@@ -454,9 +554,9 @@ class MultiBTWindow(QMainWindow):
         
         self.device_cards[address] = card
         
-        # 计算网格位置
-        row = len(self.device_cards) // 3
-        col = len(self.device_cards) % 3
+        # 计算网格位置 - 每行显示4个卡片
+        row = (len(self.device_cards) - 1) // 4
+        col = (len(self.device_cards) - 1) % 4
         self.cards_layout.addWidget(card, row, col)
     
     def remove_device_card(self, address: str):
@@ -476,10 +576,10 @@ class MultiBTWindow(QMainWindow):
         for i in reversed(range(self.cards_layout.count())):
             self.cards_layout.itemAt(i).widget().setParent(None)
         
-        # 重新添加卡片
+        # 重新添加卡片 - 每行显示4个卡片
         for i, card in enumerate(self.device_cards.values()):
-            row = i // 3
-            col = i % 3
+            row = i // 4
+            col = i % 4
             self.cards_layout.addWidget(card, row, col)
     
     def cleanup_devices(self):
