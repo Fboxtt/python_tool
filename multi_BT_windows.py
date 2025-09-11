@@ -5,8 +5,8 @@ from typing import Dict, Set
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, 
                              QWidget, QPushButton, QLabel, QScrollArea, QFrame,
                              QGridLayout, QMessageBox, QProgressBar)
-from PyQt6.QtCore import QTimer, pyqtSignal, QObject, QThread, pyqtSlot
-from PyQt6.QtGui import QFont, QPalette, QColor
+from PyQt6.QtCore import QTimer, pyqtSignal, QObject, QThread, pyqtSlot, QEvent
+from PyQt6.QtGui import QFont, QPalette, QColor, QKeySequence, QShortcut
 import bleak
 from bleak import BleakScanner, BleakClient
 
@@ -382,6 +382,13 @@ class MultiBTWindow(QMainWindow):
         self.connected_devices: Set[str] = set()
         self.scanned_devices: Set[str] = set()
         
+        # 窗口模式配置
+        self.is_fullscreen = False
+        self.window_mode_cols = 4  # 窗口模式：4列
+        self.window_mode_rows = 2  # 窗口模式：2行
+        self.fullscreen_mode_cols = 6  # 全屏模式：6列
+        self.fullscreen_mode_rows = 4  # 全屏模式：4行
+        
         self.setup_ui()
         self.setup_bluetooth()
         
@@ -396,7 +403,22 @@ class MultiBTWindow(QMainWindow):
     def setup_ui(self):
         """设置主窗口UI"""
         self.setWindowTitle("多蓝牙设备连接管理器")
-        self.setGeometry(100, 100, 800, 600)
+        
+        # 计算窗口模式大小 (4×2卡片)
+        card_width, card_height = 300, 210
+        spacing = 10
+        margin = 40
+        title_height = 80
+        control_height = 60
+        
+        window_width = self.window_mode_cols * card_width + (self.window_mode_cols - 1) * spacing + margin
+        window_height = self.window_mode_rows * card_height + (self.window_mode_rows - 1) * spacing + title_height + control_height + margin
+        
+        # 初始设置窗口大小，但不固定，以便全屏按钮可用
+        self.setGeometry(100, 100, window_width, window_height)
+        self.setMinimumSize(window_width, window_height)  # 设置最小尺寸
+        self.setMaximumSize(window_width, window_height)  # 设置最大尺寸，保持窗口模式下的固定大小
+        
         self.setStyleSheet("""
             QMainWindow {
                 background-color: #f5f5f5;
@@ -440,7 +462,7 @@ class MultiBTWindow(QMainWindow):
         """)
         self.scan_button.clicked.connect(self.toggle_scanning)
         
-        self.status_label = QLabel("准备就绪")
+        self.status_label = QLabel("准备就绪 - 窗口模式 (4×2)")
         self.status_label.setStyleSheet("color: #666666; font-size: 12px; margin-left: 20px;")
         
         control_layout.addWidget(self.scan_button)
@@ -462,11 +484,30 @@ class MultiBTWindow(QMainWindow):
         # 设备卡片容器
         self.cards_widget = QWidget()
         self.cards_layout = QGridLayout()
-        self.cards_layout.setSpacing(10)
+        self.cards_layout.setHorizontalSpacing(10)
+        self.cards_layout.setVerticalSpacing(15)
+        self.cards_layout.setContentsMargins(20, 20, 20, 20)
         self.cards_widget.setLayout(self.cards_layout)
         
         self.scroll_area.setWidget(self.cards_widget)
         main_layout.addWidget(self.scroll_area)
+        
+        # 添加键盘快捷键
+        self.setup_shortcuts()
+    
+    def setup_shortcuts(self):
+        """设置键盘快捷键"""
+        # F11 切换全屏
+        fullscreen_shortcut = QShortcut(QKeySequence("F11"), self)
+        fullscreen_shortcut.activated.connect(self.toggle_fullscreen)
+        
+        # Ctrl+F 切换全屏
+        fullscreen_shortcut2 = QShortcut(QKeySequence("Ctrl+F"), self)
+        fullscreen_shortcut2.activated.connect(self.toggle_fullscreen)
+        
+        # Ctrl+S 开始/停止扫描
+        scan_shortcut = QShortcut(QKeySequence("Ctrl+S"), self)
+        scan_shortcut.activated.connect(self.toggle_scanning)
     
     def setup_bluetooth(self):
         """设置蓝牙信号连接"""
@@ -520,6 +561,50 @@ class MultiBTWindow(QMainWindow):
             """)
             self.status_label.setText("已停止扫描")
     
+    def toggle_fullscreen(self):
+        """切换全屏/窗口模式"""
+        if self.isFullScreen():
+            # 切换到窗口模式 (4×2)
+            self.showNormal()
+        else:
+            # 切换到全屏模式 (6×4)
+            self.showFullScreen()
+    
+    def changeEvent(self, event):
+        """处理窗口状态变化事件"""
+        if event.type() == QEvent.Type.WindowStateChange:
+            # 检查是否进入或退出全屏
+            if self.isFullScreen() and not self.is_fullscreen:
+                # 进入全屏模式
+                self.is_fullscreen = True
+                # 移除尺寸限制以允许全屏
+                self.setMaximumSize(16777215, 16777215)  # Qt的最大尺寸值
+                self.status_label.setText("全屏模式 (6×4)")
+                self.rearrange_cards()
+                
+            elif not self.isFullScreen() and self.is_fullscreen:
+                # 退出全屏模式
+                self.is_fullscreen = False
+                
+                # 恢复窗口模式大小
+                card_width, card_height = 300, 210
+                spacing = 10
+                margin = 40
+                title_height = 80
+                control_height = 60
+                
+                window_width = self.window_mode_cols * card_width + (self.window_mode_cols - 1) * spacing + margin
+                window_height = self.window_mode_rows * card_height + (self.window_mode_rows - 1) * spacing + title_height + control_height + margin
+                
+                # 恢复窗口大小和最小尺寸限制
+                self.resize(window_width, window_height)
+                self.setMinimumSize(window_width, window_height)
+                self.setMaximumSize(window_width, window_height)  # 限制最大尺寸以保持固定效果
+                self.status_label.setText("窗口模式 (4×2)")
+                self.rearrange_cards()
+        
+        super().changeEvent(event)
+    
     @pyqtSlot(list)
     def on_devices_found(self, devices):
         """处理发现的蓝牙设备"""
@@ -554,9 +639,11 @@ class MultiBTWindow(QMainWindow):
         
         self.device_cards[address] = card
         
-        # 计算网格位置 - 每行显示4个卡片
-        row = (len(self.device_cards) - 1) // 4
-        col = (len(self.device_cards) - 1) % 4
+        # 根据当前模式计算网格位置
+        current_cols = self.fullscreen_mode_cols if self.is_fullscreen else self.window_mode_cols
+        card_count = len(self.device_cards) - 1
+        row = card_count // current_cols
+        col = card_count % current_cols
         self.cards_layout.addWidget(card, row, col)
     
     def remove_device_card(self, address: str):
@@ -576,10 +663,11 @@ class MultiBTWindow(QMainWindow):
         for i in reversed(range(self.cards_layout.count())):
             self.cards_layout.itemAt(i).widget().setParent(None)
         
-        # 重新添加卡片 - 每行显示4个卡片
+        # 根据当前模式重新添加卡片
+        current_cols = self.fullscreen_mode_cols if self.is_fullscreen else self.window_mode_cols
         for i, card in enumerate(self.device_cards.values()):
-            row = i // 4
-            col = i % 4
+            row = i // current_cols
+            col = i % current_cols
             self.cards_layout.addWidget(card, row, col)
     
     def cleanup_devices(self):
