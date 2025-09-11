@@ -54,6 +54,24 @@ class BluetoothManager(QThread):
         if self.loop:
             asyncio.run_coroutine_threadsafe(self._disconnect_device(address), self.loop)
     
+    def send_data(self, address: str, characteristic_uuid: str, data: bytes):
+        """发送数据到指定蓝牙设备"""
+        if self.loop:
+            asyncio.run_coroutine_threadsafe(
+                self._send_data(address, characteristic_uuid, data), self.loop
+            )
+    
+    def read_data(self, address: str, characteristic_uuid: str):
+        """从指定蓝牙设备读取数据"""
+        if self.loop:
+            asyncio.run_coroutine_threadsafe(
+                self._read_data(address, characteristic_uuid), self.loop
+            )
+    
+    def get_connected_client(self, address: str):
+        """获取已连接的蓝牙客户端对象"""
+        return self.connected_devices.get(address)
+    
     async def _scan_devices(self):
         """异步扫描蓝牙设备"""
         self.scanning = True
@@ -112,6 +130,33 @@ class BluetoothManager(QThread):
                 self.signals.device_disconnected.emit(address)
         except Exception as e:
             print(f"断开连接错误: {e}")
+    
+    async def _send_data(self, address: str, characteristic_uuid: str, data: bytes):
+        """异步发送数据到蓝牙设备"""
+        try:
+            if address in self.connected_devices:
+                client = self.connected_devices[address]
+                await client.write_gatt_char(characteristic_uuid, data)
+                print(f"数据发送成功到 {address}: {data.hex()}")
+            else:
+                print(f"设备 {address} 未连接，无法发送数据")
+        except Exception as e:
+            print(f"发送数据错误: {e}")
+    
+    async def _read_data(self, address: str, characteristic_uuid: str):
+        """异步从蓝牙设备读取数据"""
+        try:
+            if address in self.connected_devices:
+                client = self.connected_devices[address]
+                data = await client.read_gatt_char(characteristic_uuid)
+                print(f"从 {address} 读取数据: {data.hex()}")
+                return data
+            else:
+                print(f"设备 {address} 未连接，无法读取数据")
+                return None
+        except Exception as e:
+            print(f"读取数据错误: {e}")
+            return None
 
 
 class BluetoothDeviceCard(QFrame):
@@ -723,6 +768,22 @@ class MultiBTWindow(QMainWindow):
             name = self.device_cards[address].name
             QMessageBox.warning(self, "连接错误", f"连接 {name} 失败:\n{error}")
             self.status_label.setText(f"连接 {name} 失败")
+    
+    def send_bluetooth_data(self, address: str, characteristic_uuid: str, data: bytes):
+        """发送数据到指定蓝牙设备"""
+        self.bluetooth_manager.send_data(address, characteristic_uuid, data)
+    
+    def read_bluetooth_data(self, address: str, characteristic_uuid: str):
+        """从指定蓝牙设备读取数据"""
+        self.bluetooth_manager.read_data(address, characteristic_uuid)
+    
+    def get_bluetooth_client(self, address: str):
+        """获取指定设备的BleakClient对象"""
+        return self.bluetooth_manager.get_connected_client(address)
+    
+    def get_connected_devices_list(self):
+        """获取所有已连接设备的地址列表"""
+        return list(self.connected_devices)
     
     def closeEvent(self, event):
         """窗口关闭事件"""
