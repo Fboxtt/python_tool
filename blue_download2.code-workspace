@@ -1,0 +1,63 @@
+{
+    "folders": [
+        {
+            "path": "."
+        }
+    ],
+    "settings": {
+        // 全局文件编码设置
+        "files.encoding": "utf8",
+        "files.autoGuessEncoding": true,
+        "files.eol": "\n",
+
+        // Python开发环境设置
+        "python.defaultInterpreterPath": "python",
+        "python.terminal.activateEnvironment": true,
+
+        // 终端UTF-8支持
+        "terminal.integrated.shellArgs.windows": ["-NoExit", "-Command", "chcp 65001"],
+        "terminal.integrated.env.windows": {
+            "PYTHONIOENCODING": "utf-8"
+        },
+
+        // 编辑器设置
+        "editor.insertSpaces": true,
+        "editor.tabSize": 4,
+        "editor.detectIndentation": true,
+
+        // 文件保存设置
+        "files.insertFinalNewline": true,
+        "files.trimTrailingWhitespace": true,
+
+        // 针对不同文件类型的编码设置
+        "[python]": {
+            "files.encoding": "utf8",
+            "editor.insertSpaces": true,
+            "editor.tabSize": 4
+        },
+        "[json]": {
+            "files.encoding": "utf8",
+            "editor.insertSpaces": true,
+            "editor.tabSize": 2
+        },
+        "[markdown]": {
+            "files.encoding": "utf8"
+        },
+        "[plaintext]": {
+            "files.encoding": "utf8"
+        },
+        "[log]": {
+            "files.encoding": "utf8"
+        },
+        "[csv]": {
+            "files.encoding": "utf8"
+        }
+    },
+    "extensions": {
+        "recommendations": [
+            "ms-python.python",
+            "ms-python.vscode-pylance"
+        ]
+    }
+}
+
