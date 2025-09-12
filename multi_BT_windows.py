@@ -1,6 +1,8 @@
 import sys
 import asyncio
 import threading
+import json
+import os
 from typing import Dict, Set
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, 
                              QWidget, QPushButton, QLabel, QScrollArea, QFrame,
@@ -429,6 +431,10 @@ class MultiBTWindow(QMainWindow):
         self.connected_devices: Set[str] = set()
         self.scanned_devices: Set[str] = set()
         
+        # 配置文件路径
+        self.config_file = "bluetooth_config.json"
+        self.auto_connect_devices = {}  # 存储需要自动连接的设备信息
+        
         # 窗口模式配置
         self.is_fullscreen = False
         self.window_mode_cols = 4  # 窗口模式：4列
@@ -436,11 +442,17 @@ class MultiBTWindow(QMainWindow):
         self.fullscreen_mode_cols = 6  # 全屏模式：6列
         self.fullscreen_mode_rows = 4  # 全屏模式：4行
         
+        # 加载配置文件
+        self.load_config()
+        
         self.setup_ui()
         self.setup_bluetooth()
         
         # 启动蓝牙管理器线程
         self.bluetooth_manager.start()
+        
+        # 启动时自动开始扫描
+        QTimer.singleShot(1000, self.auto_start_scanning)  # 延迟1秒后开始扫描
         
         # 定时器用于清理未扫描到的设备
         self.cleanup_timer = QTimer()
@@ -556,6 +568,41 @@ class MultiBTWindow(QMainWindow):
         scan_shortcut = QShortcut(QKeySequence("Ctrl+S"), self)
         scan_shortcut.activated.connect(self.toggle_scanning)
     
+    def load_config(self):
+        """加载配置文件"""
+        try:
+            if os.path.exists(self.config_file):
+                with open(self.config_file, 'r', encoding='utf-8') as f:
+                    config = json.load(f)
+                    self.auto_connect_devices = config.get('auto_connect_devices', {})
+                    print(f"已加载配置文件，找到 {len(self.auto_connect_devices)} 个自动连接设备")
+            else:
+                # 创建空配置文件
+                self.auto_connect_devices = {}
+                self.save_config()
+                print("创建新的配置文件")
+        except Exception as e:
+            print(f"加载配置文件失败: {e}")
+            self.auto_connect_devices = {}
+    
+    def save_config(self):
+        """保存配置文件"""
+        try:
+            config = {
+                'auto_connect_devices': self.auto_connect_devices
+            }
+            with open(self.config_file, 'w', encoding='utf-8') as f:
+                json.dump(config, f, ensure_ascii=False, indent=2)
+            print(f"配置文件已保存，包含 {len(self.auto_connect_devices)} 个设备")
+        except Exception as e:
+            print(f"保存配置文件失败: {e}")
+    
+    def auto_start_scanning(self):
+        """自动开始扫描"""
+        if self.scan_button.text() == "开始扫描":
+            self.toggle_scanning()
+            print("自动开始扫描蓝牙设备")
+    
     def setup_bluetooth(self):
         """设置蓝牙信号连接"""
         self.bluetooth_manager.signals.devices_found.connect(self.on_devices_found)
@@ -667,6 +714,23 @@ class MultiBTWindow(QMainWindow):
             # 如果是新设备，创建卡片
             if address not in self.device_cards:
                 self.add_device_card(address, name, rssi)
+            
+            # 检查是否需要自动连接
+            if (address in self.auto_connect_devices and 
+                address not in self.connected_devices):
+                # 双重验证：地址匹配 AND 名称匹配（防止重名设备问题）
+                stored_device = self.auto_connect_devices[address]
+                if (stored_device['address'] == address and 
+                    stored_device['name'] == name):
+                    # 确保设备卡片存在且未连接
+                    if address in self.device_cards and not self.device_cards[address].is_connected:
+                        print(f"自动连接设备: {name} ({address}) - 地址和名称验证通过")
+                        self.connect_device(address)
+                    elif address not in self.device_cards:
+                        print(f"自动连接设备: {name} ({address}) - 地址和名称验证通过")
+                        self.connect_device(address)
+                else:
+                    print(f"设备验证失败: 存储的名称为 '{stored_device['name']}', 当前扫描到的名称为 '{name}'")
         
         # 更新扫描到的设备集合
         self.scanned_devices = current_scanned
@@ -678,7 +742,7 @@ class MultiBTWindow(QMainWindow):
         """添加设备卡片"""
         card = BluetoothDeviceCard(address, name, rssi)
         card.connect_requested.connect(self.connect_device)
-        card.disconnect_requested.connect(self.disconnect_device)
+        card.disconnect_requested.connect(lambda addr: self.disconnect_device(addr, manual_disconnect=True))
         
         # 如果设备已连接，更新状态
         if address in self.connected_devices:
@@ -737,19 +801,40 @@ class MultiBTWindow(QMainWindow):
             self.status_label.setText(f"正在连接 {self.device_cards[address].name}...")
     
     @pyqtSlot(str)
-    def disconnect_device(self, address: str):
+    def disconnect_device(self, address: str, manual_disconnect: bool = True):
         """断开蓝牙设备连接"""
         self.bluetooth_manager.disconnect_device(address)
         if address in self.device_cards:
             self.status_label.setText(f"正在断开 {self.device_cards[address].name}...")
+            
+            # 如果是手动断开，从自动连接列表中移除
+            if manual_disconnect and address in self.auto_connect_devices:
+                device_name = self.auto_connect_devices[address].get('name', 'Unknown')
+                del self.auto_connect_devices[address]
+                self.save_config()
+                print(f"设备 {device_name} ({address}) 已从自动连接列表中移除")
     
     @pyqtSlot(str, str)
     def on_device_connected(self, address: str, name: str):
         """处理设备连接成功"""
         self.connected_devices.add(address)
+        
+        # 获取正确的设备名称（优先使用设备卡片中的名称）
+        actual_name = name
         if address in self.device_cards:
             self.device_cards[address].set_connected(True)
-        self.status_label.setText(f"已连接到 {name}")
+            # 使用设备卡片中的名称，因为它是从扫描时获取的正确名称
+            actual_name = self.device_cards[address].name
+        
+        # 将连接成功的设备保存到配置文件
+        self.auto_connect_devices[address] = {
+            'name': actual_name,
+            'address': address
+        }
+        self.save_config()
+        print(f"设备 {actual_name} ({address}) 已添加到自动连接列表")
+        
+        self.status_label.setText(f"已连接到 {actual_name}")
     
     @pyqtSlot(str)
     def on_device_disconnected(self, address: str):
