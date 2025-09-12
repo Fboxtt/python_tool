@@ -6,7 +6,7 @@ import os
 from typing import Dict, Set
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, 
                              QWidget, QPushButton, QLabel, QScrollArea, QFrame,
-                             QGridLayout, QMessageBox, QProgressBar)
+                             QGridLayout, QMessageBox, QProgressBar, QCheckBox)
 from PyQt6.QtCore import QTimer, pyqtSignal, QObject, QThread, pyqtSlot, QEvent
 from PyQt6.QtGui import QFont, QPalette, QColor, QKeySequence, QShortcut
 import bleak
@@ -434,6 +434,7 @@ class MultiBTWindow(QMainWindow):
         # 配置文件路径
         self.config_file = "bluetooth_config.json"
         self.auto_connect_devices = {}  # 存储需要自动连接的设备信息
+        self.auto_connect_enabled = True  # 默认启用自动连接
         
         # 窗口模式配置
         self.is_fullscreen = False
@@ -521,10 +522,38 @@ class MultiBTWindow(QMainWindow):
         """)
         self.scan_button.clicked.connect(self.toggle_scanning)
         
+        # 自动连接复选框
+        self.auto_connect_checkbox = QCheckBox("自动连接蓝牙设备")
+        self.auto_connect_checkbox.setChecked(self.auto_connect_enabled)
+        self.auto_connect_checkbox.setStyleSheet("""
+            QCheckBox {
+                color: #333333;
+                font-weight: bold;
+                font-size: 12px;
+                margin-left: 20px;
+            }
+            QCheckBox::indicator {
+                width: 18px;
+                height: 18px;
+            }
+            QCheckBox::indicator:unchecked {
+                border: 2px solid #cccccc;
+                border-radius: 3px;
+                background-color: white;
+            }
+            QCheckBox::indicator:checked {
+                border: 2px solid #4CAF50;
+                border-radius: 3px;
+                background-color: #4CAF50;
+            }
+        """)
+        self.auto_connect_checkbox.stateChanged.connect(self.on_auto_connect_changed)
+        
         self.status_label = QLabel("准备就绪 - 窗口模式 (4×2)")
         self.status_label.setStyleSheet("color: #666666; font-size: 12px; margin-left: 20px;")
         
         control_layout.addWidget(self.scan_button)
+        control_layout.addWidget(self.auto_connect_checkbox)
         control_layout.addWidget(self.status_label)
         control_layout.addStretch()
         
@@ -575,21 +604,25 @@ class MultiBTWindow(QMainWindow):
                 with open(self.config_file, 'r', encoding='utf-8') as f:
                     config = json.load(f)
                     self.auto_connect_devices = config.get('auto_connect_devices', {})
-                    print(f"已加载配置文件，找到 {len(self.auto_connect_devices)} 个自动连接设备")
+                    self.auto_connect_enabled = config.get('auto_connect_enabled', True)
+                    print(f"已加载配置文件，找到 {len(self.auto_connect_devices)} 个自动连接设备，自动连接状态: {'启用' if self.auto_connect_enabled else '禁用'}")
             else:
                 # 创建空配置文件
                 self.auto_connect_devices = {}
+                self.auto_connect_enabled = True
                 self.save_config()
                 print("创建新的配置文件")
         except Exception as e:
             print(f"加载配置文件失败: {e}")
             self.auto_connect_devices = {}
+            self.auto_connect_enabled = True
     
     def save_config(self):
         """保存配置文件"""
         try:
             config = {
-                'auto_connect_devices': self.auto_connect_devices
+                'auto_connect_devices': self.auto_connect_devices,
+                'auto_connect_enabled': self.auto_connect_enabled
             }
             with open(self.config_file, 'w', encoding='utf-8') as f:
                 json.dump(config, f, ensure_ascii=False, indent=2)
@@ -602,6 +635,22 @@ class MultiBTWindow(QMainWindow):
         if self.scan_button.text() == "开始扫描":
             self.toggle_scanning()
             print("自动开始扫描蓝牙设备")
+    
+    def on_auto_connect_changed(self, state):
+        """处理自动连接复选框状态变化"""
+        self.auto_connect_enabled = state == 2  # Qt.CheckState.Checked 的值是 2
+        self.save_config()
+        status = "启用" if self.auto_connect_enabled else "禁用"
+        print(f"自动连接功能已{status}")
+        
+        # 更新状态标签
+        current_text = self.status_label.text()
+        if "自动连接:" not in current_text:
+            self.status_label.setText(f"{current_text} - 自动连接:{status}")
+        else:
+            # 替换现有的自动连接状态
+            parts = current_text.split(" - 自动连接:")
+            self.status_label.setText(f"{parts[0]} - 自动连接:{status}")
     
     def setup_bluetooth(self):
         """设置蓝牙信号连接"""
@@ -716,7 +765,8 @@ class MultiBTWindow(QMainWindow):
                 self.add_device_card(address, name, rssi)
             
             # 检查是否需要自动连接
-            if (address in self.auto_connect_devices and 
+            if (self.auto_connect_enabled and 
+                address in self.auto_connect_devices and 
                 address not in self.connected_devices):
                 # 双重验证：地址匹配 AND 名称匹配（防止重名设备问题）
                 stored_device = self.auto_connect_devices[address]
