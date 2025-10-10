@@ -449,7 +449,7 @@ class BluetoothTool(QWidget):
         # 波特率设置
         self.baud_label = QLabel('波特率:')
         self.baud_combo = QComboBox()
-        self.baud_combo.addItems(['9600', '13333','18000','18600', '19200', '38400', '57600', '115200'])
+        self.baud_combo.addItems(['6400','9600', '13333','18000','18600', '19200', '38400', '57600', '115200'])
         self.baud_combo.setCurrentText('19200')
         param_layout.addWidget(self.baud_label, 1, 0)
         param_layout.addWidget(self.baud_combo, 1, 1)
@@ -1387,7 +1387,7 @@ class BluetoothTool(QWidget):
                         err_count = 0
                         while err_count < 5:
                             self.display_send_data(data)
-                            self.blue_write_log("1开始发送----------------")
+                            # self.blue_write_log("1开始发送----------------")
                             await self.byte_send(data)
                             # current_time = datetime.now().strftime("%H:%M:%S.%f")[:-3]
                             # self.blue_write_log(f"TX->数据包发送完成 - 时间: {current_time}")
@@ -1418,7 +1418,8 @@ class BluetoothTool(QWidget):
                         traceback.print_exc()
                         break
                     else:
-                        self.blue_write_log(f"没有错误-----------------")
+                        pass
+                        # self.blue_write_log(f"没有错误-----------------")
 
 
             err_count = 0   
@@ -2314,8 +2315,8 @@ class load_ui_dynamically(QMainWindow):
             formatted_text += "\n"
         # 显示到窗口
         widgets.mainWindowTextEdit.append(formatted_text)
-        self.bluetooth_tool.blue_write_log(f"接收到数据: {header}")
-        self.bluetooth_tool.blue_write_log(f"命令名: {command_name}")
+        # self.bluetooth_tool.blue_write_log(f"接收到数据: {header}")
+        # self.bluetooth_tool.blue_write_log(f"命令名: {command_name}")
         csv_data_str = ""
         try:
             for lst in dict_data.values():
