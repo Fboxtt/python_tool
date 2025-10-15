@@ -1399,7 +1399,8 @@ class BluetoothTool(QWidget):
 
             # 发送下载命令并等待响应
             if not self.hex_model.is_file_loaded:
-                raise Exception("HEX文件未加载")
+                self.hex_file_label.setText('HEX文件：未加载')
+                # raise Exception("HEX文件未加载")
             else:
                 self.download_data.hex_init(self.hex_model.get_data())
                 pass
@@ -1462,18 +1463,20 @@ class BluetoothTool(QWidget):
             await asyncio.sleep(6)
 
             err_count = 0
+            await asyncio.sleep(5)
             if self.text_decode.no80_cmd == BmsCmdType.BMS_MCU_OPEN  and self.text_decode.cmd_ack == 0x00:
                 self.blue_write_log("电池重启")
-                while err_count < 5:
-                    data = self.download_data.get_download_data(BmsCmdType.READ_IC_INF)
-                    self.display_send_data(data)
-                    await self.byte_send(data)
-                    await asyncio.sleep(time512 * 2)
-                    if(self.text_decode.no80_cmd == BmsCmdType.READ_IC_INF  and self.text_decode.cmd_ack == 0x00):
-                        self.ota_ok_count += 1
-                        break
-                    else:
-                        err_count += 1
+            await asyncio.sleep(3)
+            while err_count < 5:
+                data = self.download_data.get_download_data(BmsCmdType.READ_IC_INF)
+                self.display_send_data(data)
+                await self.byte_send(data)
+                await asyncio.sleep(time512 * 3)
+                if(self.text_decode.no80_cmd == BmsCmdType.READ_IC_INF  and self.text_decode.cmd_ack == 0x00):
+                    self.ota_ok_count += 1
+                    break
+                else:
+                    err_count += 1
 
         except Exception as e:
             traceback.print_exc()
