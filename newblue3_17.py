@@ -1200,7 +1200,7 @@ class BluetoothTool(QWidget):
         """回调函数，处理接收到的数据"""
         # 将数据添加到缓冲区
         self.received_data_buffer.extend(data)
-        print("2第一次收到数据J")
+        # print("2第一次收到数据J")
         # 重启定时器
         self.data_timer.start(100)  # 100ms
 
