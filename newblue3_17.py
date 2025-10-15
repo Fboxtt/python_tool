@@ -357,8 +357,14 @@ class BluetoothTool(QWidget):
     def initUI(self):
         self.setWindowTitle('firstuse')
 
-        # 创建主布局
-        layout = QVBoxLayout()
+        # 创建主水平布局
+        main_layout = QHBoxLayout()
+
+        # 创建左侧垂直布局（原有的所有控件）
+        left_layout = QVBoxLayout()
+
+        # 创建右侧垂直布局（接收数据显示）
+        right_layout = QVBoxLayout()
 
         # HEX文件解析部分
         self.hex_layout = QHBoxLayout()
@@ -367,11 +373,11 @@ class BluetoothTool(QWidget):
         self.hex_file_button.clicked.connect(self.on_select_hex_file)
         self.hex_layout.addWidget(self.hex_file_label)
         self.hex_layout.addWidget(self.hex_file_button)
-        layout.addLayout(self.hex_layout)
+        left_layout.addLayout(self.hex_layout)
 
         # HEX文件信息显示
         self.hex_info_label = QLabel('文件大小：0 字节')
-        layout.addWidget(self.hex_info_label)
+        left_layout.addWidget(self.hex_info_label)
 
         # 创建水平分割的两个区域
         connection_layout = QHBoxLayout()
@@ -480,8 +486,8 @@ class BluetoothTool(QWidget):
         connection_layout.addWidget(bluetooth_frame, 1)  # 1是拉伸系数
         connection_layout.addWidget(serial_frame, 1)
 
-        # 将连接区域添加到主布局
-        layout.addLayout(connection_layout)
+        # 将连接区域添加到左侧布局
+        left_layout.addLayout(connection_layout)
 
         # 共用的数据收发部分
         # 数据发送部分
@@ -508,7 +514,7 @@ class BluetoothTool(QWidget):
         self.send_layout.addWidget(self.send_button)
         self.send_layout.addWidget(self.register_button)
         self.send_layout.addWidget(self.status_indicator)  # 添加状态指示灯
-        layout.addLayout(self.send_layout)
+        left_layout.addLayout(self.send_layout)
 
         # 测试数据发送部分
         self.test_layout = QHBoxLayout()
@@ -519,7 +525,7 @@ class BluetoothTool(QWidget):
         self.test_layout.addWidget(self.test512)
         self.test_layout.addWidget(self.test_send_button)
         self.test_send_button.clicked.connect(self.on_test_send_buttoned)
-        layout.addLayout(self.test_layout)
+        left_layout.addLayout(self.test_layout)
 
         # 测试数据结果显示部分
         self.success_couont_layout = QHBoxLayout()
@@ -531,7 +537,7 @@ class BluetoothTool(QWidget):
         self.success_couont_layout.addWidget(self.no_ack_label)
         self.success_couont_layout.addWidget(self.err_ack_label)
         self.success_couont_layout.addWidget(self.total_send_label)
-        layout.addLayout(self.success_couont_layout)
+        left_layout.addLayout(self.success_couont_layout)
 
         # 烧录控制部分
         self.program_layout = QHBoxLayout()
@@ -550,21 +556,22 @@ class BluetoothTool(QWidget):
         self.batch_success_label = QLabel('成功数: 0')
         self.program_layout.addWidget(self.batch_success_label)
 
-        layout.addLayout(self.program_layout)
+        left_layout.addLayout(self.program_layout)
 
-        # 数据接收部分
+        # 数据接收部分 - 移动到右侧布局
         self.receive_label = QLabel('接收到的数据:')
-        layout.addWidget(self.receive_label)
+        right_layout.addWidget(self.receive_label)
 
         self.receive_output = QTextEdit()
         self.receive_output.setReadOnly(True)
-        layout.addWidget(self.receive_output)
+        # self.receive_output.setMinimumWidth(400)  # 设置最小宽度
+        right_layout.addWidget(self.receive_output)
 
         # 16进制显示选项
         self.hex_display_checkbox = QCheckBox('16进制显示')
         self.hex_display_checkbox.setChecked(True)
         self.hex_display_checkbox.stateChanged.connect(self.on_hex_display_changed)
-        layout.addWidget(self.hex_display_checkbox)
+        right_layout.addWidget(self.hex_display_checkbox)
 
         # 添加放电控制部分
         discharge_layout = QHBoxLayout()
@@ -579,8 +586,8 @@ class BluetoothTool(QWidget):
         self.close_discharge_button.clicked.connect(self.on_close_discharge_clicked)
         discharge_layout.addWidget(self.close_discharge_button)
 
-        # 将放电控制部分添加到主布局
-        layout.addLayout(discharge_layout)
+        # 将放电控制部分添加到左侧布局
+        left_layout.addLayout(discharge_layout)
 
         # 添加充电控制部分
         charge_layout = QHBoxLayout()
@@ -595,8 +602,8 @@ class BluetoothTool(QWidget):
         self.close_charge_button.clicked.connect(self.on_close_charge_clicked)
         charge_layout.addWidget(self.close_charge_button)
 
-        # 将充电控制部分添加到主布局
-        layout.addLayout(charge_layout)
+        # 将充电控制部分添加到左侧布局
+        left_layout.addLayout(charge_layout)
 
         # 添加RT控制部分
         rt_layout = QVBoxLayout()
@@ -646,8 +653,8 @@ class BluetoothTool(QWidget):
 
         rt_layout.addLayout(rt_disable_layout)
 
-        # 将RT控制部分添加到主布局
-        layout.addLayout(rt_layout)
+        # 将RT控制部分添加到左侧布局
+        left_layout.addLayout(rt_layout)
 
         # 添加密码管理部分
         password_layout = QVBoxLayout()
@@ -692,13 +699,20 @@ class BluetoothTool(QWidget):
 
         password_layout.addLayout(password_buttons_layout)
 
-        # 将密码管理部分添加到主布局
-        layout.addLayout(password_layout)
+        # 将密码管理部分添加到左侧布局
+        left_layout.addLayout(password_layout)
+
+        # 将左侧和右侧布局添加到主水平布局
+        main_layout.addLayout(left_layout, 2)  # 左侧占2/3
+        main_layout.addLayout(right_layout, 1)  # 右侧占1/3
 
         # 初始化时刷新串口列表
         # self.refresh_serial_ports()
 
-        self.setLayout(layout)
+        self.setLayout(main_layout)
+
+        # 设置窗口默认大小（移除最小大小限制）
+        self.resize(600, 400)  # 设置更小的默认大小
 
     def blue_write_log(self,text):
         """写入日志"""
