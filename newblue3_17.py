@@ -764,7 +764,6 @@ class BluetoothTool(QWidget):
                     self.send_button.setEnabled(True)
                     self.serial_receive_task = asyncio.create_task(self.serial_receive_loop())
             except Exception as e:
-                QMessageBox.critical(self, '错误', f'串口连接失败: {str(e)}')
                 self.blue_write_log(f"串口连接失败: {str(e)}")
         else:
             # 断开连接
@@ -786,6 +785,32 @@ class BluetoothTool(QWidget):
     async def disconnect_serial(self):
         """断开串口连接"""
         pass
+
+    async def handle_serial_disconnect(self):
+        """处理串口意外断开"""
+        # 取消接收任务
+        if self.serial_receive_task:
+            self.serial_receive_task.cancel()
+            self.serial_receive_task = None
+
+        # 关闭串口
+        if self.serial_port:
+            try:
+                self.serial_port.close()
+            except:
+                pass
+
+        # 重置状态
+        self.is_serial_connected = False
+        self.commu_type = "none"
+        self.serial_port = None
+
+        # 更新UI
+        self.serial_connect_button.setText('连接串口')
+        self.disable_serial_settings(False)
+        self.send_button.setEnabled(False)
+
+        self.blue_write_log("串口连接已断开")
 
 
     def disable_serial_settings(self, disabled: bool):
@@ -817,9 +842,15 @@ class BluetoothTool(QWidget):
                                 hex_data = ' '.join([f'{b:02X}' for b in data])
                                 # self.blue_write_log(f"接收(HEX): {hex_data}")
                 await asyncio.sleep(0.01)
+            except (serial.SerialException, PermissionError, OSError):
+                # 串口异常，自动断开
+                await self.handle_serial_disconnect()
+                break
+            except asyncio.CancelledError:
+                break
             except Exception as e:
                 self.blue_write_log(f"接收数据错误: {str(e)}")
-                await self.disconnect_serial()
+                await self.handle_serial_disconnect()
                 break
 
     async def send_data(self, input_data: str):
@@ -1203,10 +1234,16 @@ class BluetoothTool(QWidget):
                     await asyncio.sleep(time_interval)
                 """串口发送"""
             elif self.serial_port and self.serial_port.is_open:
+                # 检查串口连接状态
+                if not self.is_serial_connected:
+                    raise Exception("串口连接已断开")
                 self.serial_port.write(data)
+        except (serial.SerialException, PermissionError) as e:
+            # 串口异常，自动断开
+            await self.handle_serial_disconnect()
+            raise Exception("串口发送失败，连接已断开")
         except Exception as e:
-            traceback.print_exc()
-            QMessageBox.critical(self, '发送失败', str(e))
+            self.blue_write_log(f"发送失败: {str(e)}")
             raise Exception("发送失败")
 
 
