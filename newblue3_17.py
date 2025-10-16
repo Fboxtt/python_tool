@@ -567,11 +567,19 @@ class BluetoothTool(QWidget):
         # self.receive_output.setMinimumWidth(400)  # 设置最小宽度
         right_layout.addWidget(self.receive_output)
 
-        # 16进制显示选项
+        # 16进制显示选项和清空按钮
+        hex_control_layout = QHBoxLayout()
         self.hex_display_checkbox = QCheckBox('16进制显示')
         self.hex_display_checkbox.setChecked(True)
         self.hex_display_checkbox.stateChanged.connect(self.on_hex_display_changed)
-        right_layout.addWidget(self.hex_display_checkbox)
+        hex_control_layout.addWidget(self.hex_display_checkbox)
+
+        # 清空接收窗口按钮
+        self.clear_receive_button = QPushButton('清空')
+        self.clear_receive_button.clicked.connect(lambda: self.receive_output.clear())
+        hex_control_layout.addWidget(self.clear_receive_button)
+
+        right_layout.addLayout(hex_control_layout)
 
         # 添加放电控制部分
         discharge_layout = QHBoxLayout()
