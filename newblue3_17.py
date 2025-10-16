@@ -1483,14 +1483,12 @@ class BluetoothTool(QWidget):
                         err_count = 0
                         while err_count < 5:
                             self.display_send_data(data)
-                            self.blue_write_log("1开始发送----------------")
                             await self.byte_send(data)
                             # current_time = datetime.now().strftime("%H:%M:%S.%f")[:-3]
                             # self.blue_write_log(f"TX->数据包发送完成 - 时间: {current_time}")
                             await asyncio.sleep(time512)
                             if self.text_decode.legality == ReceveDataStatus.ERR_NOTHING:
                                 await asyncio.sleep(time512)
-                            print("7返回烧录过程")
                             if(self.text_decode.no80_cmd == BmsCmdType.WRITE_FLASH  and
                                 self.text_decode.cmd_ack == 0x00 and
                                 self.text_decode.cmd_packet_num == hex_packet + 1):
@@ -1506,15 +1504,13 @@ class BluetoothTool(QWidget):
                             raise Exception("writeflash次数超限")
 
                     except BleakError:
-                        self.blue_write_log(f"蓝牙断开------------------")
                         # traceback.print_exc()
                         raise Exception("蓝牙断开")
                     except Exception as e:
-                        self.blue_write_log(f"有错误------------------{e}")
                         traceback.print_exc()
                         break
                     else:
-                        self.blue_write_log(f"没有错误-----------------")
+                        pass
 
 
             err_count = 0
