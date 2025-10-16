@@ -539,6 +539,32 @@ class BluetoothTool(QWidget):
         self.success_couont_layout.addWidget(self.total_send_label)
         left_layout.addLayout(self.success_couont_layout)
 
+        # 测试模式指令部分
+        test_mode_layout = QVBoxLayout()
+        test_mode_title = QLabel('测试模式指令')
+        test_mode_title.setFont(QFont('Arial', 10, QFont.Weight.Bold))
+        test_mode_layout.addWidget(test_mode_title)
+
+        # 测试模式控制按钮
+        test_mode_control_layout = QHBoxLayout()
+
+        # 设置测试模式
+        self.set_test_mode_input = QLineEdit()
+        self.set_test_mode_input.setPlaceholderText('输入测试模式值(0-255)')
+        self.set_test_mode_button = QPushButton('设置测试模式(0x67)')
+        self.set_test_mode_button.clicked.connect(self.on_set_test_mode_clicked)
+
+        test_mode_control_layout.addWidget(self.set_test_mode_input)
+        test_mode_control_layout.addWidget(self.set_test_mode_button)
+
+        # 获取测试模式
+        self.get_test_mode_button = QPushButton('获取测试模式(0x68)')
+        self.get_test_mode_button.clicked.connect(self.on_get_test_mode_clicked)
+        test_mode_control_layout.addWidget(self.get_test_mode_button)
+
+        test_mode_layout.addLayout(test_mode_control_layout)
+        left_layout.addLayout(test_mode_layout)
+
         # 烧录控制部分
         self.program_layout = QHBoxLayout()
         self.program_button = QPushButton('开始烧录')
@@ -727,6 +753,60 @@ class BluetoothTool(QWidget):
         print(text)
         self.receive_output.append(text)
         LogManager.get_instance().write_log(text)
+
+    def on_set_test_mode_clicked(self):
+        """处理设置测试模式按钮点击事件"""
+        try:
+            # 获取输入值
+            input_text = self.set_test_mode_input.text().strip()
+            if not input_text:
+                self.blue_write_log("错误：请输入测试模式值")
+                return
+
+            # 解析10进制数值
+            try:
+                test_mode_value = int(input_text)
+                if test_mode_value < 0 or test_mode_value > 255:
+                    self.blue_write_log("错误：测试模式值必须在0-255范围内")
+                    return
+            except ValueError:
+                self.blue_write_log("错误：请输入有效的数字")
+                return
+
+            # 构造PC_SET_TEST_MODE命令 (0x67)
+            # 命令格式：[头部] + [0x67] + [数据长度] + [测试模式值] + [校验]
+            cmd_data = bytearray([0x00, 0x00, 0x05, 0x01, 0x67, 0x55, 0xAA,test_mode_value])
+
+            # 计算校验和
+            checksum = sum(cmd_data[:]) & 0xFF
+            cmd_data.append(checksum)
+
+            # 发送命令
+            self.blue_write_log(f"发送设置测试模式命令: 0x67, 值: {test_mode_value}")
+            self.display_send_data(cmd_data)
+            asyncio.create_task(self.byte_send(bytes(cmd_data)))
+
+        except Exception as e:
+            self.blue_write_log(f"设置测试模式失败: {str(e)}")
+
+    def on_get_test_mode_clicked(self):
+        """处理获取测试模式按钮点击事件"""
+        try:
+            # 构造PC_GET_TEST_MODE命令 (0x68)
+            # 命令格式：[头部] + [0x68] + [数据长度] + [校验]
+            cmd_data = bytearray([0x00, 0x00, 0x04, 0x01, 0x68, 0x55, 0xAA])
+
+            # 计算校验和
+            checksum = sum(cmd_data[:]) & 0xFF
+            cmd_data.append(checksum)
+
+            # 发送命令
+            self.blue_write_log("发送获取测试模式命令: 0x68")
+            self.display_send_data(cmd_data)
+            asyncio.create_task(self.byte_send(bytes(cmd_data)))
+
+        except Exception as e:
+            self.blue_write_log(f"获取测试模式失败: {str(e)}")
 
     async def refresh_serial_ports(self):
         """刷新可用串口列表"""
