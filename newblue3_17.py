@@ -734,37 +734,8 @@ class BluetoothTool(QWidget):
     def on_serial_connect_clicked(self):
         """处理串口连接/断开"""
         if not self.is_serial_connected:
-            try:
-                # 获取串口参数
-                port = self.port_combo.currentText()
-                baud_rate = int(self.baud_combo.currentText())
-                data_bits = int(self.data_bits_combo.currentText())
-                stop_bits = float(self.stop_bits_combo.currentText())
-                parity = {'无': 'N', '奇校验': 'O', '偶校验': 'E'}[self.parity_combo.currentText()]
-
-                # 创建串口对象
-                self.serial_port = serial.Serial(
-                    port=port,
-                    baudrate=baud_rate,
-                    bytesize=data_bits,
-                    stopbits=stop_bits,
-                    parity=parity,
-                    timeout=0.1
-                )
-
-                if self.serial_port.is_open:
-                    self.device_name = port
-                    self.commu_type = "serial"
-                    self.is_serial_connected = True
-                    self.serial_connect_button.setText('断开串口')
-                    self.blue_write_log(f"串口 {port} 连接成功")
-                    # 禁用参数设置
-                    self.disable_serial_settings(True)
-                    # 启动接收任务
-                    self.send_button.setEnabled(True)
-                    self.serial_receive_task = asyncio.create_task(self.serial_receive_loop())
-            except Exception as e:
-                self.blue_write_log(f"串口连接失败: {str(e)}")
+            # 使用异步方法避免UI阻塞
+            asyncio.create_task(self.connect_serial_async())
         else:
             # 断开连接
             # asyncio.create_task(self.disconnect_serial())
@@ -781,6 +752,44 @@ class BluetoothTool(QWidget):
             self.serial_connect_button.setText('连接串口')
             self.disable_serial_settings(False)
             self.blue_write_log("串口已断开")
+
+    async def connect_serial_async(self):
+        """异步串口连接，避免UI阻塞"""
+        try:
+            # 获取串口参数
+            port = self.port_combo.currentText()
+            baud_rate = int(self.baud_combo.currentText())
+            data_bits = int(self.data_bits_combo.currentText())
+            stop_bits = float(self.stop_bits_combo.currentText())
+            parity = {'无': 'N', '奇校验': 'O', '偶校验': 'E'}[self.parity_combo.currentText()]
+
+            # 在线程池中执行阻塞的串口连接操作
+            loop = asyncio.get_event_loop()
+            self.serial_port = await loop.run_in_executor(
+                None,
+                lambda: serial.Serial(
+                    port=port,
+                    baudrate=baud_rate,
+                    bytesize=data_bits,
+                    stopbits=stop_bits,
+                    parity=parity,
+                    timeout=0.1
+                )
+            )
+
+            if self.serial_port.is_open:
+                self.device_name = port
+                self.commu_type = "serial"
+                self.is_serial_connected = True
+                self.serial_connect_button.setText('断开串口')
+                self.blue_write_log(f"串口 {port} 连接成功")
+                # 禁用参数设置
+                self.disable_serial_settings(True)
+                # 启动接收任务
+                self.send_button.setEnabled(True)
+                self.serial_receive_task = asyncio.create_task(self.serial_receive_loop())
+        except Exception as e:
+            self.blue_write_log(f"串口连接失败: {str(e)}")
 
     async def disconnect_serial(self):
         """断开串口连接"""
