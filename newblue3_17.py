@@ -42,44 +42,44 @@ class BitFlagsTableModel(QAbstractTableModel):
         self._headers = ['参数名1', '当前值1', '写入值1', '参数名2', '当前值2', '写入值2', '参数名3', '当前值3', '写入值3']
         self._organized_data = []  # 重新组织后的数据
         self._organize_data()
-    
+
     def _organize_data(self):
         """重新组织数据，超过25行时分成新的列组"""
         self._organized_data = []
         data_len = len(self._original_data)
-        
+
         if data_len == 0:
             return
-        
+
         # 计算需要的行数
         max_rows = min(self._max_rows_per_column, data_len)
-        
+
         # 创建行数据
         for row in range(max_rows):
             row_data = [''] * self._columns
-            
+
             # 填充第一列组 (columns 0-2)
             if row < data_len:
                 row_data[0] = self._original_data[row][0]  # 参数名
                 row_data[1] = self._original_data[row][2]  # 当前值
                 row_data[2] = self._write_values.get(row, "")  # 写入值
-            
+
             # 填充第二列组 (columns 3-5)
             second_group_idx = row + self._max_rows_per_column
             if second_group_idx < data_len:
                 row_data[3] = self._original_data[second_group_idx][0]  # 参数名
                 row_data[4] = self._original_data[second_group_idx][2]  # 当前值
                 row_data[5] = self._write_values.get(second_group_idx, "")  # 写入值
-            
+
             # 填充第三列组 (columns 6-8)
             third_group_idx = row + 2 * self._max_rows_per_column
             if third_group_idx < data_len:
                 row_data[6] = self._original_data[third_group_idx][0]  # 参数名
                 row_data[7] = self._original_data[third_group_idx][2]  # 当前值
                 row_data[8] = self._write_values.get(third_group_idx, "")  # 写入值
-            
+
             self._organized_data.append(row_data)
-    
+
     def _get_original_index(self, row, col):
         """根据表格位置获取原始数据索引"""
         if col in [0, 1, 2]:  # 第一列组
@@ -89,25 +89,25 @@ class BitFlagsTableModel(QAbstractTableModel):
         elif col in [6, 7, 8]:  # 第三列组
             return row + 2 * self._max_rows_per_column
         return -1
-    
+
     def data(self, index, role):
         if not index.isValid():
             return None
-        
+
         row = index.row()
         col = index.column()
-        
+
         if role == Qt.ItemDataRole.DisplayRole or role == Qt.ItemDataRole.EditRole:
             if row < len(self._organized_data) and col < self._columns:
                 return self._organized_data[row][col]
         return None
-    
+
     def setData(self, index, value, role):
         """设置数据，仅允许编辑写入值列"""
         if role == Qt.ItemDataRole.EditRole:
             row = index.row()
             col = index.column()
-            
+
             # 只能编辑写入值列 (2, 5, 8)
             if col in [2, 5, 8] and row < len(self._organized_data):
                 original_idx = self._get_original_index(row, col)
@@ -117,7 +117,7 @@ class BitFlagsTableModel(QAbstractTableModel):
                     self.dataChanged.emit(index, index)
                     return True
         return False
-    
+
     def flags(self, index):
         """设置单元格标志，写入值列可编辑"""
         flags = Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable
@@ -125,13 +125,13 @@ class BitFlagsTableModel(QAbstractTableModel):
         if col in [2, 5, 8]:  # 写入值列可编辑
             flags |= Qt.ItemFlag.ItemIsEditable
         return flags
-    
+
     def rowCount(self, parent=QModelIndex()):
         return len(self._organized_data)
-    
+
     def columnCount(self, parent=QModelIndex()):
         return self._columns
-    
+
     def headerData(self, section, orientation, role):
         if role == Qt.ItemDataRole.DisplayRole:
             if orientation == Qt.Orientation.Horizontal:
@@ -139,14 +139,14 @@ class BitFlagsTableModel(QAbstractTableModel):
             else:
                 return str(section + 1)
         return None
-    
+
     def update_data(self, data):
         """完全更新所有数据（重置模型）"""
         self.beginResetModel()
         self._original_data = data
         self._organize_data()
         self.endResetModel()
-    
+
     def update_row(self, row, row_data):
         """更新指定行的数据"""
         if 0 <= row < len(self._original_data):
@@ -157,7 +157,7 @@ class BitFlagsTableModel(QAbstractTableModel):
             self.endResetModel()
             return True
         return False
-    
+
     def update_cell(self, row, col, value):
         """更新指定单元格的数据"""
         if 0 <= row < len(self._original_data) and 0 <= col < 2:  # 只能更新前两列的原始数据
@@ -167,20 +167,20 @@ class BitFlagsTableModel(QAbstractTableModel):
             elif col == 1:
                 # 更新当前值（假设原数据格式为 (name, hex_value, decimal_value)）
                 self._original_data[row] = (self._original_data[row][0], self._original_data[row][1], value)
-            
+
             self._organize_data()
             # 通知视图该单元格的数据已更改
             self.beginResetModel()
             self.endResetModel()
             return True
         return False
-    
+
     def update_partial_data(self, updates):
         """批量更新部分数据
         updates: 字典，格式为 {row_index: new_row_data} 或 {(row, col): new_value}
         """
         changed = False
-        
+
         for key, value in updates.items():
             if isinstance(key, int):
                 # 更新整行
@@ -192,13 +192,13 @@ class BitFlagsTableModel(QAbstractTableModel):
                 row, col = key
                 if self.update_cell(row, col, value):
                     changed = True
-        
+
         # 批量通知视图更改
         if changed:
             self._organize_data()
             self.beginResetModel()
             self.endResetModel()
-    
+
     def append_row(self, row_data):
         """添加新行"""
         row = len(self._original_data)
@@ -206,7 +206,7 @@ class BitFlagsTableModel(QAbstractTableModel):
         self._original_data.append(row_data)
         self._organize_data()
         self.endInsertRows()
-    
+
     def remove_row(self, row):
         """删除指定行"""
         if 0 <= row < len(self._original_data):
@@ -227,25 +227,25 @@ class BitFlagsTableModel(QAbstractTableModel):
             self.endRemoveRows()
             return True
         return False
-    
+
     def find_row_by_name(self, param_name):
         """根据参数名查找行索引"""
         for i, row_data in enumerate(self._original_data):
             if row_data[0] == param_name:
                 return i
         return -1
-    
+
     def update_value_by_name(self, param_name, new_value):
         """根据参数名更新数值"""
         row = self.find_row_by_name(param_name)
         if row >= 0:
             return self.update_cell(row, 1, new_value)
         return False
-    
+
     def get_write_values(self):
         """获取所有写入值"""
         return self._write_values.copy()
-    
+
     def get_modified_data(self):
         """获取有写入值的数据列表，返回格式：[(row, param_name, current_value, write_value), ...]"""
         modified_data = []
@@ -255,7 +255,7 @@ class BitFlagsTableModel(QAbstractTableModel):
                 current_value = self._original_data[row][2]
                 modified_data.append((row, param_name, current_value, write_value))
         return modified_data
-    
+
     def clear_write_values(self):
         """清空所有写入值"""
         self._write_values.clear()
@@ -263,7 +263,7 @@ class BitFlagsTableModel(QAbstractTableModel):
         # 通知视图写入值列需要更新
         self.beginResetModel()
         self.endResetModel()
-    
+
     def set_write_value(self, row, value):
         """设置指定行的写入值"""
         if 0 <= row < len(self._original_data):
@@ -282,7 +282,7 @@ class BitFlagsTableModel(QAbstractTableModel):
 #         self.logger.write_log("主窗口已初始化")
 #         self.initUI()
 #         pass
-        
+
 #     def initUI(self):
 #         pass
 
@@ -290,9 +290,9 @@ class BitFlagsTableModel(QAbstractTableModel):
 #         """重写关闭事件，关闭日志文件并断开连接"""
 #         # 关闭日志文件
 #         self.logger.close_log()
-        
+
 #         # ... 处理蓝牙和串口断开连接 ...
-        
+
 #         event.accept()
 
 # 添加启动画面
@@ -301,7 +301,7 @@ class SplashScreen(QSplashScreen):
         pixmap = QPixmap(400, 300)
         pixmap.fill(Qt.GlobalColor.white)
         super().__init__(pixmap)
-        
+
         # 在启动画面上添加信息
         self.setStyleSheet("""
             QSplashScreen {
@@ -310,11 +310,11 @@ class SplashScreen(QSplashScreen):
                 background-color: white;
             }
         """)
-        
+
         # 显示启动信息
         self.showMessage(
-            "正在启动应用...", 
-            Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignCenter, 
+            "正在启动应用...",
+            Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignCenter,
             Qt.GlobalColor.black
         )
 
@@ -342,7 +342,7 @@ class BluetoothTool(QWidget):
         self.hex_parser = HexParserApp()
         # asyncio.create_task(self.scan_devices())
         QTimer.singleShot(0, self.on_scan_devices_clicked)
-        # 初始化定时器 
+        # 初始化定时器
         self.data_timer = QTimer()
         self.data_timer.setSingleShot(True) #单次定时器可能会影响实际数据接收数量上限
         self.data_timer.timeout.connect(self.process_complete_data)
@@ -357,8 +357,14 @@ class BluetoothTool(QWidget):
     def initUI(self):
         self.setWindowTitle('firstuse')
 
-        # 创建主布局
-        layout = QVBoxLayout()
+        # 创建主水平布局
+        main_layout = QHBoxLayout()
+
+        # 创建左侧垂直布局（原有的所有控件）
+        left_layout = QVBoxLayout()
+
+        # 创建右侧垂直布局（接收数据显示）
+        right_layout = QVBoxLayout()
 
         # HEX文件解析部分
         self.hex_layout = QHBoxLayout()
@@ -367,20 +373,20 @@ class BluetoothTool(QWidget):
         self.hex_file_button.clicked.connect(self.on_select_hex_file)
         self.hex_layout.addWidget(self.hex_file_label)
         self.hex_layout.addWidget(self.hex_file_button)
-        layout.addLayout(self.hex_layout)
+        left_layout.addLayout(self.hex_layout)
 
         # HEX文件信息显示
         self.hex_info_label = QLabel('文件大小：0 字节')
-        layout.addWidget(self.hex_info_label)
+        left_layout.addWidget(self.hex_info_label)
 
         # 创建水平分割的两个区域
         connection_layout = QHBoxLayout()
-        
+
         # ========== 左侧：蓝牙连接部分 ==========
         bluetooth_layout = QVBoxLayout()
         bluetooth_frame = QWidget()
         bluetooth_frame.setLayout(bluetooth_layout)
-        
+
         # 蓝牙标题
         bluetooth_title = QLabel('蓝牙连接')
         bluetooth_title.setFont(QFont('Arial', 12, QFont.Weight.Bold))
@@ -416,26 +422,26 @@ class BluetoothTool(QWidget):
         self.connect_layout.addWidget(self.connect_button)
         self.connect_layout.addWidget(self.disconnect_button)
         bluetooth_layout.addLayout(self.connect_layout)
-        
+
         # ========== 右侧：串口连接部分 ==========
         serial_layout = QVBoxLayout()
         serial_frame = QWidget()
         serial_frame.setLayout(serial_layout)
-        
+
         # 串口标题
         serial_title = QLabel('串口连接')
         serial_title.setFont(QFont('Arial', 12, QFont.Weight.Bold))
         serial_layout.addWidget(serial_title)
-        
+
         # 串口参数设置
         param_layout = QGridLayout()
-        
+
         # 串口选择
         self.port_label = QLabel('串口:')
         self.port_combo = QComboBox()
         param_layout.addWidget(self.port_label, 0, 0)
         param_layout.addWidget(self.port_combo, 0, 1)
-        
+
         # 波特率设置
         self.baud_label = QLabel('波特率:')
         self.baud_combo = QComboBox()
@@ -443,7 +449,7 @@ class BluetoothTool(QWidget):
         self.baud_combo.setCurrentText('19200')
         param_layout.addWidget(self.baud_label, 1, 0)
         param_layout.addWidget(self.baud_combo, 1, 1)
-        
+
         # 数据位
         self.data_bits_label = QLabel('数据位:')
         self.data_bits_combo = QComboBox()
@@ -451,7 +457,7 @@ class BluetoothTool(QWidget):
         self.data_bits_combo.setCurrentText('8')
         param_layout.addWidget(self.data_bits_label, 2, 0)
         param_layout.addWidget(self.data_bits_combo, 2, 1)
-        
+
         # 停止位
         self.stop_bits_label = QLabel('停止位:')
         self.stop_bits_combo = QComboBox()
@@ -459,30 +465,30 @@ class BluetoothTool(QWidget):
         self.stop_bits_combo.setCurrentText('1')
         param_layout.addWidget(self.stop_bits_label, 3, 0)
         param_layout.addWidget(self.stop_bits_combo, 3, 1)
-        
+
         # 校验位
         self.parity_label = QLabel('校验位:')
         self.parity_combo = QComboBox()
         self.parity_combo.addItems(['无', '奇校验', '偶校验'])
         param_layout.addWidget(self.parity_label, 4, 0)
         param_layout.addWidget(self.parity_combo, 4, 1)
-        
+
         serial_layout.addLayout(param_layout)
-        
+
         # 串口连接按钮
         self.serial_connect_button = QPushButton('连接串口')
         self.serial_connect_button.clicked.connect(self.on_serial_connect_clicked)
         serial_layout.addWidget(self.serial_connect_button)
-        
+
         serial_layout.addStretch(1)  # 添加弹性空间
-        
+
         # 将两个区域添加到水平布局
         connection_layout.addWidget(bluetooth_frame, 1)  # 1是拉伸系数
         connection_layout.addWidget(serial_frame, 1)
-        
-        # 将连接区域添加到主布局
-        layout.addLayout(connection_layout)
-        
+
+        # 将连接区域添加到左侧布局
+        left_layout.addLayout(connection_layout)
+
         # 共用的数据收发部分
         # 数据发送部分
         self.send_layout = QHBoxLayout()
@@ -497,18 +503,18 @@ class BluetoothTool(QWidget):
         self.send_button.setEnabled(False)  # 初始状态下发送按钮不可用
         self.register_button = QPushButton('注册')
         self.register_button.clicked.connect(self.on_register_clicked)
-        
+
         # 新增状态指示灯
         self.status_indicator = QLabel()
         self.update_registration_status(False)  # 初始状态为未注册
-        
+
         self.send_layout.addWidget(self.send_input)
         self.send_layout.addWidget(self.hex_send_checkbox)
         self.send_layout.addWidget(self.crlf_send_checkbox)
         self.send_layout.addWidget(self.send_button)
         self.send_layout.addWidget(self.register_button)
         self.send_layout.addWidget(self.status_indicator)  # 添加状态指示灯
-        layout.addLayout(self.send_layout)
+        left_layout.addLayout(self.send_layout)
 
         # 测试数据发送部分
         self.test_layout = QHBoxLayout()
@@ -519,7 +525,7 @@ class BluetoothTool(QWidget):
         self.test_layout.addWidget(self.test512)
         self.test_layout.addWidget(self.test_send_button)
         self.test_send_button.clicked.connect(self.on_test_send_buttoned)
-        layout.addLayout(self.test_layout)
+        left_layout.addLayout(self.test_layout)
 
         # 测试数据结果显示部分
         self.success_couont_layout = QHBoxLayout()
@@ -531,7 +537,7 @@ class BluetoothTool(QWidget):
         self.success_couont_layout.addWidget(self.no_ack_label)
         self.success_couont_layout.addWidget(self.err_ack_label)
         self.success_couont_layout.addWidget(self.total_send_label)
-        layout.addLayout(self.success_couont_layout)
+        left_layout.addLayout(self.success_couont_layout)
 
         # 烧录控制部分
         self.program_layout = QHBoxLayout()
@@ -550,113 +556,122 @@ class BluetoothTool(QWidget):
         self.batch_success_label = QLabel('成功数: 0')
         self.program_layout.addWidget(self.batch_success_label)
 
-        layout.addLayout(self.program_layout)
+        left_layout.addLayout(self.program_layout)
 
-        # 数据接收部分
+        # 数据接收部分 - 移动到右侧布局
         self.receive_label = QLabel('接收到的数据:')
-        layout.addWidget(self.receive_label)
+        right_layout.addWidget(self.receive_label)
 
         self.receive_output = QTextEdit()
         self.receive_output.setReadOnly(True)
-        layout.addWidget(self.receive_output)
+        # self.receive_output.setMinimumWidth(400)  # 设置最小宽度
+        right_layout.addWidget(self.receive_output)
 
-        # 16进制显示选项
+        # 16进制显示选项和清空按钮
+        hex_control_layout = QHBoxLayout()
         self.hex_display_checkbox = QCheckBox('16进制显示')
         self.hex_display_checkbox.setChecked(True)
         self.hex_display_checkbox.stateChanged.connect(self.on_hex_display_changed)
-        layout.addWidget(self.hex_display_checkbox)
+        hex_control_layout.addWidget(self.hex_display_checkbox)
+
+        # 清空接收窗口按钮
+        self.clear_receive_button = QPushButton('清空')
+        self.clear_receive_button.clicked.connect(lambda: self.receive_output.clear())
+        hex_control_layout.addWidget(self.clear_receive_button)
+
+        right_layout.addLayout(hex_control_layout)
 
         # 添加放电控制部分
         discharge_layout = QHBoxLayout()
-        
+
         # 打开放电按钮
         self.open_discharge_button = QPushButton('打开放电')
         self.open_discharge_button.clicked.connect(self.on_open_discharge_clicked)
         discharge_layout.addWidget(self.open_discharge_button)
-        
+
         # 关闭放电按钮
         self.close_discharge_button = QPushButton('关闭放电')
         self.close_discharge_button.clicked.connect(self.on_close_discharge_clicked)
         discharge_layout.addWidget(self.close_discharge_button)
-        
-        # 将放电控制部分添加到主布局
-        layout.addLayout(discharge_layout)
+
+        # 将放电控制部分添加到左侧布局
+        left_layout.addLayout(discharge_layout)
 
         # 添加充电控制部分
         charge_layout = QHBoxLayout()
-        
+
         # 打开充电按钮
         self.open_charge_button = QPushButton('打开充电')
         self.open_charge_button.clicked.connect(self.on_open_charge_clicked)
         charge_layout.addWidget(self.open_charge_button)
-        
+
         # 关闭充电按钮
         self.close_charge_button = QPushButton('关闭充电')
         self.close_charge_button.clicked.connect(self.on_close_charge_clicked)
         charge_layout.addWidget(self.close_charge_button)
-        
-        # 将充电控制部分添加到主布局
-        layout.addLayout(charge_layout)
+
+        # 将充电控制部分添加到左侧布局
+        left_layout.addLayout(charge_layout)
 
         # 添加RT控制部分
         rt_layout = QVBoxLayout()
-        
+
         # RT控制标题
         rt_title = QLabel('RT控制')
         rt_title.setFont(QFont('Arial', 12, QFont.Weight.Bold))
         rt_layout.addWidget(rt_title)
-        
+
         # RT使能按钮行
         rt_enable_layout = QHBoxLayout()
-        
+
         # RT0使能按钮
         self.rt0_enable_button = QPushButton('RT0使能')
         self.rt0_enable_button.clicked.connect(self.on_rt0_enable_clicked)
         rt_enable_layout.addWidget(self.rt0_enable_button)
-        
+
         # RT1使能按钮
         self.rt1_enable_button = QPushButton('RT1使能')
         self.rt1_enable_button.clicked.connect(self.on_rt1_enable_clicked)
         rt_enable_layout.addWidget(self.rt1_enable_button)
-        
+
         # RT2使能按钮
         self.rt2_enable_button = QPushButton('RT2使能')
         self.rt2_enable_button.clicked.connect(self.on_rt2_enable_clicked)
         rt_enable_layout.addWidget(self.rt2_enable_button)
-        
+
         rt_layout.addLayout(rt_enable_layout)
-        
+
         # RT关闭按钮行
         rt_disable_layout = QHBoxLayout()
-        
+
         # RT0关闭按钮
         self.rt0_disable_button = QPushButton('RT0关闭')
         self.rt0_disable_button.clicked.connect(self.on_rt0_disable_clicked)
         rt_disable_layout.addWidget(self.rt0_disable_button)
-        
+
         # RT1关闭按钮
         self.rt1_disable_button = QPushButton('RT1关闭')
         self.rt1_disable_button.clicked.connect(self.on_rt1_disable_clicked)
         rt_disable_layout.addWidget(self.rt1_disable_button)
-        
+
         # RT2关闭按钮
         self.rt2_disable_button = QPushButton('RT2关闭')
         self.rt2_disable_button.clicked.connect(self.on_rt2_disable_clicked)
         rt_disable_layout.addWidget(self.rt2_disable_button)
-        
+
         rt_layout.addLayout(rt_disable_layout)
-        
-        # 将RT控制部分添加到主布局
-        layout.addLayout(rt_layout)
+
+        # 将RT控制部分添加到左侧布局
+        left_layout.addLayout(rt_layout)
 
         # 添加密码管理部分
         password_layout = QVBoxLayout()
-        
+
         # 密码管理标题
         password_title = QLabel('密码管理')
         password_title.setFont(QFont('Arial', 12, QFont.Weight.Bold))
         password_layout.addWidget(password_title)
-        
+
         # 密码输入框
         password_input_layout = QHBoxLayout()
         self.password_label = QLabel('密码(6位):')
@@ -666,40 +681,47 @@ class BluetoothTool(QWidget):
         password_input_layout.addWidget(self.password_label)
         password_input_layout.addWidget(self.password_input)
         password_layout.addLayout(password_input_layout)
-        
+
         # 密码管理按钮
         password_buttons_layout = QHBoxLayout()
-        
+
         # 查询加密状态按钮
         self.query_lock_button = QPushButton('查询状态(扫描)')
         self.query_lock_button.clicked.connect(self.on_query_lock_clicked)
         password_buttons_layout.addWidget(self.query_lock_button)
-        
+
         # 验证密码按钮
         self.login_button = QPushButton('验证密码')
         self.login_button.clicked.connect(self.on_login_clicked)
         password_buttons_layout.addWidget(self.login_button)
-        
+
         # 设置密码按钮
         self.set_password_button = QPushButton('设置密码')
         self.set_password_button.clicked.connect(self.on_set_password_clicked)
         password_buttons_layout.addWidget(self.set_password_button)
-        
+
         # 取消密码按钮
         self.reset_password_button = QPushButton('取消密码')
         self.reset_password_button.clicked.connect(self.on_reset_password_clicked)
         password_buttons_layout.addWidget(self.reset_password_button)
-        
+
         password_layout.addLayout(password_buttons_layout)
-        
-        # 将密码管理部分添加到主布局
-        layout.addLayout(password_layout)
+
+        # 将密码管理部分添加到左侧布局
+        left_layout.addLayout(password_layout)
+
+        # 将左侧和右侧布局添加到主水平布局
+        main_layout.addLayout(left_layout, 2)  # 左侧占2/3
+        main_layout.addLayout(right_layout, 1)  # 右侧占1/3
 
         # 初始化时刷新串口列表
         # self.refresh_serial_ports()
 
-        self.setLayout(layout)
-        
+        self.setLayout(main_layout)
+
+        # 设置窗口默认大小（移除最小大小限制）
+        self.resize(600, 400)  # 设置更小的默认大小
+
     def blue_write_log(self,text):
         """写入日志"""
         print(text)
@@ -720,16 +742,40 @@ class BluetoothTool(QWidget):
     def on_serial_connect_clicked(self):
         """处理串口连接/断开"""
         if not self.is_serial_connected:
-            try:
-                # 获取串口参数
-                port = self.port_combo.currentText()
-                baud_rate = int(self.baud_combo.currentText())
-                data_bits = int(self.data_bits_combo.currentText())
-                stop_bits = float(self.stop_bits_combo.currentText())
-                parity = {'无': 'N', '奇校验': 'O', '偶校验': 'E'}[self.parity_combo.currentText()]
+            # 使用异步方法避免UI阻塞
+            asyncio.create_task(self.connect_serial_async())
+        else:
+            # 断开连接
+            # asyncio.create_task(self.disconnect_serial())
+            if self.serial_receive_task:
+                self.serial_receive_task.cancel()
+                self.serial_receive_task = None
 
-                # 创建串口对象
-                self.serial_port = serial.Serial(
+            if self.serial_port and self.serial_port.is_open:
+                self.send_button.setEnabled(False)
+                self.serial_port.close()
+                self.commu_type = "none"
+
+            self.is_serial_connected = False
+            self.serial_connect_button.setText('连接串口')
+            self.disable_serial_settings(False)
+            self.blue_write_log("串口已断开")
+
+    async def connect_serial_async(self):
+        """异步串口连接，避免UI阻塞"""
+        try:
+            # 获取串口参数
+            port = self.port_combo.currentText()
+            baud_rate = int(self.baud_combo.currentText())
+            data_bits = int(self.data_bits_combo.currentText())
+            stop_bits = float(self.stop_bits_combo.currentText())
+            parity = {'无': 'N', '奇校验': 'O', '偶校验': 'E'}[self.parity_combo.currentText()]
+
+            # 在线程池中执行阻塞的串口连接操作
+            loop = asyncio.get_event_loop()
+            self.serial_port = await loop.run_in_executor(
+                None,
+                lambda: serial.Serial(
                     port=port,
                     baudrate=baud_rate,
                     bytesize=data_bits,
@@ -737,41 +783,51 @@ class BluetoothTool(QWidget):
                     parity=parity,
                     timeout=0.1
                 )
+            )
 
-                if self.serial_port.is_open:
-                    self.device_name = port
-                    self.commu_type = "serial"
-                    self.is_serial_connected = True
-                    self.serial_connect_button.setText('断开串口')
-                    self.blue_write_log(f"串口 {port} 连接成功")
-                    # 禁用参数设置
-                    self.disable_serial_settings(True)
-                    # 启动接收任务
-                    self.send_button.setEnabled(True)
-                    self.serial_receive_task = asyncio.create_task(self.serial_receive_loop())
-            except Exception as e:
-                QMessageBox.critical(self, '错误', f'串口连接失败: {str(e)}')
-                self.blue_write_log(f"串口连接失败: {str(e)}")
-        else:
-            # 断开连接
-            # asyncio.create_task(self.disconnect_serial())
-            if self.serial_receive_task:
-                self.serial_receive_task.cancel()
-                self.serial_receive_task = None
-            
-            if self.serial_port and self.serial_port.is_open:
-                self.send_button.setEnabled(False)
-                self.serial_port.close()
-                self.commu_type = "none"
-            
-            self.is_serial_connected = False
-            self.serial_connect_button.setText('连接串口')
-            self.disable_serial_settings(False)
-            self.blue_write_log("串口已断开")
+            if self.serial_port.is_open:
+                self.device_name = port
+                self.commu_type = "serial"
+                self.is_serial_connected = True
+                self.serial_connect_button.setText('断开串口')
+                self.blue_write_log(f"串口 {port} 连接成功")
+                # 禁用参数设置
+                self.disable_serial_settings(True)
+                # 启动接收任务
+                self.send_button.setEnabled(True)
+                self.serial_receive_task = asyncio.create_task(self.serial_receive_loop())
+        except Exception as e:
+            self.blue_write_log(f"串口连接失败: {str(e)}")
 
     async def disconnect_serial(self):
         """断开串口连接"""
         pass
+
+    async def handle_serial_disconnect(self):
+        """处理串口意外断开"""
+        # 取消接收任务
+        if self.serial_receive_task:
+            self.serial_receive_task.cancel()
+            self.serial_receive_task = None
+
+        # 关闭串口
+        if self.serial_port:
+            try:
+                self.serial_port.close()
+            except:
+                pass
+
+        # 重置状态
+        self.is_serial_connected = False
+        self.commu_type = "none"
+        self.serial_port = None
+
+        # 更新UI
+        self.serial_connect_button.setText('连接串口')
+        self.disable_serial_settings(False)
+        self.send_button.setEnabled(False)
+
+        self.blue_write_log("串口连接已断开")
 
 
     def disable_serial_settings(self, disabled: bool):
@@ -803,9 +859,15 @@ class BluetoothTool(QWidget):
                                 hex_data = ' '.join([f'{b:02X}' for b in data])
                                 # self.blue_write_log(f"接收(HEX): {hex_data}")
                 await asyncio.sleep(0.01)
+            except (serial.SerialException, PermissionError, OSError):
+                # 串口异常，自动断开
+                await self.handle_serial_disconnect()
+                break
+            except asyncio.CancelledError:
+                break
             except Exception as e:
                 self.blue_write_log(f"接收数据错误: {str(e)}")
-                await self.disconnect_serial()
+                await self.handle_serial_disconnect()
                 break
 
     async def send_data(self, input_data: str):
@@ -819,11 +881,11 @@ class BluetoothTool(QWidget):
                     if not all(c in '0123456789ABCDEFabcdef' for c in hex_data):
                         raise ValueError("Invalid hex string")
                     data_bytes = bytes.fromhex(hex_data)
-                    
+
                     # 如果选中了\r\n发送，添加回车换行符
                     if self.crlf_send_checkbox.isChecked():
                         data_bytes += b'\r\n'
-                        
+
                 except ValueError as e:
                     QMessageBox.warning(self, '警告', '无效的16进制数据')
                     return
@@ -855,7 +917,7 @@ class BluetoothTool(QWidget):
             reve_data = ' '.join([f'{b:02X}' for b in data])
         else:
             # 文本显示，无法解码的字符显示为乱码
-            reve_data = data.decode('utf-8', errors='replace')  
+            reve_data = data.decode('utf-8', errors='replace')
         self.blue_write_log(f"RX->,{self.commu_type},{self.device_name},cmd,{reve_data}")
     def display_send_data(self, input_data):
         """显示接收到的数据，根据16进制显示选项决定显示格式"""
@@ -882,7 +944,7 @@ class BluetoothTool(QWidget):
 
     def on_connect_device_clicked(self):
         """同步方法，用于触发异步连接"""
-        self.decode_data_ok_signal.emit(None,{"connect" : {'nothing':('nothing','nothing','nothing')}}) 
+        self.decode_data_ok_signal.emit(None,{"connect" : {'nothing':('nothing','nothing','nothing')}})
         asyncio.create_task(self.connect_device())
 
     def on_disconnect_device_clicked(self):
@@ -943,7 +1005,7 @@ class BluetoothTool(QWidget):
                         if len(data) >= 2:
                             second_last_byte = data[-2]  # 倒数第二个字节
                             last_byte = data[-1]         # 最后一个字节
-                            
+
                             if second_last_byte == 0x50:  # 支持密码功能
                                 if last_byte == 0x00:
                                     password_status_short = " [密码:未设置]"
@@ -952,30 +1014,30 @@ class BluetoothTool(QWidget):
                                 else:
                                     password_status_short = f" [密码:未知{last_byte:02X}]"
                                 break  # 找到了就退出循环
-                
+
                 # 保存设备名到地址的映射
                 self.device_name_to_address[device.name] = device.address
-                
+
                 # 添加到设备列表，去掉地址显示，添加密码状态
                 self.device_list.addItem(f"{device.name} (RSSI: {advertisement_data.rssi}){password_status_short}")
                 # 获取更有用的设备信息
                 # device_info = f"发现设备: {device.name} - {device.address} - (RSSI: {advertisement_data.rssi})"
-                
+
                 # # 尝试获取广告数据中的有用信息
                 # try:
                 #     metadata_info = []
-                    
+
                 #     # 解析服务UUID
                 #     if advertisement_data.service_uuids:
                 #         uuids = list(advertisement_data.service_uuids)
                 #         metadata_info.append(f"服务UUID: {uuids}")
-                    
+
                 #     # 解析厂商数据
                 #     if advertisement_data.manufacturer_data:
                 #         for company_id, data in advertisement_data.manufacturer_data.items():
                 #             # 转换厂商ID为十六进制
                 #             hex_id = f"0x{company_id:04X}"
-                            
+
                 #             # 转换数据为十六进制字符串
                 #             hex_data = data.hex().upper() if data else "空"
                 #             # 尝试解析为ASCII（如果可能）
@@ -984,18 +1046,18 @@ class BluetoothTool(QWidget):
                 #                 ascii_info = f" (ASCII: '{ascii_data}')" if ascii_data.isprintable() else ""
                 #             except:
                 #                 ascii_info = ""
-                            
+
                 #             # 检查密码状态：查看最后两个字节
                 #             password_status = ""
-                            
+
                 #             # 判断逻辑：检查最后两个字节
                 #             # 倒数第二个字节为0x50 → 支持密码功能
                 #             # 最后一个字节：0x00=未设置，0x01=已设置
-                            
+
                 #             if len(data) >= 2:
                 #                 second_last_byte = data[-2]  # 倒数第二个字节
                 #                 last_byte = data[-1]         # 最后一个字节
-                                
+
                 #                 if second_last_byte == 0x50:  # 支持密码功能
                 #                     if last_byte == 0x00:
                 #                         password_status = " [支持密码，未设置]"
@@ -1005,16 +1067,16 @@ class BluetoothTool(QWidget):
                 #                         password_status = f" [支持密码，状态未知:0x{last_byte:02X}]"
                 #             else:
                 #                 password_status = " [数据长度不足]"
-                            
+
                 #             # metadata_info.append(f"厂商数据: ID={hex_id}, 数据={hex_data}{ascii_info}{password_status}")
-                    
+
                 #     if metadata_info:
                 #         device_info += f" - {'; '.join(metadata_info)}"
                 # except Exception as ex:
                 #     self.blue_write_log(f"解析广告数据失败: {ex}")
-                
+
                 # self.blue_write_log(device_info)
-        
+
         self.label.setText('发现的蓝牙设备:')
 
     async def connect_device(self):
@@ -1024,7 +1086,7 @@ class BluetoothTool(QWidget):
             # 从显示文本中提取设备名
             device_text = selected_device.text()
             device_name = device_text.split(' (RSSI:')[0]  # 提取设备名
-            
+
             # 通过设备名查找地址
             device_address = self.device_name_to_address.get(device_name)
             if not device_address:
@@ -1059,16 +1121,16 @@ class BluetoothTool(QWidget):
         if self.client and self.client.is_connected:
             try:
                 await self.client.disconnect()
-                
+
                 # 创建消息框
                 msg_box = QMessageBox(QMessageBox.Icon.Information, '断开成功', '设备已断开')
-                
+
                 # 设置定时器自动关闭 (3秒后)
                 QTimer.singleShot(1000, msg_box.close)
-                
+
                 # 显示消息框
                 msg_box.exec()
-                
+
                 # 禁用断开按钮和发送按钮
                 self.disconnect_button.setEnabled(False)
                 self.send_button.setEnabled(False)
@@ -1101,7 +1163,7 @@ class BluetoothTool(QWidget):
 
                 # 假设设备的写特征 UUID 是 "0000ffe1-0000-1000-8000-00805f9b34fb"
                 await self.client.write_gatt_char("0000ffe1-0000-1000-8000-00805f9b34fb", data_bytes)
-                
+
                 # 显示发送的数据
                 if self.hex_send_checkbox.isChecked():
                     hex_data = ' '.join([f'{b:02X}' for b in data_bytes])
@@ -1147,7 +1209,7 @@ class BluetoothTool(QWidget):
                         self.blue_write_log("没有回复")
 
                     # 如果收到数据过长，清楚部分开头数据，提升软件性能
-                    if self.send_count > 10:                        
+                    if self.send_count > 10:
                         cursor = self.receive_output.textCursor()  # 获取 QTextCursor
                         cursor.movePosition(cursor.MoveOperation.Start)  # 移动到文档开头
                         cursor.movePosition(cursor.MoveOperation.Down, cursor.MoveMode.KeepAnchor)  # 选中首行
@@ -1189,10 +1251,16 @@ class BluetoothTool(QWidget):
                     await asyncio.sleep(time_interval)
                 """串口发送"""
             elif self.serial_port and self.serial_port.is_open:
+                # 检查串口连接状态
+                if not self.is_serial_connected:
+                    raise Exception("串口连接已断开")
                 self.serial_port.write(data)
+        except (serial.SerialException, PermissionError) as e:
+            # 串口异常，自动断开
+            await self.handle_serial_disconnect()
+            raise Exception("串口发送失败，连接已断开")
         except Exception as e:
-            traceback.print_exc()
-            QMessageBox.critical(self, '发送失败', str(e))
+            self.blue_write_log(f"发送失败: {str(e)}")
             raise Exception("发送失败")
 
 
@@ -1200,7 +1268,7 @@ class BluetoothTool(QWidget):
         """回调函数，处理接收到的数据"""
         # 将数据添加到缓冲区
         self.received_data_buffer.extend(data)
-        print("2第一次收到数据J")
+        # print("2第一次收到数据J")
         # 重启定时器
         self.data_timer.start(100)  # 100ms
 
@@ -1208,7 +1276,7 @@ class BluetoothTool(QWidget):
         """处理完整的数据包"""
         # 在这里处理完整的数据包
         # self.blue_write_log(f"Received complete data packet: {self.received_data_buffer}")
-    
+
         # 先检查是否是新的密码命令响应格式
         if self.check_new_password_response(self.received_data_buffer):
             # 处理新的密码命令响应
@@ -1225,7 +1293,7 @@ class BluetoothTool(QWidget):
                     header = f"RX->,{self.commu_type},{self.device_name},{struct_name}"
                     """csv记录监控数据"""
                     """外部窗口展示 监控数据 |字典数据|纯参数数据|"""
-                    self.decode_data_ok_signal.emit(header,dict_data) 
+                    self.decode_data_ok_signal.emit(header,dict_data)
                     print("5发射完字典")
                     # 发射到函数 get_dict_from_receive_data (str,dict)
         """log记录调试数据"""
@@ -1239,28 +1307,28 @@ class BluetoothTool(QWidget):
         """检查是否是新的密码命令响应格式"""
         if len(data) < 5:
             return False
-        
+
         # 检查帧头和帧尾
         if data[0] == 0xFB and data[-1] == 0xBB:
             cmd_code = data[1]
             # 检查是否是密码相关命令的响应
             if cmd_code in [0x01, 0x02, 0x03]:
                 return True
-        
+
         return False
 
     def handle_new_password_response(self, data):
         """处理新的密码命令响应"""
         try:
             success, result = self.parse_new_password_response(data)
-            
+
             if not success:
                 self.blue_write_log(f"密码命令响应解析失败: {result}")
                 return
-            
+
             cmd_code = result["cmd_code"]
             content = result["content"]
-            
+
             if cmd_code == 0x01:  # 验证密码响应
                 if len(content) >= 1:
                     if content[0] == 0x00:
@@ -1271,7 +1339,7 @@ class BluetoothTool(QWidget):
                         self.blue_write_log(f"密码验证响应: 未知状态 {content[0]:02X}")
                 else:
                     self.blue_write_log("密码验证响应: 数据长度不足")
-                    
+
             elif cmd_code == 0x02:  # 设置密码响应
                 if len(content) >= 1:
                     if content[0] == 0x00:
@@ -1282,7 +1350,7 @@ class BluetoothTool(QWidget):
                         self.blue_write_log(f"设置密码响应: 未知状态 {content[0]:02X}")
                 else:
                     self.blue_write_log("设置密码响应: 数据长度不足")
-                    
+
             elif cmd_code == 0x03:  # 取消密码响应
                 if len(content) >= 1:
                     if content[0] == 0x00:
@@ -1293,7 +1361,7 @@ class BluetoothTool(QWidget):
                         self.blue_write_log(f"取消密码响应: 未知状态 {content[0]:02X}")
                 else:
                     self.blue_write_log("取消密码响应: 数据长度不足")
-                    
+
         except Exception as e:
             self.blue_write_log(f"处理密码命令响应异常: {str(e)}")
 
@@ -1334,7 +1402,7 @@ class BluetoothTool(QWidget):
             time128 = int(self.test128.text()) / 1000
             time512 = int(self.test512.text()) / 1000
             self.program_button.setText('再点击即停止')
-            err_count = 0  
+            err_count = 0
             # while err_count < 4:
             #     data = self.download_data.get_download_data(BmsCmdType.DOWNLOAD_BUFFER)
             #     self.display_send_data(data)
@@ -1376,7 +1444,7 @@ class BluetoothTool(QWidget):
 
 
 
-            err_count = 0  
+            err_count = 0
             while err_count < 2:
                 data = self.download_data.get_download_data(BmsCmdType.DOWNLOAD_BUFFER)
                 self.display_send_data(data)
@@ -1393,15 +1461,16 @@ class BluetoothTool(QWidget):
                     err_count += 1
             else:
                 self.blue_write_log(f"擦除命令发送失败")
-                
-            # while 
-            
+
+            # while
+
 
             # 发送下载命令并等待响应
             if not self.hex_model.is_file_loaded:
-                raise Exception("HEX文件未加载")
+                self.hex_file_label.setText('HEX文件：未加载')
+                # raise Exception("HEX文件未加载")
             else:
-                self.download_data.hex_init(self.hex_model.get_data())   
+                self.download_data.hex_init(self.hex_model.get_data())
                 pass
             hex_packet = 0
             while 1:
@@ -1414,15 +1483,13 @@ class BluetoothTool(QWidget):
                         err_count = 0
                         while err_count < 5:
                             self.display_send_data(data)
-                            self.blue_write_log("1开始发送----------------")
                             await self.byte_send(data)
                             # current_time = datetime.now().strftime("%H:%M:%S.%f")[:-3]
                             # self.blue_write_log(f"TX->数据包发送完成 - 时间: {current_time}")
-                            await asyncio.sleep(time512)  
+                            await asyncio.sleep(time512)
                             if self.text_decode.legality == ReceveDataStatus.ERR_NOTHING:
-                                await asyncio.sleep(time512)  
-                            print("7返回烧录过程")
-                            if(self.text_decode.no80_cmd == BmsCmdType.WRITE_FLASH  and 
+                                await asyncio.sleep(time512)
+                            if(self.text_decode.no80_cmd == BmsCmdType.WRITE_FLASH  and
                                 self.text_decode.cmd_ack == 0x00 and
                                 self.text_decode.cmd_packet_num == hex_packet + 1):
                                     self.packet_success_label.setText(f'包号: {hex_packet + 1} 总包数: {self.download_data.packet_num}')
@@ -1430,25 +1497,23 @@ class BluetoothTool(QWidget):
                                     hex_packet += 1
                                     break
                             else:
-                                await asyncio.sleep(time512*3)  
+                                await asyncio.sleep(time512*3)
                                 err_count += 1
                         else:
                             self.blue_write_log(f"数据发送失败")
                             raise Exception("writeflash次数超限")
 
                     except BleakError:
-                        self.blue_write_log(f"蓝牙断开------------------")
                         # traceback.print_exc()
                         raise Exception("蓝牙断开")
                     except Exception as e:
-                        self.blue_write_log(f"有错误------------------{e}")
                         traceback.print_exc()
                         break
                     else:
-                        self.blue_write_log(f"没有错误-----------------")
+                        pass
 
 
-            err_count = 0   
+            err_count = 0
             while err_count < 5:
                 data = self.download_data.get_download_data(BmsCmdType.REC_TOTAL_CHECKSUM)
                 self.display_send_data(data)
@@ -1462,24 +1527,26 @@ class BluetoothTool(QWidget):
             await asyncio.sleep(6)
 
             err_count = 0
+            await asyncio.sleep(5)
             if self.text_decode.no80_cmd == BmsCmdType.BMS_MCU_OPEN  and self.text_decode.cmd_ack == 0x00:
                 self.blue_write_log("电池重启")
-                while err_count < 5:
-                    data = self.download_data.get_download_data(BmsCmdType.READ_IC_INF)
-                    self.display_send_data(data)
-                    await self.byte_send(data)
-                    await asyncio.sleep(time512 * 2)
-                    if(self.text_decode.no80_cmd == BmsCmdType.READ_IC_INF  and self.text_decode.cmd_ack == 0x00):
-                        self.ota_ok_count += 1
-                        break
-                    else:
-                        err_count += 1
-            
+            await asyncio.sleep(3)
+            while err_count < 5:
+                data = self.download_data.get_download_data(BmsCmdType.READ_IC_INF)
+                self.display_send_data(data)
+                await self.byte_send(data)
+                await asyncio.sleep(time512 * 3)
+                if(self.text_decode.no80_cmd == BmsCmdType.READ_IC_INF  and self.text_decode.cmd_ack == 0x00):
+                    self.ota_ok_count += 1
+                    break
+                else:
+                    err_count += 1
+
         except Exception as e:
             traceback.print_exc()
             self.blue_write_log(f"烧录失败: {str(e)}")
             # QMessageBox.critical(self, '错误', f'烧录失败: {str(e)}')
-        
+
         finally:
             # 恢复按钮状态
             self.program_task = None
@@ -1490,10 +1557,10 @@ class BluetoothTool(QWidget):
         """同步方法，用于触发异步扫描蓝牙和刷新串口"""
         # 显示扫描开始信息
         self.blue_write_log("开始扫描蓝牙设备和刷新串口...")
-        
+
         # 刷新串口列表
         asyncio.create_task(self.refresh_serial_ports())
-        
+
         # 扫描蓝牙设备
         asyncio.create_task(self.scan_devices())
 
@@ -1606,7 +1673,7 @@ class BluetoothTool(QWidget):
     def on_register_clicked(self):
         asyncio.create_task(self.send_register_cmd())
         pass
-    
+
     async def send_register_cmd(self):
         """注册按钮点击处理"""
         try:
@@ -1628,7 +1695,7 @@ class BluetoothTool(QWidget):
             else:
                 self.update_registration_status(False)
                 self.blue_write_log("注册失败")
-                
+
         except Exception as e:
             self.blue_write_log(f"注册异常: {str(e)}")
             self.update_registration_status(False)
@@ -1676,11 +1743,11 @@ class BluetoothTool(QWidget):
         try:
             # 使用send_hex_fill方法构造查询加密命令
             data = self.text_decode.send_hex_fill(0x5D)
-            
+
             self.display_send_data(data)
             await self.byte_send(data)
             await asyncio.sleep(0.4)
-            
+
             if self.text_decode.legality != ReceveDataStatus.ERR_NOTHING:
                 if self.text_decode.no80_cmd == 0x5D & 0x7F:  # 回复命令码是0xDD
                     # 检查数据位
@@ -1700,7 +1767,7 @@ class BluetoothTool(QWidget):
                     self.blue_write_log("查询加密状态失败: 命令码不匹配")
             else:
                 self.blue_write_log("查询加密状态失败: 无响应")
-                
+
         except Exception as e:
             self.blue_write_log(f"查询加密状态异常: {str(e)}")
 
@@ -1711,14 +1778,14 @@ class BluetoothTool(QWidget):
             password_data = bytearray()
             for char in password:
                 password_data.append(ord(char))
-            
+
             # 使用send_hex_fill方法构造登录命令
             data = self.text_decode.send_hex_fill(0x5F, password_data)
-            
+
             self.display_send_data(data)
             await self.byte_send(data)
             await asyncio.sleep(0.4)
-            
+
             if self.text_decode.legality != ReceveDataStatus.ERR_NOTHING:
                 if self.text_decode.no80_cmd == 0xDF & 0x7F:  # 回复命令码是0xDF
                     # 检查数据位
@@ -1736,7 +1803,7 @@ class BluetoothTool(QWidget):
                     self.blue_write_log("登录失败: 命令码不匹配")
             else:
                 self.blue_write_log("登录失败: 无响应")
-                
+
         except Exception as e:
             self.blue_write_log(f"登录异常: {str(e)}")
 
@@ -1750,14 +1817,14 @@ class BluetoothTool(QWidget):
             # 添加6字节密码（ASCII）
             for char in password:
                 set_password_data.append(ord(char))
-            
+
             # 使用send_hex_fill方法构造设置密码命令
             data = self.text_decode.send_hex_fill(0x5E, set_password_data)
-            
+
             self.display_send_data(data)
             await self.byte_send(data)
             await asyncio.sleep(0.4)
-            
+
             if self.text_decode.legality != ReceveDataStatus.ERR_NOTHING:
                 if self.text_decode.no80_cmd == 0xDE & 0x7F:  # 回复命令码是0xDE
                     # 检查数据位
@@ -1775,7 +1842,7 @@ class BluetoothTool(QWidget):
                     self.blue_write_log("设置密码失败: 命令码不匹配")
             else:
                 self.blue_write_log("设置密码失败: 无响应")
-                
+
         except Exception as e:
             self.blue_write_log(f"设置密码异常: {str(e)}")
 
@@ -1786,14 +1853,14 @@ class BluetoothTool(QWidget):
             reset_data = bytearray()
             # 添加6字节校验码: 5A 5A 5A A5 A5 A5
             reset_data.extend([0x5A, 0x5A, 0x5A, 0xA5, 0xA5, 0xA5])
-            
+
             # 使用send_hex_fill方法构造重置密码命令
             data = self.text_decode.send_hex_fill(0x5C, reset_data)
-            
+
             self.display_send_data(data)
             await self.byte_send(data)
             await asyncio.sleep(0.4)
-            
+
             if self.text_decode.legality != ReceveDataStatus.ERR_NOTHING:
                 if self.text_decode.no80_cmd == 0xDC & 0x7F:  # 回复命令码应该是0xDC
                     if self.text_decode.cmd_ack == 0x00:
@@ -1804,12 +1871,12 @@ class BluetoothTool(QWidget):
                     self.blue_write_log("重置密码失败: 命令码不匹配")
             else:
                 self.blue_write_log("重置密码失败: 无响应")
-                
+
         except Exception as e:
             self.blue_write_log(f"重置密码异常: {str(e)}")
 
     # ==================== 新的加密命令实现 ====================
-    
+
     def construct_new_password_cmd(self, cmd_code, data_bytes):
         """构造新的密码命令包"""
         # 新的帧格式：0xFB + 指令号 + 内容长度 + 内容 + 0xBB
@@ -1820,19 +1887,19 @@ class BluetoothTool(QWidget):
         cmd_packet.extend(data_bytes)  # 内容
         cmd_packet.append(0xBB)  # 帧尾
         return cmd_packet
-    
+
     def parse_new_password_response(self, data):
         """解析新的密码命令响应"""
         if len(data) < 5:
             return False, "响应数据长度不足"
-        
+
         if data[0] != 0xFB or data[-1] != 0xBB:
             return False, "响应帧格式错误"
-        
+
         cmd_code = data[1]
         content_length = data[2]
         content = data[3:3+content_length]
-        
+
         return True, {"cmd_code": cmd_code, "content": content}
 
     async def send_verify_password_cmd(self, password: str):
@@ -1842,16 +1909,16 @@ class BluetoothTool(QWidget):
             password_data = bytearray()
             for char in password:
                 password_data.append(ord(char))
-            
+
             # 构造命令包：0xFB 0x01 0x06 + 6字节密码 + 0xBB
             cmd_packet = self.construct_new_password_cmd(0x01, password_data)
-            
+
             self.display_send_data(cmd_packet)
             await self.byte_send(cmd_packet)
-            
+
             # 解析响应（这里需要在数据接收处理中添加新的解析逻辑）
             self.blue_write_log("验证密码命令已发送，等待响应...")
-            
+
         except Exception as e:
             self.blue_write_log(f"验证密码异常: {str(e)}")
 
@@ -1862,14 +1929,14 @@ class BluetoothTool(QWidget):
             password_data = bytearray()
             for char in password:
                 password_data.append(ord(char))
-            
+
             # 构造命令包：0xFB 0x02 0x06 + 6字节密码 + 0xBB
             cmd_packet = self.construct_new_password_cmd(0x02, password_data)
-            
+
             self.display_send_data(cmd_packet)
             await self.byte_send(cmd_packet)
             self.blue_write_log("设置密码命令已发送，等待响应...")
-            
+
         except Exception as e:
             self.blue_write_log(f"设置密码异常: {str(e)}")
 
@@ -1878,15 +1945,15 @@ class BluetoothTool(QWidget):
         try:
             # 构造数据：0x01
             cancel_data = bytearray([0x01])
-            
+
             # 构造命令包：0xFB 0x03 0x01 0x01 + 0xBB
             cmd_packet = self.construct_new_password_cmd(0x03, cancel_data)
-            
+
             self.display_send_data(cmd_packet)
             await self.byte_send(cmd_packet)
-            
+
             self.blue_write_log("取消密码命令已发送，等待响应...")
-            
+
         except Exception as e:
             self.blue_write_log(f"取消密码异常: {str(e)}")
 
@@ -1900,10 +1967,10 @@ class load_ui_dynamically(QMainWindow):
         try:
             # 初始化日志管理器
             self.logger = LogManager.get_instance()
-            
+
             # 初始化当前数据来源
             self.current_data_source = None
-            
+
             # 初始化命令信息标签（稍后会创建）
             self.command_info_label = None
 
@@ -1935,6 +2002,7 @@ class load_ui_dynamically(QMainWindow):
             widgets.mainWindowTextEdit.clear()
             widgets.mainWindowTextEdit.setReadOnly(True)
             widgets.mainWindowTextEdit.setFontFamily("Courier New")  # 使用等宽字体
+            widgets.mainWindowTextEdit.hide()
 
 
             # 初始化电池状态查询
@@ -1943,7 +2011,7 @@ class load_ui_dynamically(QMainWindow):
             # 连接数据解析模块到主窗口
             self.bluetooth_tool.decode_data_ok_signal.connect(self.get_dict_from_receive_data)
 
-            
+
             # 初始化结构体模型列表 到csv文件
             self.struct_list = self.bluetooth_tool.hex_parser.get_struct_name_list()
             ComunManager.get_instance(self.struct_list)
@@ -1955,40 +2023,40 @@ class load_ui_dynamically(QMainWindow):
             # 在一级窗口上再创建一个qwidget用来显示一些标志位
             # self.setGeometry(0, 0, 900, 600)
             self.setFixedSize(1100,600)
-            self.bit_window = QWidget()
-            
+            self.bit_window = QWidget(self)  # 设置父窗口为self
+
             # 创建命令信息显示标签
             self.command_info_label = QLabel('当前命令: 无')
             self.command_info_label.setStyleSheet("QLabel { color: blue; font-weight: bold; }")
-            
+
             # 创建按钮布局
             button_layout = QHBoxLayout()
             self.send_modify_button = QPushButton('发送修改值')
             self.clear_modify_button = QPushButton('清空修改值')
-            
+
             button_layout.addWidget(self.send_modify_button)
             button_layout.addWidget(self.clear_modify_button)
             button_layout.addStretch()  # 添加弹性空间
-            
+
             # 创建QTableView和模型
             self.bit_table_view = QTableView()
             self.bit_table_model = BitFlagsTableModel()
             self.bit_table_view.setModel(self.bit_table_model)
-            
+
             # 设置表格属性
             self.bit_table_view.setAlternatingRowColors(True)
             self.bit_table_view.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
             self.bit_table_view.horizontalHeader().setStretchLastSection(False)
-            
+
             # 设置列宽 - 现在是9列
             column_widths = [120, 80, 80, 120, 80, 80, 120, 80, 80]
             for i, width in enumerate(column_widths):
                 self.bit_table_view.setColumnWidth(i, width)
-            
+
             # 设置更紧凑的行间距
             self.bit_table_view.verticalHeader().setDefaultSectionSize(20)  # 默认行高设为20
             self.bit_table_view.verticalHeader().setMinimumSectionSize(18)  # 最小行高设为18
-            
+
             # 添加样式表以区分不同的列组
             self.bit_table_view.setStyleSheet("""
                 QTableView::item {
@@ -2021,24 +2089,24 @@ class load_ui_dynamically(QMainWindow):
                     background-color: #f8e8f8;
                 }
             """)
-            
+
             # 创建主布局
             self.bit_layout = QVBoxLayout()
             self.bit_layout.addWidget(self.command_info_label)
             self.bit_layout.addLayout(button_layout)
             self.bit_layout.addWidget(self.bit_table_view)
             self.bit_window.setLayout(self.bit_layout)
-            
+
             # 保留原有的标签列表（可能其他地方还在使用）
             self.key_label_list = []
             self.value_label_list = []
-            
+
             # 连接按钮信号
             self.send_modify_button.clicked.connect(self.send_modified_values)  # 发送修改值
             self.clear_modify_button.clicked.connect(self.clear_modified_values)
-            
-            self.bit_window.setWindowTitle('烧录标志位')
-            self.bit_window.setGeometry(620, 10, 880, 600)  # 增加窗口宽度以适应9列
+
+            # 设置bit_window在主窗口内的位置和大小
+            self.bit_window.setGeometry(150, 10, 880, 580)  # 位置(150,10)，调整高度适应主窗口
             self.bit_window.show()
         except Exception as e:
             self.logger.write_log(f"加载UI文件失败: {e}")
@@ -2059,7 +2127,7 @@ class load_ui_dynamically(QMainWindow):
                     # 检查参数名或数值是否有变化
                     if old_unit[0] != new_unit[0] or old_unit[2] != new_unit[2]:
                         updates[i] = new_unit
-                
+
                 if updates:
                     # 有数据变化，进行部分更新
                     self.bit_table_model.update_partial_data(updates)
@@ -2067,11 +2135,11 @@ class load_ui_dynamically(QMainWindow):
                 else:
                     # 没有数据变化，无需更新
                     pass
-            
+
             # 调试信息
             # for i, unit in enumerate(data):
             #     print(f'i = {i} tuple = {len(unit)} - {unit[0]}: {unit[2]}')
-                
+
         except Exception as e:
             self.logger.write_log(f"bit windows写入失败: {e}")
             traceback.print_exc()
@@ -2104,7 +2172,7 @@ class load_ui_dynamically(QMainWindow):
     def get_dict_from_receive_data(self, header:str, dict_data:dict):
         """从结构模型中获取字典，并按列打印到窗口"""
         widgets.mainWindowTextEdit.clear()
-        
+
         # 从接收字符串中提取纯命令名
         # header 格式: "RX->,bluetooth,L-12100BNNA70-A88888,PC_GET_BMS"
         # 需要提取最后的命令名部分
@@ -2112,12 +2180,12 @@ class load_ui_dynamically(QMainWindow):
             command_name = header.split(',')[-1]  # 提取最后一部分
         else:
             command_name = header
-        
+
         # 保存当前数据来源，用于发送修改值时确定命令
         self.current_data_source = command_name
-        
+
         self.bluetooth_tool.blue_write_log(f"提取的命令名: {command_name}")
-        
+
         # 更新BitWindow的命令信息显示
         if hasattr(self, 'command_info_label') and self.command_info_label:
             write_cmd_name = get_write_command_from_read(command_name)
@@ -2127,7 +2195,7 @@ class load_ui_dynamically(QMainWindow):
             else:
                 self.command_info_label.setText(f"当前命令: {command_name} (只读)")
                 self.command_info_label.setStyleSheet("QLabel { color: red; font-weight: bold; }")
-        
+
         # 构建列格式化字符串
         formatted_text = ""
         for category, items in dict_data.items():
@@ -2182,7 +2250,7 @@ class load_ui_dynamically(QMainWindow):
         """重写关闭事件，在关闭前断开连接"""
         # 先隐藏窗口，给用户一个即时反馈
         self.hide()
-        
+
         if hasattr(self.bluetooth_tool, 'log_file') and self.bluetooth_tool.log_file :
             try:
                 self.bluetooth_tool.write_log("程序关闭")
@@ -2192,13 +2260,13 @@ class load_ui_dynamically(QMainWindow):
                 self.bluetooth_tool.blue_write_log(f"关闭日志文件失败: {e}")
 
         has_connection = False
-        
+
         # 检查是否有连接需要断开
         if self.bluetooth_tool.client and self.bluetooth_tool.client.is_connected:
             has_connection = True
         if hasattr(self.bluetooth_tool, 'serial_port') and self.bluetooth_tool.serial_port and self.bluetooth_tool.serial_port.is_open:
             has_connection = True
-        
+
         if has_connection:
             # 创建断开连接的函数
             async def disconnect_and_close():
@@ -2207,37 +2275,37 @@ class load_ui_dynamically(QMainWindow):
                     if self.bluetooth_tool.client and self.bluetooth_tool.client.is_connected:
                         await self.bluetooth_tool.disconnect_device()
                         self.bluetooth_tool.blue_write_log("蓝牙已断开连接")
-                    
+
                     # 断开串口连接
                     if hasattr(self.bluetooth_tool, 'serial_port') and self.bluetooth_tool.serial_port and self.bluetooth_tool.serial_port.is_open:
                         self.bluetooth_tool.serial_port.close()
                         self.bluetooth_tool.blue_write_log("串口已断开")
-                    
+
                 except Exception as e:
                     self.bluetooth_tool.blue_write_log(f"断开连接时出错: {e}")
-                
+
                 # 最后强制退出应用程序
                 # 使用QTimer确保这个调用发生在主事件循环中
                 QApplication.instance().quit()
                 # QTimer.singleShot(100, lambda: QApplication.instance().quit())
-            
+
             # 启动异步任务
             asyncio.create_task(disconnect_and_close())
-            
+
             # 忽略关闭事件，我们会在异步任务完成后手动退出
             event.ignore()
             return
-        
+
         # 如果没有连接需要断开，接受事件并正常关闭
         event.accept()
 
     def parse_hex_or_decimal_value(self, value_str):
         """
         解析十六进制或十进制值，支持负数
-        
+
         Args:
             value_str (str): 要解析的值字符串，如 '100', '0x64', '0x-186A0', '-0x186A0'
-            
+
         Returns:
             int: 解析后的整数值
         """
@@ -2262,30 +2330,30 @@ class load_ui_dynamically(QMainWindow):
         """获取修改的值并发送到设备"""
         try:
             self.bluetooth_tool.blue_write_log("=== 开始发送修改值流程 ===")
-            
+
             modified_data = self.bit_table_model.get_modified_data()
-            
+
             if not modified_data:
                 self.bluetooth_tool.blue_write_log("没有需要发送的修改值")
                 self.logger.write_log("没有需要发送的修改值")
                 return []
-            
+
             self.bluetooth_tool.blue_write_log(f"检测到 {len(modified_data)} 个修改值")
-            
+
             # 检查当前数据来源
             if not self.current_data_source:
                 self.bluetooth_tool.blue_write_log("错误：无法确定当前数据来源")
                 self.logger.write_log("错误：无法确定当前数据来源")
                 return []
-            
+
             self.bluetooth_tool.blue_write_log(f"当前数据来源: {self.current_data_source}")
-            
+
             # 检查是否可以写入
             if not can_command_be_written(self.current_data_source):
                 self.bluetooth_tool.blue_write_log(f"错误：命令 {self.current_data_source} 不支持写入")
                 self.logger.write_log(f"错误：命令 {self.current_data_source} 不支持写入")
                 return []
-            
+
             # 获取写入命令名称和代码
             write_cmd_name = get_write_command_from_read(self.current_data_source)
             write_cmd_code = get_write_command_code(self.current_data_source)
@@ -2293,42 +2361,42 @@ class load_ui_dynamically(QMainWindow):
                 self.bluetooth_tool.blue_write_log(f"错误：无法获取 {self.current_data_source} 的写入命令代码")
                 self.logger.write_log(f"错误：无法获取 {self.current_data_source} 的写入命令代码")
                 return []
-            
+
             self.bluetooth_tool.blue_write_log(f"读取命令: {self.current_data_source}")
             self.bluetooth_tool.blue_write_log(f"写入命令: {write_cmd_name}")
             self.bluetooth_tool.blue_write_log(f"写入命令代码: 0x{write_cmd_code:02X}")
-            
+
             # 更新BitWindow显示正在发送的命令
             self.command_info_label.setText(f"正在发送: {self.current_data_source} → {write_cmd_name}")
             self.command_info_label.setStyleSheet("QLabel { color: orange; font-weight: bold; }")
-            
+
             # 创建一个完整的数据数组来重新构造结构体
             # 获取当前数据来源的格式和变量列表
             format_string = STRUCT_FORMATS.get(self.current_data_source)
             variables = STRUCT_VARIABLES.get(self.current_data_source)
-            
+
             if not format_string or not variables:
                 self.bluetooth_tool.blue_write_log(f"错误：无法获取 {self.current_data_source} 的格式信息")
                 self.logger.write_log(f"错误：无法获取 {self.current_data_source} 的格式信息")
                 return []
-            
+
             self.bluetooth_tool.blue_write_log(f"数据格式: {format_string}")
             self.bluetooth_tool.blue_write_log(f"变量数量: {len(variables)}")
-            
+
             # 创建值数组，初始化为当前值
             values = []
             self.bluetooth_tool.blue_write_log("开始构造数据包:")
-            
+
             for i, var_name in enumerate(variables):
                 current_hex_value = self.bit_table_model._data[i][1] if i < len(self.bit_table_model._data) else '0x00'
-                
+
                 # 检查是否有修改值
                 modified_value = None
                 for row, param_name, current_value, write_value in modified_data:
                     if param_name == var_name and write_value.strip():
                         modified_value = write_value
                         break
-                
+
                 if modified_value:
                     try:
                         # 尝试解析修改值
@@ -2353,24 +2421,24 @@ class load_ui_dynamically(QMainWindow):
                     except ValueError as e:
                         self.bluetooth_tool.blue_write_log(f"  错误：无法解析当前值 '{current_hex_value}' ({e})，使用 0")
                         int_value = 0
-                    
+
                     values.append(int_value)
                     self.bluetooth_tool.blue_write_log(f"  {var_name}: {current_hex_value} (不变)")
-            
+
             self.bluetooth_tool.blue_write_log(f"最终数据值: {values}")
-            
+
             # 使用 struct 模块打包数据
             try:
                 packed_binary_data = struct.pack(format_string, *values)
                 self.bluetooth_tool.blue_write_log(f"数据打包成功，共 {len(packed_binary_data)} 字节")
                 self.bluetooth_tool.blue_write_log(f"打包后的原始数据: {packed_binary_data.hex()}")
                 self.logger.write_log(f"数据打包成功，共 {len(packed_binary_data)} 字节")
-                
+
                 # 使用 send_hex_fill 发送数据
                 send_data = self.bluetooth_tool.text_decode.send_hex_fill(write_cmd_code, packed_binary_data)
                 self.bluetooth_tool.blue_write_log(f"构造发送数据包: {send_data.hex()}")
                 self.logger.write_log(f"发送数据: {send_data.hex()}")
-                
+
                 # 异步发送数据
                 async def send_data_async():
                     try:
@@ -2379,49 +2447,49 @@ class load_ui_dynamically(QMainWindow):
                         self.bluetooth_tool.display_send_data(send_data)
                         self.bluetooth_tool.blue_write_log("数据发送成功")
                         self.logger.write_log("数据发送成功")
-                        
+
                         # 更新BitWindow显示发送成功
                         self.command_info_label.setText(f"发送成功: {self.current_data_source} → {write_cmd_name}")
                         self.command_info_label.setStyleSheet("QLabel { color: green; font-weight: bold; }")
-                        
+
                         # 发送成功后清空修改值
                         self.bit_table_model.clear_write_values()
-                        
+
                     except Exception as e:
                         self.bluetooth_tool.blue_write_log(f"数据发送失败: {e}")
                         self.logger.write_log(f"数据发送失败: {e}")
                         traceback.print_exc()
-                        
+
                         # 更新BitWindow显示发送失败
                         self.command_info_label.setText(f"发送失败: {self.current_data_source} → {write_cmd_name}")
                         self.command_info_label.setStyleSheet("QLabel { color: red; font-weight: bold; }")
-                
+
                 # 使用 asyncio 创建任务
                 asyncio.create_task(send_data_async())
-                
+
                 return modified_data
-                
+
             except struct.error as e:
                 self.bluetooth_tool.blue_write_log(f"数据打包失败: {e}")
                 self.logger.write_log(f"数据打包失败: {e}")
-                
+
                 # 更新BitWindow显示打包失败
                 if hasattr(self, 'command_info_label') and self.command_info_label:
                     self.command_info_label.setText(f"打包失败: {self.current_data_source}")
                     self.command_info_label.setStyleSheet("QLabel { color: red; font-weight: bold; }")
                 return []
-                
+
         except Exception as e:
             self.bluetooth_tool.blue_write_log(f"发送修改值失败: {e}")
             self.logger.write_log(f"发送修改值失败: {e}")
             traceback.print_exc()
-            
+
             # 更新BitWindow显示流程失败
             if hasattr(self, 'command_info_label') and self.command_info_label:
                 self.command_info_label.setText(f"流程失败: {self.current_data_source if self.current_data_source else '无'}")
                 self.command_info_label.setStyleSheet("QLabel { color: red; font-weight: bold; }")
             return []
-    
+
     def clear_modified_values(self):
         """清空所有修改的写入值"""
         try:
@@ -2430,7 +2498,7 @@ class load_ui_dynamically(QMainWindow):
         except Exception as e:
             self.logger.write_log(f"清空修改值失败: {e}")
             traceback.print_exc()
-    
+
     def set_write_value_by_name(self, param_name, value):
         """根据参数名设置写入值"""
         try:
@@ -2451,7 +2519,7 @@ if __name__ == '__main__':
         # 创建并显示启动画面
         splash = SplashScreen()
         splash.show()
-        
+
         # 设置事件循环
         loop = QEventLoop(app)
         asyncio.set_event_loop(loop)
@@ -2459,7 +2527,7 @@ if __name__ == '__main__':
 
         # 方法3: 动态加载（推荐）
         window = load_ui_dynamically('测试上位机.ui')
-        
+
         if window:
             QTimer.singleShot(500, lambda: (splash.finish(window), window.show()))
             # window.show()
@@ -2468,7 +2536,7 @@ if __name__ == '__main__':
             QMessageBox.critical(None, '错误', 'UI文件加载失败')
             traceback.print_exc()
             # sys.exit(1)
-        
+
         # 运行事件循环
         with loop:
             loop.run_forever()

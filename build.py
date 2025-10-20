@@ -38,7 +38,7 @@ def build_exe(mode: str):
     ]
     
     # 调试版额外配置
-    if mode in ["debugApp","firstuse"]:
+    if mode in ["debugApp"]:
         args += [
             "--debug=all",
             "--console"  # 调试版显示控制台
