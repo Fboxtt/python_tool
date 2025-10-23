@@ -541,13 +541,13 @@ class HexParserApp(QMainWindow):
                         
                         # 根据约定确定符号
                         if var_name.startswith('s') or var_name.startswith('l'):
-                            dec_values.append(str(value))  # 保留符号
+                            dec_values.append(f"{value}")  # 保留符号
                         else:
-                            dec_values.append(str(value & 0xFFFF_FFFF))  # 无符号显示
+                            dec_values.append(f"{value & 0xFFFF_FFFF}")  # 无符号显示
                     else:
                         # 其他类型的值
-                        hex_byte_array.append(str(value))
-                        dec_values.append(str(value))
+                        hex_byte_array.append(f"{value}")
+                        dec_values.append(f"{value}")
             
             # 按字节对齐显示
             display_data = []
@@ -571,25 +571,15 @@ class HexParserApp(QMainWindow):
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     window = HexParserApp()
-
+    str1 = "4A 9A 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 15 00 16 00 16 00 00 00 00 00 00 00 00 00 00 00 00 00 64 00 10 27 00 00 C0 00 01 00 20 10 00 00 00 00 00 00 10 00 00 00 00 00 00 00 00 00 01 00 64 00 00 00 00 00 00 00 00 00 00 00"
     # 测试数据
-    test_data = bytearray([
-        0x01, 0x00, 0x02, 0x00, 0x03, 0x00, 0xE7, 0x07, 0x0A, 0x0F, 0x00,0x00, # bootVer
-        0x04, 0x00, 0x05, 0x00, 0x06, 0x00, 0xE7, 0x07, 0x0B, 0x14, 0x00,0x00, # app_Ver
-        0x07, 0x00, 0x08, 0x00, 0x09, 0x00, 0xE7, 0x07, 0x0C, 0x19, 0x00,0x00, # buffVer
-        0x0A, 0x00, 0x0B, 0x00, 0x0C, 0x00, 0xE8, 0x07, 0x01, 0x01, 0x00,0x00, # backVer
-        0x49, 0x43, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38,  # icName
-        0x39, 0x30, 0x31, 0x32, 0x33,  # icName (continued)
-        0x01,  # writableArea
-        0x78, 0x56, 0x34, 0x12,  # pcAddr
-        0xD0, 0x34, 0x56, 0x78  # uniqueID
-    ])
+    test_data = bytes.fromhex(str1)
 
     # 解析测试数据
-    struct_name, parsed_data = window.decode_cmd_hex_data(0x71, test_data)
+    struct_name, parsed_data = window.decode_cmd_hex_data(0x13, test_data)
     print(f"Struct Name: {struct_name}")
     print("Parsed Data:")
-    for var_name, hex_val, dec_val in parsed_data["PC_GET_INF"]:
+    for var_name, hex_val, dec_val in parsed_data["PC_GET_SBS"]:
         print(f"{var_name}: {hex_val} | {dec_val}")
 
     window.show()
