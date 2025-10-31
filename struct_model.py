@@ -34,9 +34,9 @@ STRUCT_FORMATS = {
     "PC_GET_MOSHTDATA": "<HHHH",
     "PC_GET_LIFE_PARA": "<HHLLL",
     "PC_GET_SBS": "<LL"  # ulPackV, ulBattV
-        "HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH"  # usCellV[CELL_COUNT]
+        "HHHHHHHHHHHHHHHH"  # usCellV[CELL_COUNT]
         "l"  # lCurrent
-        "hhhhhhhhhhhhhhh"  # sTemp[TEMP_COUNT]
+        "hhhhh"  # sTemp[TEMP_COUNT]
         "HHH"  # usRemainAH, usFccAH, usBiaAH
         "LLLLL"  # ulOtherInfo, ulAlarmStatus, ulProtectStatus, ulFaultStatus, ulBalanceStatus
         "HH"  # usBattStatus, usSOC_Percent
@@ -110,9 +110,9 @@ STRUCT_VARIABLES = {
     ],
     "PC_GET_SBS": [
         "ulPackV", "ulBattV",
-        *[f"usCellV[{i}]" for i in range(32)],
+        *[f"usCellV[{i}]" for i in range(16)],
         "lCurrent",
-        *[f"sTemp[{i}]" for i in range(15)],
+        *[f"sTemp[{i}]" for i in range(5)],
         "usRemainAH", "usFccAH", "usBiaAH",
         "ulOtherInfo", "ulAlarmStatus", "ulProtectStatus", "ulFaultStatus", "ulBalanceStatus",
         "usBattStatus", "usSOC_Percent",
@@ -571,8 +571,18 @@ class HexParserApp(QMainWindow):
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     window = HexParserApp()
-
+    hex_str = "00 00 65 01 93 55 AA 00 AC 11 00 00 B5 86 00 00 F5 0A 98 0B A9 0B 8F 0B A3 0B BD 0B 22 0B E0 09 18 0B 28 0B 29 0B 25 0B 00 00 00 00 00 00 00 00 00 00 00 00 1E 00 1D 00 1E 00 00 00 00 00 00 00 88 13 00 00 C0 00 00 00 20 10 00 00 20 00 00 00 80 00 00 00 00 00 00 00 00 00 00 00 64 00 00 00 02 00 00 00 69 00 00 00 79"
+    test_data1 = bytearray.fromhex(hex_str)
+    test_data2 = test_data1[8:-1]
+    print(test_data2)
+    # 解析测试数据
+    struct_name, parsed_data = window.decode_cmd_hex_data(0x13, test_data2)
+    print(f"Struct Name: {struct_name}")
+    print("Parsed Data:")
+    for var_name, hex_val, dec_val in parsed_data["PC_GET_INF"]:
+        print(f"{var_name}: {hex_val} | {dec_val}")
     # 测试数据
+
     test_data = bytearray([
         0x01, 0x00, 0x02, 0x00, 0x03, 0x00, 0xE7, 0x07, 0x0A, 0x0F, 0x00,0x00, # bootVer
         0x04, 0x00, 0x05, 0x00, 0x06, 0x00, 0xE7, 0x07, 0x0B, 0x14, 0x00,0x00, # app_Ver
