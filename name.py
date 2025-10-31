@@ -550,19 +550,19 @@ class FirmwareNamingTool(QMainWindow):
         # 始终包含BMS特性标识
         if include_cell_model:
             if feature_str:
-                # 升级固件: APP-【BMS特性】-【使用场景】【电压】【容量】-【功能特征】-【电芯型号】-OTA-【芯片平台】【产品序号】_V【主版本】_【次版本】_【修订号】_【日期】
-                app_name = f"APP-{bms_spec}-{software_spec}-{feature_str}-{cell_model}-OTA-{unique_code}_{version_str}_{date}"
+                # 升级固件: APP-【BMS特性】-【使用场景】【电压】【容量】-【功能特征】-【电芯型号】-【芯片平台】【产品序号】_V【主版本】_【次版本】_【修订号】_【日期】
+                app_name = f"APP-{bms_spec}-{software_spec}-{feature_str}-{cell_model}-{unique_code}_{version_str}_{date}"
                 # 完整固件: IAP+APP-【BMS特性】-【使用场景】【电压】【容量】-【功能特征】-【电芯型号】-【芯片平台】【产品序号】_V【主版本】_【次版本】_【修订号】_【日期】
                 full_name = f"IAP+APP-{bms_spec}-{software_spec}-{feature_str}-{cell_model}-{unique_code}_{version_str}_{date}"
             else:
-                app_name = f"APP-{bms_spec}-{software_spec}-{cell_model}-OTA-{unique_code}_{version_str}_{date}"
+                app_name = f"APP-{bms_spec}-{software_spec}-{cell_model}-{unique_code}_{version_str}_{date}"
                 full_name = f"IAP+APP-{bms_spec}-{software_spec}-{cell_model}-{unique_code}_{version_str}_{date}"
         else:
             if feature_str:
-                app_name = f"APP-{bms_spec}-{software_spec}-{feature_str}-OTA-{unique_code}_{version_str}_{date}"
+                app_name = f"APP-{bms_spec}-{software_spec}-{feature_str}-{unique_code}_{version_str}_{date}"
                 full_name = f"IAP+APP-{bms_spec}-{software_spec}-{feature_str}-{unique_code}_{version_str}_{date}"
             else:
-                app_name = f"APP-{bms_spec}-{software_spec}-OTA-{unique_code}_{version_str}_{date}"
+                app_name = f"APP-{bms_spec}-{software_spec}-{unique_code}_{version_str}_{date}"
                 full_name = f"IAP+APP-{bms_spec}-{software_spec}-{unique_code}_{version_str}_{date}"
         
         # 显示结果
