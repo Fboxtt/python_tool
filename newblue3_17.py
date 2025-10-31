@@ -354,6 +354,9 @@ class BluetoothTool(QWidget):
         self.ota_start_count = 0
         self.ota_ok_count = 0
         self.batch_task = None
+        
+        # 检测当前配置并设置checkbox状态（不触发信号）
+        self.detect_and_set_cell_config()
     def initUI(self):
         self.setWindowTitle('firstuse')
 
@@ -378,6 +381,12 @@ class BluetoothTool(QWidget):
         # HEX文件信息显示
         self.hex_info_label = QLabel('文件大小：0 字节')
         left_layout.addWidget(self.hex_info_label)
+
+        # 32电芯配置切换
+        self.cell_32_checkbox = QCheckBox('32电芯配置')
+        self.cell_32_checkbox.setToolTip('勾选：32电芯+15温度传感器\n不勾选：16电芯+SBS 5温度+KB 8温度')
+        self.cell_32_checkbox.stateChanged.connect(self.on_cell_config_changed)
+        left_layout.addWidget(self.cell_32_checkbox)
 
         # 创建水平分割的两个区域
         connection_layout = QHBoxLayout()
@@ -1956,6 +1965,49 @@ class BluetoothTool(QWidget):
 
         except Exception as e:
             self.blue_write_log(f"取消密码异常: {str(e)}")
+
+    def detect_and_set_cell_config(self):
+        """检测当前配置是16串还是32串，并设置checkbox状态"""
+        try:
+            # 调用 HexParserApp 的方法检测当前配置
+            cell_count = self.hex_parser.get_current_cell_config()
+            
+            # 暂时阻止信号，避免触发配置切换
+            self.cell_32_checkbox.blockSignals(True)
+            
+            if cell_count == 32:
+                self.cell_32_checkbox.setChecked(True)
+                self.blue_write_log("检测到当前配置：32串配置")
+            elif cell_count == 16:
+                self.cell_32_checkbox.setChecked(False)
+                self.blue_write_log("检测到当前配置：16串配置")
+            else:
+                self.cell_32_checkbox.setChecked(False)
+                self.blue_write_log(f"警告：未知的电芯配置，默认使用16串配置")
+            
+            # 恢复信号
+            self.cell_32_checkbox.blockSignals(False)
+            
+        except Exception as e:
+            self.blue_write_log(f"检测配置失败: {str(e)}")
+            traceback.print_exc()
+    
+    def on_cell_config_changed(self, state):
+        """处理32电芯配置checkbox状态变化"""
+        try:
+            if state == Qt.CheckState.Checked.value:
+                # 切换到32串配置
+                self.blue_write_log("正在切换到32串配置...")
+                self.hex_parser.set_struct_to_cell_32()
+                self.blue_write_log("已切换到32串配置（32电芯 + 15温度传感器）")
+            else:
+                # 切换到16串配置
+                self.blue_write_log("正在切换到16串配置...")
+                self.hex_parser.set_struct_to_cell_16()
+                self.blue_write_log("已切换到16串配置（16电芯 + SBS:5温度 + KB:8温度）")
+        except Exception as e:
+            self.blue_write_log(f"切换配置失败: {str(e)}")
+            traceback.print_exc()
 
 widgets = None
 

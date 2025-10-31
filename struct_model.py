@@ -26,9 +26,9 @@ STRUCT_FORMATS = {
         "hh",
     "PC_GET_KB": "<"
         "HH"
-        "HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH"
+        "HHHHHHHHHHHHHHHH"
         "HhHhHhHhHhHh"
-        "HHHHHHHHHHHHHHH",
+        "HHHHHHHH",
     "PC_GET_OCP_DELAYTIME": "<HHHH",
     "PC_GET_CELL_CAP_PARA": "<LL",
     "PC_GET_MOSHTDATA": "<HHHH",
@@ -329,39 +329,51 @@ class HexParserApp(QMainWindow):
                 self.update_dict(target[key], value)
             else:
                 target[key] = value
-    def set_config_file(self):
+    def set_config_file(self, force_write=False):
+        """
+        设置配置文件
+        
+        Args:
+            force_write (bool): 如果为 True，强制写入当前 config_data，不从文件读取
+        """
         # 配置文件路径
         config_file_path = os.path.join(os.getcwd(), "default_config.json")
 
-        # 检查配置文件是否存在
-        if os.path.exists(config_file_path):
-            try:
-                # 读取现有配置文件
-                with open(config_file_path, 'r', encoding='utf-8') as config_file:
-                    existing_config = json.load(config_file)
-                
-                # 检查现有配置文件格式是否正确
-                if isinstance(existing_config, dict):
-                    # 比较现有配置文件与当前配置数据
-                    if existing_config != config_data:
-                        # 更新 config_data 为现有配置文件内容
-                        self.update_dict(config_data, existing_config)
+        # 如果不是强制写入，则先读取现有配置并合并
+        if not force_write:
+            # 检查配置文件是否存在
+            if os.path.exists(config_file_path):
+                try:
+                    # 读取现有配置文件
+                    with open(config_file_path, 'r', encoding='utf-8') as config_file:
+                        existing_config = json.load(config_file)
+                    
+                    # 检查现有配置文件格式是否正确
+                    if isinstance(existing_config, dict):
+                        # 比较现有配置文件与当前配置数据
+                        if existing_config != config_data:
+                            # 更新 config_data 为现有配置文件内容
+                            self.update_dict(config_data, existing_config)
+                            print("已从现有配置文件加载配置")
+                        else:
+                            print("配置文件已存在且内容相同，无需更新")
+                            return  # 内容相同，不需要写入
                     else:
-                        print("配置文件已存在且内容相同，无需更新")
-                else:
-                    print("配置文件格式不正确，使用当前配置数据")
-            except Exception as e:
-                traceback.print_exc()
-                print(f"读取配置文件失败: {e}")
-        else:
-            print("配置文件不存在，将创建新文件")
+                        print("配置文件格式不正确，使用当前配置数据")
+                except Exception as e:
+                    traceback.print_exc()
+                    print(f"读取配置文件失败: {e}")
+            else:
+                print("配置文件不存在，将创建新文件")
 
         # 将字典写入 JSON 文件
-        with open(config_file_path, 'w', encoding='utf-8') as config_file:
-            json.dump(config_data, config_file, ensure_ascii=False, indent=4)
-
-        print(f"配置文件已生成或更新: {config_file_path}")
-        pass
+        try:
+            with open(config_file_path, 'w', encoding='utf-8') as config_file:
+                json.dump(config_data, config_file, ensure_ascii=False, indent=4)
+            print(f"配置文件已生成或更新: {config_file_path}")
+        except Exception as e:
+            traceback.print_exc()
+            print(f"写入配置文件失败: {e}")
     def initUI(self):
         self.setWindowTitle("HEX 文件解析器")
         self.setGeometry(100, 100, 800, 600)
@@ -384,6 +396,100 @@ class HexParserApp(QMainWindow):
         container = QWidget()
         container.setLayout(layout)
         self.setCentralWidget(container)
+
+    def set_struct_to_cell_16(self):
+        """
+        设置为16串配置
+        - PC_GET_SBS: 16个电池单元 + 5个温度传感器
+        - PC_GET_KB: 16个电池单元 + 8个温度传感器
+        """
+        # PC_GET_SBS: 5个温度传感器
+        STRUCT_FORMATS["PC_GET_SBS"] = "<LL" + \
+        "HHHHHHHHHHHHHHHH" +\
+        "l" +\
+        "hhhhh" +\
+        "HHH" +\
+        "LLLLL" +\
+        "HH" +\
+        "LLL" 
+        STRUCT_VARIABLES["PC_GET_SBS"] = ["ulPackV", "ulBattV",
+        *[f"usCellV[{i}]" for i in range(16)],
+        "lCurrent",
+        *[f"sTemp[{i}]" for i in range(5)],
+        "usRemainAH", "usFccAH", "usBiaAH",
+        "ulOtherInfo", "ulAlarmStatus", "ulProtectStatus", "ulFaultStatus", "ulBalanceStatus",
+        "usBattStatus", "usSOC_Percent",
+        "ulSOH_Percent", "ulDisTimes", "ulTotalDisAH"]
+        
+        # PC_GET_KB: 8个温度传感器
+        STRUCT_FORMATS["PC_GET_KB"] = "<HH" + \
+        "HHHHHHHHHHHHHHHH" +\
+        "HhHhHhHhHhHh" +\
+        "HHHHHHHH"
+        STRUCT_VARIABLES["PC_GET_KB"] = ["usPackVK", "usBattVK",
+        *[f"usCellVK[{i}]" for i in range(16)],
+        "usChgCurrK", "sChgCurrB",
+        "usDisCurrK", "sDisCurrB",
+        "usChgCurrSK", "sChgCurrSB",
+        "usDisCurrSK", "sDisCurrSB",
+        "usChgCurrSSK", "sChgCurrSSB",
+        "usDisCurrSSK", "sDisCurrSSB",
+        *[f"usTempK[{i}]" for i in range(8)]]
+        
+        # 修改完成后，更新 config_data 字典
+        config_data["STRUCT_FORMATS"] = STRUCT_FORMATS
+        config_data["STRUCT_VARIABLES"] = STRUCT_VARIABLES
+        
+        # 强制写入配置文件
+        print("16串配置已更新（SBS:5个温度, KB:8个温度），正在写入配置文件...")
+        self.set_config_file(force_write=True)
+    
+    def set_struct_to_cell_32(self):
+        """
+        设置为32串配置
+        - PC_GET_SBS: 32个电池单元 + 15个温度传感器
+        - PC_GET_KB: 32个电池单元 + 15个温度传感器
+        """
+        # PC_GET_SBS: 15个温度传感器
+        STRUCT_FORMATS["PC_GET_SBS"] = "<LL" + \
+        "HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH" +\
+        "l" +\
+        "hhhhhhhhhhhhhhh" +\
+        "HHH" +\
+        "LLLLL" +\
+        "HH" +\
+        "LLL" 
+        STRUCT_VARIABLES["PC_GET_SBS"] =  ["ulPackV", "ulBattV",
+        *[f"usCellV[{i}]" for i in range(32)],
+        "lCurrent",
+        *[f"sTemp[{i}]" for i in range(15)],
+        "usRemainAH", "usFccAH", "usBiaAH",
+        "ulOtherInfo", "ulAlarmStatus", "ulProtectStatus", "ulFaultStatus", "ulBalanceStatus",
+        "usBattStatus", "usSOC_Percent",
+        "ulSOH_Percent", "ulDisTimes", "ulTotalDisAH"]
+        
+        # PC_GET_KB: 15个温度传感器
+        STRUCT_FORMATS["PC_GET_KB"] = "<HH" + \
+        "HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH" +\
+        "HhHhHhHhHhHh" +\
+        "HHHHHHHHHHHHHHH"
+        STRUCT_VARIABLES["PC_GET_KB"] = ["usPackVK", "usBattVK",
+        *[f"usCellVK[{i}]" for i in range(32)],
+        "usChgCurrK", "sChgCurrB",
+        "usDisCurrK", "sDisCurrB",
+        "usChgCurrSK", "sChgCurrSB",
+        "usDisCurrSK", "sDisCurrSB",
+        "usChgCurrSSK", "sChgCurrSSB",
+        "usDisCurrSSK", "sDisCurrSSB",
+        *[f"usTempK[{i}]" for i in range(15)]]
+        
+        # 修改完成后，更新 config_data 字典
+        config_data["STRUCT_FORMATS"] = STRUCT_FORMATS
+        config_data["STRUCT_VARIABLES"] = STRUCT_VARIABLES
+        
+        # 强制写入配置文件
+        print("32串配置已更新，正在写入配置文件...")
+        self.set_config_file(force_write=True)
     def get_struct_name_list(self):
         for key, value in STRUCT_VARIABLES.items():
             struct_str = key
@@ -391,6 +497,39 @@ class HexParserApp(QMainWindow):
                 struct_str += "," + i
             self.struct_name_list.append(struct_str)
         return self.struct_name_list
+    
+    def get_current_cell_config(self):
+        """
+        检测当前配置是16串还是32串
+        
+        Returns:
+            int: 返回电芯数量，16 或 32，如果无法确定则返回 -1
+        """
+        try:
+            # 通过检查 PC_GET_SBS 的 usCellV 数量来判断
+            # 16串配置: usCellV[0] ~ usCellV[15]，共16个
+            # 32串配置: usCellV[0] ~ usCellV[31]，共32个
+            
+            sbs_variables = STRUCT_VARIABLES.get("PC_GET_SBS", [])
+            
+            # 计算 usCellV 的数量
+            cell_count = sum(1 for var in sbs_variables if var.startswith("usCellV["))
+            
+            if cell_count == 16:
+                print("当前配置：16串")
+                return 16
+            elif cell_count == 32:
+                print("当前配置：32串")
+                return 32
+            else:
+                print(f"警告：未知的电芯数量 {cell_count}")
+                return -1
+                
+        except Exception as e:
+            print(f"检测配置失败: {str(e)}")
+            traceback.print_exc()
+            return -1
+    
     def load_hex_file(self):
         # 打开文件对话框选择 HEX 文件
         file_path, _ = QFileDialog.getOpenFileName(self, "打开 HEX 文件", "", "(*.*);;HEX 文件 (*.hex)")
