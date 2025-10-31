@@ -41,6 +41,11 @@ STRUCT_FORMATS = {
         "LLLLL"  # ulOtherInfo, ulAlarmStatus, ulProtectStatus, ulFaultStatus, ulBalanceStatus
         "HH"  # usBattStatus, usSOC_Percent
         "LLL",  # ulSOH_Percent, ulDisTimes, ulTotalDisAH
+    "PC_GET_VER": "<"
+        "HHHH"    # usMajorVer, usMinorVer, usRevision, usCompileYear
+        "BB"      # ucCompileMonth, ucCompileDay
+        "30s"     # cHWversion (30 bytes)
+        "40s",    # cFuncVersion (40 bytes)
     "PC_GET_INF": "<"
         "HHHHBBBB"  # TVER: bootVer
         "HHHHBBBB"  # TVER: app_Ver
@@ -85,14 +90,14 @@ STRUCT_VARIABLES = {
     ],
     "PC_GET_KB": [
         "usPackVK", "usBattVK",
-        *[f"usCellVK[{i}]" for i in range(32)],
+        *[f"usCellVK[{i}]" for i in range(16)],
         "usChgCurrK", "sChgCurrB",
         "usDisCurrK", "sDisCurrB",
         "usChgCurrSK", "sChgCurrSB",
         "usDisCurrSK", "sDisCurrSB",
         "usChgCurrSSK", "sChgCurrSSB",
         "usDisCurrSSK", "sDisCurrSSB",
-        *[f"usTempK[{i}]" for i in range(15)]
+        *[f"usTempK[{i}]" for i in range(8)]
     ],
     "PC_GET_OCP_DELAYTIME": [
         "ChgDelayCount_1C", "ChgDelayCount_2C",
@@ -110,9 +115,9 @@ STRUCT_VARIABLES = {
     ],
     "PC_GET_SBS": [
         "ulPackV", "ulBattV",
-        *[f"usCellV[{i}]" for i in range(32)],
+        *[f"usCellV[{i}]" for i in range(16)],
         "lCurrent",
-        *[f"sTemp[{i}]" for i in range(15)],
+        *[f"sTemp[{i}]" for i in range(5)],
         "usRemainAH", "usFccAH", "usBiaAH",
         "ulOtherInfo", "ulAlarmStatus", "ulProtectStatus", "ulFaultStatus", "ulBalanceStatus",
         "usBattStatus", "usSOC_Percent",
@@ -492,8 +497,8 @@ class HexParserApp(QMainWindow):
             print(fmt)
             size = struct.calcsize(fmt)
             if size != len(data_bytes):
-                print(f"解析 {struct_name} 失败: 数据长度不匹配")
-                LogManager.get_instance().write_log(f"解析 {struct_name} 失败: 数据长度不匹配")
+                print(f"解析 {struct_name} 失败: 数据长度不匹配, 目标长度: {size}, 实际长度: {len(data_bytes)}")
+                LogManager.get_instance().write_log(f"解析 {struct_name} 失败: 数据长度不匹配, 目标长度: {size}, 实际长度: {len(data_bytes)}")
                 return None, None
             
             # 解析为元组
@@ -541,13 +546,13 @@ class HexParserApp(QMainWindow):
                         
                         # 根据约定确定符号
                         if var_name.startswith('s') or var_name.startswith('l'):
-                            dec_values.append(f"{value}")  # 保留符号
+                            dec_values.append(str(value))  # 保留符号
                         else:
-                            dec_values.append(f"{value & 0xFFFF_FFFF}")  # 无符号显示
+                            dec_values.append(str(value & 0xFFFF_FFFF))  # 无符号显示
                     else:
                         # 其他类型的值
-                        hex_byte_array.append(f"{value}")
-                        dec_values.append(f"{value}")
+                        hex_byte_array.append(str(value))
+                        dec_values.append(str(value))
             
             # 按字节对齐显示
             display_data = []
@@ -572,11 +577,23 @@ if __name__ == "__main__":
     app = QApplication(sys.argv)
     window = HexParserApp()
     str1 = "4A 9A 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 15 00 16 00 16 00 00 00 00 00 00 00 00 00 00 00 00 00 64 00 10 27 00 00 C0 00 01 00 20 10 00 00 00 00 00 00 10 00 00 00 00 00 00 00 00 00 01 00 64 00 00 00 00 00 00 00 00 00 00 00"
+    # 转换成字节数据
+    str1_bytes = bytearray.fromhex(str1.replace(" ", ""))
     # 测试数据
-    test_data = bytes.fromhex(str1)
+    test_data = bytearray([
+        0x01, 0x00, 0x02, 0x00, 0x03, 0x00, 0xE7, 0x07, 0x0A, 0x0F, 0x00,0x00, # bootVer
+        0x04, 0x00, 0x05, 0x00, 0x06, 0x00, 0xE7, 0x07, 0x0B, 0x14, 0x00,0x00, # app_Ver
+        0x07, 0x00, 0x08, 0x00, 0x09, 0x00, 0xE7, 0x07, 0x0C, 0x19, 0x00,0x00, # buffVer
+        0x0A, 0x00, 0x0B, 0x00, 0x0C, 0x00, 0xE8, 0x07, 0x01, 0x01, 0x00,0x00, # backVer
+        0x49, 0x43, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38,  # icName
+        0x39, 0x30, 0x31, 0x32, 0x33,  # icName (continued)
+        0x01,  # writableArea
+        0x78, 0x56, 0x34, 0x12,  # pcAddr
+        0xD0, 0x34, 0x56, 0x78  # uniqueID
+    ])
 
     # 解析测试数据
-    struct_name, parsed_data = window.decode_cmd_hex_data(0x13, test_data)
+    struct_name, parsed_data = window.decode_cmd_hex_data(0x13, str1_bytes)
     print(f"Struct Name: {struct_name}")
     print("Parsed Data:")
     for var_name, hex_val, dec_val in parsed_data["PC_GET_SBS"]:
