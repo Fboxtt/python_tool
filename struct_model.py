@@ -41,6 +41,11 @@ STRUCT_FORMATS = {
         "LLLLL"  # ulOtherInfo, ulAlarmStatus, ulProtectStatus, ulFaultStatus, ulBalanceStatus
         "HH"  # usBattStatus, usSOC_Percent
         "LLL",  # ulSOH_Percent, ulDisTimes, ulTotalDisAH
+    "PC_GET_VER": "<"
+        "HHHH"    # usMajorVer, usMinorVer, usRevision, usCompileYear
+        "BB"      # ucCompileMonth, ucCompileDay
+        "30s"     # cHWversion (30 bytes)
+        "40s",    # cFuncVersion (40 bytes)
     "PC_GET_INF": "<"
         "HHHHBBBB"  # TVER: bootVer
         "HHHHBBBB"  # TVER: app_Ver
@@ -85,14 +90,14 @@ STRUCT_VARIABLES = {
     ],
     "PC_GET_KB": [
         "usPackVK", "usBattVK",
-        *[f"usCellVK[{i}]" for i in range(32)],
+        *[f"usCellVK[{i}]" for i in range(16)],
         "usChgCurrK", "sChgCurrB",
         "usDisCurrK", "sDisCurrB",
         "usChgCurrSK", "sChgCurrSB",
         "usDisCurrSK", "sDisCurrSB",
         "usChgCurrSSK", "sChgCurrSSB",
         "usDisCurrSSK", "sDisCurrSSB",
-        *[f"usTempK[{i}]" for i in range(15)]
+        *[f"usTempK[{i}]" for i in range(8)]
     ],
     "PC_GET_OCP_DELAYTIME": [
         "ChgDelayCount_1C", "ChgDelayCount_2C",
@@ -492,8 +497,8 @@ class HexParserApp(QMainWindow):
             print(fmt)
             size = struct.calcsize(fmt)
             if size != len(data_bytes):
-                print(f"解析 {struct_name} 失败: 数据长度不匹配")
-                LogManager.get_instance().write_log(f"解析 {struct_name} 失败: 数据长度不匹配")
+                print(f"解析 {struct_name} 失败: 数据长度不匹配, 目标长度: {size}, 实际长度: {len(data_bytes)}")
+                LogManager.get_instance().write_log(f"解析 {struct_name} 失败: 数据长度不匹配, 目标长度: {size}, 实际长度: {len(data_bytes)}")
                 return None, None
             
             # 解析为元组
@@ -571,16 +576,9 @@ class HexParserApp(QMainWindow):
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     window = HexParserApp()
-    hex_str = "00 00 65 01 93 55 AA 00 AC 11 00 00 B5 86 00 00 F5 0A 98 0B A9 0B 8F 0B A3 0B BD 0B 22 0B E0 09 18 0B 28 0B 29 0B 25 0B 00 00 00 00 00 00 00 00 00 00 00 00 1E 00 1D 00 1E 00 00 00 00 00 00 00 88 13 00 00 C0 00 00 00 20 10 00 00 20 00 00 00 80 00 00 00 00 00 00 00 00 00 00 00 64 00 00 00 02 00 00 00 69 00 00 00 79"
-    test_data1 = bytearray.fromhex(hex_str)
-    test_data2 = test_data1[8:-1]
-    print(test_data2)
-    # 解析测试数据
-    struct_name, parsed_data = window.decode_cmd_hex_data(0x13, test_data2)
-    print(f"Struct Name: {struct_name}")
-    print("Parsed Data:")
-    for var_name, hex_val, dec_val in parsed_data["PC_GET_INF"]:
-        print(f"{var_name}: {hex_val} | {dec_val}")
+    str1 = "4A 9A 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 15 00 16 00 16 00 00 00 00 00 00 00 00 00 00 00 00 00 64 00 10 27 00 00 C0 00 01 00 20 10 00 00 00 00 00 00 10 00 00 00 00 00 00 00 00 00 01 00 64 00 00 00 00 00 00 00 00 00 00 00"
+    # 转换成字节数据
+    str1_bytes = bytearray.fromhex(str1.replace(" ", ""))
     # 测试数据
 
     test_data = bytearray([
@@ -596,10 +594,10 @@ if __name__ == "__main__":
     ])
 
     # 解析测试数据
-    struct_name, parsed_data = window.decode_cmd_hex_data(0x71, test_data)
+    struct_name, parsed_data = window.decode_cmd_hex_data(0x13, str1_bytes)
     print(f"Struct Name: {struct_name}")
     print("Parsed Data:")
-    for var_name, hex_val, dec_val in parsed_data["PC_GET_INF"]:
+    for var_name, hex_val, dec_val in parsed_data["PC_GET_SBS"]:
         print(f"{var_name}: {hex_val} | {dec_val}")
 
     window.show()
