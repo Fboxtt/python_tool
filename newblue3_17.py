@@ -61,24 +61,38 @@ class BitFlagsTableModel(QAbstractTableModel):
             # 填充第一列组 (columns 0-2)
             if row < data_len:
                 row_data[0] = self._original_data[row][0]  # 参数名
-                row_data[1] = self._original_data[row][2]  # 当前值
+                row_data[1] = self._format_display_value(self._original_data[row][2])  # 当前值（格式化显示）
                 row_data[2] = self._write_values.get(row, "")  # 写入值
 
             # 填充第二列组 (columns 3-5)
             second_group_idx = row + self._max_rows_per_column
             if second_group_idx < data_len:
                 row_data[3] = self._original_data[second_group_idx][0]  # 参数名
-                row_data[4] = self._original_data[second_group_idx][2]  # 当前值
+                row_data[4] = self._format_display_value(self._original_data[second_group_idx][2])  # 当前值（格式化显示）
                 row_data[5] = self._write_values.get(second_group_idx, "")  # 写入值
 
             # 填充第三列组 (columns 6-8)
             third_group_idx = row + 2 * self._max_rows_per_column
             if third_group_idx < data_len:
                 row_data[6] = self._original_data[third_group_idx][0]  # 参数名
-                row_data[7] = self._original_data[third_group_idx][2]  # 当前值
+                row_data[7] = self._format_display_value(self._original_data[third_group_idx][2])  # 当前值（格式化显示）
                 row_data[8] = self._write_values.get(third_group_idx, "")  # 写入值
 
             self._organized_data.append(row_data)
+
+    def _format_display_value(self, value):
+        """格式化显示值，处理十六进制显示格式"""
+        if isinstance(value, str):
+            # 检查是否是十六进制格式 "0xXXXX"
+            if value.startswith("0x") or value.startswith("0X"):
+                # 已经是十六进制显示，直接返回
+                return value
+            else:
+                # 普通字符串值，直接返回
+                return value
+        else:
+            # 非字符串值，转换为字符串
+            return str(value)
 
     def _get_original_index(self, row, col):
         """根据表格位置获取原始数据索引"""

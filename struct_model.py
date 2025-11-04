@@ -203,12 +203,26 @@ STRUCT_COMMANDS = {
     "PC_GET_INF" : 0x71
 }
 
+# 定义需要显示十六进制的变量
+HEX_DISPLAY_VARIABLES = {
+    "PC_GET_SBS": [
+        "ulOtherInfo", "ulAlarmStatus", "ulProtectStatus", "ulFaultStatus", "ulBalanceStatus"
+    ],
+    "PC_GET_BMS": [
+        # 可以根据需要添加其他命令的十六进制显示变量
+    ],
+    "PC_GET_MOSHTDATA": [
+        "sAlarm", "sAlarmRe", "sProtect", "sProtectRe"
+    ]
+}
+
 # 将所有字典组合成一个字典
 config_data = {
     "STRUCT_FORMATS": STRUCT_FORMATS,
     "STRUCT_ADDRESSES": STRUCT_ADDRESSES,
     "STRUCT_VARIABLES": STRUCT_VARIABLES,
-    "STRUCT_COMMANDS": STRUCT_COMMANDS
+    "STRUCT_COMMANDS": STRUCT_COMMANDS,
+    "HEX_DISPLAY_VARIABLES": HEX_DISPLAY_VARIABLES
 }
 
 # 写入读出对应关系管理
@@ -682,12 +696,24 @@ class HexParserApp(QMainWindow):
                             hex_byte_array.append(f"0x{value:04X}")
                         else:
                             hex_byte_array.append(f"0x{value:08X}")
-                        
-                        # 根据约定确定符号
-                        if var_name.startswith('s') or var_name.startswith('l'):
-                            dec_values.append(str(value))  # 保留符号
+
+                        # 检查是否需要显示十六进制格式
+                        hex_vars = HEX_DISPLAY_VARIABLES.get(struct_name, [])
+                        if var_name in hex_vars:
+                            # 为指定变量只显示十六进制字符串
+                            if value < 256:
+                                hex_str = f"0x{value:02X}"
+                            elif value < 65536:
+                                hex_str = f"0x{value:04X}"
+                            else:
+                                hex_str = f"0x{value:08X}"
+                            dec_values.append(hex_str)  # 只显示十六进制
                         else:
-                            dec_values.append(str(value & 0xFFFF_FFFF))  # 无符号显示
+                            # 根据约定确定符号
+                            if var_name.startswith('s') or var_name.startswith('l'):
+                                dec_values.append(str(value))  # 保留符号
+                            else:
+                                dec_values.append(str(value & 0xFFFF_FFFF))  # 无符号显示
                     else:
                         # 其他类型的值
                         hex_byte_array.append(str(value))
