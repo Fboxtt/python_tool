@@ -13,6 +13,296 @@ import traceback
 CELL_COUNT = 16  # Adjust this value as needed
 TEMP_COUNT = 5   # Adjust this value as needed
 
+# ======================== 状态位定义（位掩码）========================
+# 告警状态位 (ALARM)
+ALARM_PACK_OV = 0x00000001
+ALARM_BATT_OV = 0x00000002
+ALARM_CELL_OV = 0x00000004
+ALARM_BATT_UV = 0x00000010
+ALARM_CELL_UV = 0x00000020
+ALARM_CHG_OC = 0x00000040
+ALARM_DIS_OC = 0x00000080
+ALARM_CHG_OT = 0x00000100
+ALARM_DIS_OT = 0x00000200
+ALARM_CHG_UT = 0x00000400
+ALARM_DIS_UT = 0x00000800
+ALARM_SOC_L = 0x00001000
+ALARM_END_LIFE = 0x00010000
+ALARM_MOS_HT = 0x00020000
+
+# 保护状态位 (PROTECT)
+PROTECT_PACK_OV = 0x00000001
+PROTECT_BATT_OV = 0x00000002
+PROTECT_CELL_OV = 0x00000004
+PROTECT_BATT_UV = 0x00000010
+PROTECT_CELL_UV = 0x00000020
+PROTECT_CHG_OC = 0x00000040
+PROTECT_DIS_OC = 0x00000080
+PROTECT_CHG_OT = 0x00000100
+PROTECT_DIS_OT = 0x00000200
+PROTECT_CHG_UT = 0x00000400
+PROTECT_DIS_UT = 0x00000800
+PROTECT_SHORT = 0x00004000
+PROTECT_REV = 0x00008000
+PROTECT_CHG_UTOC = 0x00010000
+PROTECT_CHG_UTOV = 0x00040000
+PROTECT_CHG_SHORT = 0x00080000
+PROTECT_PSP = 0x00100000
+PROTECT_BQ_SCD = 0x00200000  # BQ769X0检测短路
+PROTECT_BQ_OCD = 0x00400000  # BQ769X0检测放电过流
+PROTECT_MOS_HT = 0x00800000
+PROTECT_CHG_UT_LIMIT = 0x01000000  # 充电低温极限保护值
+
+# 失效状态位 (FAULT)
+FAULT_V_SENSOR = 0x00000001
+FAULT_T_SENSOR = 0x00000002
+FAULT_CHG = 0x00000004
+FAULT_DIS = 0x00000008
+FAULT_CELL_BAD = 0x00000010
+FAULT_SWITCH_OFF = 0x00000080
+FAULT_LIFE_END = 0x00000100
+FAULT_BQ_UV = 0x00010000  # BQ769X0二次保护欠压
+FAULT_BQ_OV = 0x00020000  # BQ769X0二次保护过压
+FAULT_BQ_DEVIECE = 0x00040000  # BQ769X0芯片失效
+FAULT_BQ_OVERWR = 0x00080000  # BQ769X0芯片失效
+FAULT_FUSE_BREAK = 0x00100000  # 保险丝熔断异常
+
+# 其他信息状态位 (INFO)
+INFO_HEAETER_CONFIG = 0x00000001
+INFO_HEATER_ON = 0x00000002
+INFO_CHG_FULL_T = 0x00000004
+INFO_BATT_FULL = 0x00000008
+INFO_CHG_LIMITED_ON = 0x00000010
+INFO_DIS_LIMITED_ON = 0x00000020
+INFO_CHG_MOS_OFF = 0x00000040
+INFO_DIS_MOS_OFF = 0x00000080
+INFO_LOWVOL_LIMIT = 0x00000100
+INFO_LOWTEMP_FORCECHG = 0x00000200
+INFO_MULT_BATT = 0x00000400
+INFO_CAN_MASTER = 0x00000800
+INFO_CAN_SLAVE = 0x00001000
+INFO_CALENDAR_REACH = 0x00002000
+INFO_TEST_KB = 0x00004000
+INFO_CALIBRATED_V = 0x00008000
+INFO_CALIBRATED_C = 0x00010000
+INFO_LOST_CANBOX = 0x00020000
+INFO_NO_INV_TIMEOUTE = 0x00040000
+INFO_FUSEEN_OPEN = 0x00080000
+INFO_CELL_CTO = 0x00100000
+
+# 充放电状态 (STATUS)
+STATUS_IDLE = 0x00
+STATUS_CHG = 0x01
+STATUS_DIS = 0x02
+STATUS_FULL = 0x04
+
+# 状态位名称映射字典（统一长度5-6字符）
+STATUS_BIT_NAMES = {
+    # 告警状态 (ALARM)
+    'ALARM': {
+        ALARM_PACK_OV: '告_组过压',
+        ALARM_BATT_OV: '告_池过压',
+        ALARM_CELL_OV: '告_芯过压',
+        ALARM_BATT_UV: '告_池欠压',
+        ALARM_CELL_UV: '告_芯欠压',
+        ALARM_CHG_OC: '告_充过流',
+        ALARM_DIS_OC: '告_放过流',
+        ALARM_CHG_OT: '告_充过温',
+        ALARM_DIS_OT: '告_放过温',
+        ALARM_CHG_UT: '告_充低温',
+        ALARM_DIS_UT: '告_放低温',
+        ALARM_SOC_L: '告_SOC低',
+        ALARM_END_LIFE: '告_寿终止',
+        ALARM_MOS_HT: '告_MOS热',
+    },
+    # 保护状态 (PROTECT)
+    'PROTECT': {
+        PROTECT_PACK_OV: '护_组过压',
+        PROTECT_BATT_OV: '护_池过压',
+        PROTECT_CELL_OV: '护_芯过压',
+        PROTECT_BATT_UV: '护_池欠压',
+        PROTECT_CELL_UV: '护_芯欠压',
+        PROTECT_CHG_OC: '护_充过流',
+        PROTECT_DIS_OC: '护_放过流',
+        PROTECT_CHG_OT: '护_充过温',
+        PROTECT_DIS_OT: '护_放过温',
+        PROTECT_CHG_UT: '护_充低温',
+        PROTECT_DIS_UT: '护_放低温',
+        PROTECT_SHORT: '护_短路',
+        PROTECT_REV: '护_反接',
+        PROTECT_CHG_UTOC: '护_充温流',
+        PROTECT_CHG_UTOV: '护_充温压',
+        PROTECT_CHG_SHORT: '护_充短路',
+        PROTECT_PSP: '护_PSP',
+        PROTECT_BQ_SCD: '护_BQ短路',
+        PROTECT_BQ_OCD: '护_BQ过流',
+        PROTECT_MOS_HT: '护_MOS热',
+        PROTECT_CHG_UT_LIMIT: '护_充温限',
+    },
+    # 失效状态 (FAULT)
+    'FAULT': {
+        FAULT_V_SENSOR: '错_电压器',
+        FAULT_T_SENSOR: '错_温度器',
+        FAULT_CHG: '错_充电',
+        FAULT_DIS: '错_放电',
+        FAULT_CELL_BAD: '错_电芯',
+        FAULT_SWITCH_OFF: '错_开关',
+        FAULT_LIFE_END: '错_寿终',
+        FAULT_BQ_UV: '错_BQ欠压',
+        FAULT_BQ_OV: '错_BQ过压',
+        FAULT_BQ_DEVIECE: '错_BQ芯片',
+        FAULT_BQ_OVERWR: '错_BQ覆写',
+        FAULT_FUSE_BREAK: '错_保险丝',
+    },
+    # 其他信息 (INFO)
+    'INFO': {
+        INFO_HEAETER_CONFIG: '另_加热配',
+        INFO_HEATER_ON: '另_加热开',
+        INFO_CHG_FULL_T: '另_充满温',
+        INFO_BATT_FULL: '另_电池满',
+        INFO_CHG_LIMITED_ON: '另_充限流',
+        INFO_DIS_LIMITED_ON: '另_放限流',
+        INFO_CHG_MOS_OFF: '另_充MOS',
+        INFO_DIS_MOS_OFF: '另_放MOS',
+        INFO_LOWVOL_LIMIT: '另_低压限',
+        INFO_LOWTEMP_FORCECHG: '另_温强充',
+        INFO_MULT_BATT: '另_多电池',
+        INFO_CAN_MASTER: '另_CAN主',
+        INFO_CAN_SLAVE: '另_CAN从',
+        INFO_CALENDAR_REACH: '另_日历到',
+        INFO_TEST_KB: '另_测试KB',
+        INFO_CALIBRATED_V: '另_电压准',
+        INFO_CALIBRATED_C: '另_电流准',
+        INFO_LOST_CANBOX: '另_CAN丢',
+        INFO_NO_INV_TIMEOUTE: '另_无逆变',
+        INFO_FUSEEN_OPEN: '另_保险开',
+        INFO_CELL_CTO: '另_芯CTO',
+    }
+}
+
+# 充放电状态名称
+BATTERY_STATUS_NAMES = {
+    STATUS_IDLE: '空闲',
+    STATUS_CHG: '充电',
+    STATUS_DIS: '放电',
+    STATUS_FULL: '已满'
+}
+
+
+def parse_status_bits(status_value, status_type='ALARM'):
+    """
+    解析状态寄存器值为单个状态位列表
+
+    Args:
+        status_value: 状态寄存器的值（32位整数）
+        status_type: 状态类型 'ALARM', 'PROTECT', 'FAULT', 'INFO'
+
+    Returns:
+        list: 状态位列表，每项格式 {'name': str, 'value': int, 'bit': int}
+    """
+    if status_type not in STATUS_BIT_NAMES:
+        return []
+
+    bit_map = STATUS_BIT_NAMES[status_type]
+    result = []
+
+    for bit_mask, name in bit_map.items():
+        # 检查该位是否被置起
+        is_set = 1 if (status_value & bit_mask) != 0 else 0
+
+        # 计算位位置（用于调试）
+        bit_position = (bit_mask & -bit_mask).bit_length() - 1
+
+        result.append({
+            'name': name,
+            'value': is_set,
+            'bit': bit_position,
+            'mask': bit_mask
+        })
+
+    return result
+
+
+def parse_all_status_from_sbs(sbs_data_dict):
+    """
+    从 PC_GET_SBS 数据字典中解析所有状态位
+
+    Args:
+        sbs_data_dict: PC_GET_SBS 解析后的字典，包含 ulAlarmStatus, ulProtectStatus 等
+
+    Returns:
+        dict: 包含所有状态位的字典
+            {
+                'alarm': [...],
+                'protect': [...],
+                'fault': [...],
+                'info': [...],
+                'battery_status': str
+            }
+    """
+    result = {}
+
+    # 解析告警状态
+    if 'ulAlarmStatus' in sbs_data_dict:
+        result['alarm'] = parse_status_bits(sbs_data_dict['ulAlarmStatus'], 'ALARM')
+
+    # 解析保护状态
+    if 'ulProtectStatus' in sbs_data_dict:
+        result['protect'] = parse_status_bits(sbs_data_dict['ulProtectStatus'], 'PROTECT')
+
+    # 解析失效状态
+    if 'ulFaultStatus' in sbs_data_dict:
+        result['fault'] = parse_status_bits(sbs_data_dict['ulFaultStatus'], 'FAULT')
+
+    # 解析其他信息
+    if 'ulOtherInfo' in sbs_data_dict:
+        result['info'] = parse_status_bits(sbs_data_dict['ulOtherInfo'], 'INFO')
+
+    # 解析电池状态
+    if 'usBattStatus' in sbs_data_dict:
+        batt_status = sbs_data_dict['usBattStatus']
+        result['battery_status'] = BATTERY_STATUS_NAMES.get(batt_status, f'未知({batt_status})')
+
+    return result
+
+
+def get_all_status_bits_for_display(sbs_data_dict):
+    """
+    从 PC_GET_SBS 数据中提取所有状态位，格式化为适合 StatusBitsWidget 显示的格式
+    按类型分组，同类型在同一列显示
+
+    Args:
+        sbs_data_dict: PC_GET_SBS 解析后的字典
+
+    Returns:
+        list: 状态位列表，每项格式 {'name': str, 'value': int}，适合直接传给 update_status_bits()
+    """
+    all_status = parse_all_status_from_sbs(sbs_data_dict)
+    display_list = []
+
+    # 添加告警状态（名称已包含"告_"前缀）
+    if 'alarm' in all_status:
+        for bit in all_status['alarm']:
+            display_list.append({'name': bit['name'], 'value': bit['value']})
+
+    # 添加保护状态（名称已包含"护_"前缀）
+    if 'protect' in all_status:
+        for bit in all_status['protect']:
+            display_list.append({'name': bit['name'], 'value': bit['value']})
+
+    # 添加失效状态（名称已包含"错_"前缀）
+    if 'fault' in all_status:
+        for bit in all_status['fault']:
+            display_list.append({'name': bit['name'], 'value': bit['value']})
+
+    # 添加其他信息（名称已包含"另_"前缀）
+    if 'info' in all_status:
+        for bit in all_status['info']:
+            display_list.append({'name': bit['name'], 'value': bit['value']})
+
+    return display_list
+
+
 # ---------------------------- 结构体定义 ----------------------------
 # 注意：所有格式字符串均已展开为具体字符，确保顺序严格匹配
 STRUCT_FORMATS = {
@@ -68,7 +358,7 @@ STRUCT_ADDRESSES = {
 
 STRUCT_VARIABLES = {
     "PC_GET_BMS": [
-        "ulCHG_SwitchV", "ulSwitch_PB_DiffV", 
+        "ulCHG_SwitchV", "ulSwitch_PB_DiffV",
         "ulCHG_Bls_StartV", "ulCHG_Bls_StopV",
         "ulPack_OVA_Threshold", "ulPack_OVA_Resume",
         "ulPack_OVP_Threshold", "ulPack_OVP_Resume",
@@ -229,7 +519,7 @@ config_data = {
 WRITE_READ_COMMAND_MAPPING = {
     # 写入命令 : 读取命令
     "PC_SET_KB": "PC_GET_KB",
-    "PC_SET_BMS": "PC_GET_BMS", 
+    "PC_SET_BMS": "PC_GET_BMS",
     "PC_SET_OCP_DELAYTIME": "PC_GET_OCP_DELAYTIME",
     "PC_SET_CELL_CAP_PARA": "PC_GET_CELL_CAP_PARA",
     "PC_SET_LIFE_PARA": "PC_GET_LIFE_PARA",
@@ -241,7 +531,7 @@ READ_WRITE_COMMAND_MAPPING = {
     # 读取命令 : 写入命令
     "PC_GET_KB": "PC_SET_KB",
     "PC_GET_BMS": "PC_SET_BMS",
-    "PC_GET_OCP_DELAYTIME": "PC_SET_OCP_DELAYTIME", 
+    "PC_GET_OCP_DELAYTIME": "PC_SET_OCP_DELAYTIME",
     "PC_GET_CELL_CAP_PARA": "PC_SET_CELL_CAP_PARA",
     "PC_GET_LIFE_PARA": "PC_SET_LIFE_PARA",
     "PC_GET_MOSHTDATA": "PC_SET_MOSHTDATA",
@@ -250,10 +540,10 @@ READ_WRITE_COMMAND_MAPPING = {
 def get_write_command_from_read(read_command_name):
     """
     根据读取命令名称获取对应的写入命令名称
-    
+
     Args:
         read_command_name (str): 读取命令名称，如 "PC_GET_LIFE_PARA"
-    
+
     Returns:
         str: 对应的写入命令名称，如 "PC_SET_LIFE_PARA"，如果没有找到则返回 None
     """
@@ -262,10 +552,10 @@ def get_write_command_from_read(read_command_name):
 def get_read_command_from_write(write_command_name):
     """
     根据写入命令名称获取对应的读取命令名称
-    
+
     Args:
         write_command_name (str): 写入命令名称，如 "PC_SET_LIFE_PARA"
-    
+
     Returns:
         str: 对应的读取命令名称，如 "PC_GET_LIFE_PARA"，如果没有找到则返回 None
     """
@@ -274,10 +564,10 @@ def get_read_command_from_write(write_command_name):
 def get_write_command_code(read_command_name):
     """
     根据读取命令名称获取对应的写入命令代码
-    
+
     Args:
         read_command_name (str): 读取命令名称，如 "PC_GET_LIFE_PARA"
-    
+
     Returns:
         int: 对应的写入命令代码，如 0x40，如果没有找到则返回 None
     """
@@ -289,10 +579,10 @@ def get_write_command_code(read_command_name):
 def get_read_command_code(write_command_name):
     """
     根据写入命令名称获取对应的读取命令代码
-    
+
     Args:
         write_command_name (str): 写入命令名称，如 "PC_SET_LIFE_PARA"
-    
+
     Returns:
         int: 对应的读取命令代码，如 0x41，如果没有找到则返回 None
     """
@@ -304,10 +594,10 @@ def get_read_command_code(write_command_name):
 def can_command_be_written(read_command_name):
     """
     检查某个读取命令是否有对应的写入命令
-    
+
     Args:
         read_command_name (str): 读取命令名称
-    
+
     Returns:
         bool: 如果有对应的写入命令返回 True，否则返回 False
     """
@@ -316,7 +606,7 @@ def can_command_be_written(read_command_name):
 def get_all_writable_commands():
     """
     获取所有可写入的命令对应关系
-    
+
     Returns:
         dict: 所有可写入的命令对应关系字典
     """
@@ -346,7 +636,7 @@ class HexParserApp(QMainWindow):
     def set_config_file(self, force_write=False):
         """
         设置配置文件
-        
+
         Args:
             force_write (bool): 如果为 True，强制写入当前 config_data，不从文件读取
         """
@@ -361,7 +651,7 @@ class HexParserApp(QMainWindow):
                     # 读取现有配置文件
                     with open(config_file_path, 'r', encoding='utf-8') as config_file:
                         existing_config = json.load(config_file)
-                    
+
                     # 检查现有配置文件格式是否正确
                     if isinstance(existing_config, dict):
                         # 比较现有配置文件与当前配置数据
@@ -425,7 +715,7 @@ class HexParserApp(QMainWindow):
         "HHH" +\
         "LLLLL" +\
         "HH" +\
-        "LLL" 
+        "LLL"
         STRUCT_VARIABLES["PC_GET_SBS"] = ["ulPackV", "ulBattV",
         *[f"usCellV[{i}]" for i in range(16)],
         "lCurrent",
@@ -434,7 +724,7 @@ class HexParserApp(QMainWindow):
         "ulOtherInfo", "ulAlarmStatus", "ulProtectStatus", "ulFaultStatus", "ulBalanceStatus",
         "usBattStatus", "usSOC_Percent",
         "ulSOH_Percent", "ulDisTimes", "ulTotalDisAH"]
-        
+
         # PC_GET_KB: 8个温度传感器
         STRUCT_FORMATS["PC_GET_KB"] = "<HH" + \
         "HHHHHHHHHHHHHHHH" +\
@@ -449,15 +739,15 @@ class HexParserApp(QMainWindow):
         "usChgCurrSSK", "sChgCurrSSB",
         "usDisCurrSSK", "sDisCurrSSB",
         *[f"usTempK[{i}]" for i in range(8)]]
-        
+
         # 修改完成后，更新 config_data 字典
         config_data["STRUCT_FORMATS"] = STRUCT_FORMATS
         config_data["STRUCT_VARIABLES"] = STRUCT_VARIABLES
-        
+
         # 强制写入配置文件
         print("16串配置已更新（SBS:5个温度, KB:8个温度），正在写入配置文件...")
         self.set_config_file(force_write=True)
-    
+
     def set_struct_to_cell_32(self):
         """
         设置为32串配置
@@ -472,7 +762,7 @@ class HexParserApp(QMainWindow):
         "HHH" +\
         "LLLLL" +\
         "HH" +\
-        "LLL" 
+        "LLL"
         STRUCT_VARIABLES["PC_GET_SBS"] =  ["ulPackV", "ulBattV",
         *[f"usCellV[{i}]" for i in range(32)],
         "lCurrent",
@@ -481,7 +771,7 @@ class HexParserApp(QMainWindow):
         "ulOtherInfo", "ulAlarmStatus", "ulProtectStatus", "ulFaultStatus", "ulBalanceStatus",
         "usBattStatus", "usSOC_Percent",
         "ulSOH_Percent", "ulDisTimes", "ulTotalDisAH"]
-        
+
         # PC_GET_KB: 15个温度传感器
         STRUCT_FORMATS["PC_GET_KB"] = "<HH" + \
         "HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH" +\
@@ -496,11 +786,11 @@ class HexParserApp(QMainWindow):
         "usChgCurrSSK", "sChgCurrSSB",
         "usDisCurrSSK", "sDisCurrSSB",
         *[f"usTempK[{i}]" for i in range(15)]]
-        
+
         # 修改完成后，更新 config_data 字典
         config_data["STRUCT_FORMATS"] = STRUCT_FORMATS
         config_data["STRUCT_VARIABLES"] = STRUCT_VARIABLES
-        
+
         # 强制写入配置文件
         print("32串配置已更新，正在写入配置文件...")
         self.set_config_file(force_write=True)
@@ -511,11 +801,11 @@ class HexParserApp(QMainWindow):
                 struct_str += "," + i
             self.struct_name_list.append(struct_str)
         return self.struct_name_list
-    
+
     def get_current_cell_config(self):
         """
         检测当前配置是16串还是32串
-        
+
         Returns:
             int: 返回电芯数量，16 或 32，如果无法确定则返回 -1
         """
@@ -523,12 +813,12 @@ class HexParserApp(QMainWindow):
             # 通过检查 PC_GET_SBS 的 usCellV 数量来判断
             # 16串配置: usCellV[0] ~ usCellV[15]，共16个
             # 32串配置: usCellV[0] ~ usCellV[31]，共32个
-            
+
             sbs_variables = STRUCT_VARIABLES.get("PC_GET_SBS", [])
-            
+
             # 计算 usCellV 的数量
             cell_count = sum(1 for var in sbs_variables if var.startswith("usCellV["))
-            
+
             if cell_count == 16:
                 print("当前配置：16串")
                 return 16
@@ -538,12 +828,12 @@ class HexParserApp(QMainWindow):
             else:
                 print(f"警告：未知的电芯数量 {cell_count}")
                 return -1
-                
+
         except Exception as e:
             print(f"检测配置失败: {str(e)}")
             traceback.print_exc()
             return -1
-    
+
     def load_hex_file(self):
         # 打开文件对话框选择 HEX 文件
         file_path, _ = QFileDialog.getOpenFileName(self, "打开 HEX 文件", "", "(*.*);;HEX 文件 (*.hex)")
@@ -578,7 +868,7 @@ class HexParserApp(QMainWindow):
         for struct_name, address in STRUCT_ADDRESSES.items():
             fmt = STRUCT_FORMATS[struct_name]
             size = struct.calcsize(fmt)
-            
+
             try:
                 # 读取原始字节
                 data_bytes = ih.tobinstr(start=address, size=size)
@@ -609,7 +899,7 @@ class HexParserApp(QMainWindow):
                         dec_values.append(str(value))  # 保留符号
                     else:
                         dec_values.append(str(value & 0xFFFF_FFFF))  # 无符号显示
-                
+
                 # 按字节对齐显示
                 display_data = []
                 byte_offset = 0
@@ -624,15 +914,15 @@ class HexParserApp(QMainWindow):
                     byte_offset += byte_len
                     i += 1
                 parsed_data[struct_name] = display_data
-                
+
             except Exception as e:
                 self.text_edit.append(f"解析 {struct_name} 失败: {str(e)}")
-        
+
         return parsed_data
     def decode_cmd_hex_data(self, cmd:int, data_bytes:bytes):
         """
         把二进制数据转换成字典数据
-        """            
+        """
         parsed_data = {}
         if cmd in STRUCT_COMMANDS.values():
             for key, value in STRUCT_COMMANDS.items():
@@ -653,21 +943,21 @@ class HexParserApp(QMainWindow):
                 print(f"解析 {struct_name} 失败: 数据长度不匹配, 目标长度: {size}, 实际长度: {len(data_bytes)}")
                 LogManager.get_instance().write_log(f"解析 {struct_name} 失败: 数据长度不匹配, 目标长度: {size}, 实际长度: {len(data_bytes)}")
                 return None, None
-            
+
             # 解析为元组
             values = struct.unpack(fmt, data_bytes)
-            
+
             # 处理有符号值
             dec_values = []
             hex_byte_array = []
-            
+
             # 首先找到icName字段在values中的索引
             icname_index = None
             for i, var_name in enumerate(STRUCT_VARIABLES[struct_name]):
                 if var_name == "icName":
                     icname_index = i
                     break
-            
+
             for i, (var_name, value) in enumerate(zip(STRUCT_VARIABLES[struct_name], values)):
                 if var_name == "icName":
                     # 检查value的类型并相应处理
@@ -718,7 +1008,7 @@ class HexParserApp(QMainWindow):
                         # 其他类型的值
                         hex_byte_array.append(str(value))
                         dec_values.append(str(value))
-            
+
             # 按字节对齐显示
             display_data = []
             for i, (var_name, dec_val) in enumerate(zip(STRUCT_VARIABLES[struct_name], dec_values)):
@@ -728,11 +1018,11 @@ class HexParserApp(QMainWindow):
                     dec_val
                 ))
             parsed_data[struct_name] = display_data
-            
+
         except Exception as e:
             traceback.print_exc()
             LogManager.get_instance().write_log(f"解析 {struct_name} 失败: {str(e)}")
-        
+
         LogManager.get_instance().write_log("发射dic信号")
         return struct_name, parsed_data
 
