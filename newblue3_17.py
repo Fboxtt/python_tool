@@ -36,6 +36,11 @@ from struct_model import (
 import struct
 
 from ui_main import Ui_Form
+from data_display_manager import DataDisplayManager  # ⭐ 导入数据显示管理器
+# from display_widgets import BitFlagsTableModel, StatusBitsWidget, StatusBitsDelegate, StatusBitsTableModel  # 导入显示组件
+
+# 注意：BitFlagsTableModel等类保留在此文件中，data_display_manager从display_widgets导入
+# 这样避免循环导入问题
 
 class BitFlagsTableModel(QAbstractTableModel):
     """位标志表格模型（性能优化版）"""
@@ -2702,101 +2707,44 @@ class load_ui_dynamically(QMainWindow):
             # widgets.pushButton.clicked.connect(self.close)  # 假设 pushButton 是一个关闭按钮
             self.bluetooth_tool.blue_write_log(f"UI文件 {ui_file} 加载成功")
 
-            # 在一级窗口上再创建一个qwidget用来显示一些标志位
-            # self.setGeometry(0, 0, 900, 600)
-            self.setFixedSize(1150,600)  # 增加宽度以容纳bit_window和status_widget
-            self.bit_window = QWidget(self)  # 设置父窗口为self
+            # ============== 使用DataDisplayManager统一管理显示窗口 ==============
+            self.setFixedSize(1150, 600)  # 设置主窗口大小
 
-            # 创建命令信息显示标签
-            self.command_info_label = QLabel('当前命令: 无')
-            self.command_info_label.setStyleSheet("QLabel { color: blue; font-weight: bold; }")
+            # 创建数据显示管理器（嵌入模式）
+            self.data_display_mgr = DataDisplayManager(
+                parent=None,
+                logger=self.logger,
+                standalone=False
+            )
 
-            # 创建按钮布局
-            button_layout = QHBoxLayout()
-            self.send_modify_button = QPushButton('发送修改值')
-            self.clear_modify_button = QPushButton('清空修改值')
+            # 创建所有显示窗口
+            self.data_display_mgr.create_windows(parent_widget=self)
 
-            button_layout.addWidget(self.send_modify_button)
-            button_layout.addWidget(self.clear_modify_button)
-            button_layout.addStretch()  # 添加弹性空间
+            # 设置窗口位置和大小
+            self.data_display_mgr.setup_windows_geometry(
+                bit_geom=(150, 10, 580, 580),    # bit_window: x, y, width, height
+                status_geom=(740, 10, 390, 580)  # status_widget: x, y, width, height
+            )
 
-            # 创建QTableView和模型
-            self.bit_table_view = QTableView()
-            self.bit_table_model = BitFlagsTableModel()
-            self.bit_table_view.setModel(self.bit_table_model)
+            # 显示所有窗口
+            self.data_display_mgr.show_windows()
 
-            # 设置表格属性
-            self.bit_table_view.setAlternatingRowColors(True)
-            self.bit_table_view.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-            self.bit_table_view.horizontalHeader().setStretchLastSection(False)
+            # 获取内部组件引用（为了兼容性）
+            self.bit_window = self.data_display_mgr.bit_window_manager.widget if self.data_display_mgr.bit_window_manager else None
+            self.status_widget = self.data_display_mgr.status_window_manager.widget if self.data_display_mgr.status_window_manager else None
+            self.bit_table_model = self.data_display_mgr.bit_window_manager.table_model if self.data_display_mgr.bit_window_manager else None
+            self.command_info_label = None  # 标签已在manager内部管理
 
-            # 设置列宽 - 现在是9列（适应580宽度的窗口）
-            column_widths = [75, 55, 55, 75, 55, 55, 75, 55, 55]
-            for i, width in enumerate(column_widths):
-                self.bit_table_view.setColumnWidth(i, width)
+            # 连接发送按钮信号（从管理器内部获取按钮）
+            if self.data_display_mgr.bit_window_manager:
+                self.data_display_mgr.bit_window_manager.send_button.clicked.connect(self.send_modified_values)
+                self.data_display_mgr.bit_window_manager.clear_button.clicked.connect(self.clear_modified_values)
 
-            # 设置更紧凑的行间距
-            self.bit_table_view.verticalHeader().setDefaultSectionSize(20)  # 默认行高设为20
-            self.bit_table_view.verticalHeader().setMinimumSectionSize(18)  # 最小行高设为18
-
-            # 添加样式表以区分不同的列组
-            self.bit_table_view.setStyleSheet("""
-                QTableView::item {
-                    border: 1px solid #cccccc;
-                    padding: 3px;
-                }
-                QTableView::item:selected {
-                    background-color: #3399ff;
-                    color: white;
-                }
-                QHeaderView::section {
-                    background-color: #f0f0f0;
-                    border: 1px solid #cccccc;
-                    padding: 4px;
-                    font-weight: bold;
-                }
-                QHeaderView::section:nth-child(1),
-                QHeaderView::section:nth-child(2),
-                QHeaderView::section:nth-child(3) {
-                    background-color: #e8f4f8;
-                }
-                QHeaderView::section:nth-child(4),
-                QHeaderView::section:nth-child(5),
-                QHeaderView::section:nth-child(6) {
-                    background-color: #f8f8e8;
-                }
-                QHeaderView::section:nth-child(7),
-                QHeaderView::section:nth-child(8),
-                QHeaderView::section:nth-child(9) {
-                    background-color: #f8e8f8;
-                }
-            """)
-
-            # 创建主布局
-            self.bit_layout = QVBoxLayout()
-            self.bit_layout.addWidget(self.command_info_label)
-            self.bit_layout.addLayout(button_layout)
-            self.bit_layout.addWidget(self.bit_table_view)
-            self.bit_window.setLayout(self.bit_layout)
-
-            # 保留原有的标签列表（可能其他地方还在使用）
+            # 保留原有的标签列表（为了兼容性）
             self.key_label_list = []
             self.value_label_list = []
 
-            # 连接按钮信号
-            self.send_modify_button.clicked.connect(self.send_modified_values)  # 发送修改值
-            self.clear_modify_button.clicked.connect(self.clear_modified_values)
-
-            # 设置bit_window在主窗口内的位置和大小（压缩宽度，为右侧status_window留出空间）
-            self.bit_window.setGeometry(150, 10, 580, 580)  # 位置(150,10)，宽度580（缩小50px），高度580
-            self.bit_window.show()
-
-            # ============== 创建状态位显示窗口（使用封装的StatusBitsWidget）==============
-            self.status_widget = StatusBitsWidget(parent=self, logger=self.logger)
-            self.status_widget.setGeometry(740, 10, 390, 580)  # 位置(740,10)，宽度390（增加50px），右边界1130
-            self.status_widget.show()
-
-            self.logger.write_log("状态位显示窗口创建成功")
+            self.logger.write_log("✅ 数据显示管理器初始化成功（bit_window + status_widget）")
 
         except Exception as e:
             self.logger.write_log(f"加载UI文件失败: {e}")
@@ -2815,33 +2763,28 @@ class load_ui_dynamically(QMainWindow):
             self.status_widget.update_single_status_bit(index, name, value)
 
     # ============== 原有的标志位显示方法 ==============
-    def visualize_bit_flags(self,data: list):
+    def visualize_bit_flags(self, data: list):
+        """更新位标志显示（使用DataDisplayManager）"""
         try:
-            # 检查是否是第一次加载数据或数据长度发生变化
-            if len(self.bit_table_model._original_data) != len(data):
-                # 数据结构变化，需要完全重置
-                self.bit_table_model.update_data(data)
-                self.logger.write_log(f"完全更新标志位数据，共 {len(data)} 条记录")
+            # ⭐ 使用管理器的统一接口更新位标志数据
+            if hasattr(self, 'data_display_mgr'):
+                self.data_display_mgr.update_bit_data(data)
+                self.logger.write_log(f"更新位标志数据: {len(data)} 条记录")
             else:
-                # 逐项比较，只更新有变化的数据
-                updates = {}
-                for i, new_unit in enumerate(data):
-                    old_unit = self.bit_table_model._original_data[i]
-                    # 检查参数名或数值是否有变化
-                    if old_unit[0] != new_unit[0] or old_unit[2] != new_unit[2]:
-                        updates[i] = new_unit
-
-                if updates:
-                    # 有数据变化，进行部分更新
-                    self.bit_table_model.update_partial_data(updates)
-                    self.logger.write_log(f"部分更新标志位数据，更新了 {len(updates)} 条记录")
-                else:
-                    # 没有数据变化，无需更新
-                    pass
-
-            # 调试信息
-            # for i, unit in enumerate(data):
-            #     print(f'i = {i} tuple = {len(unit)} - {unit[0]}: {unit[2]}')
+                # 兼容旧方法（如果管理器不存在）
+                if hasattr(self, 'bit_table_model') and self.bit_table_model:
+                    if len(self.bit_table_model._original_data) != len(data):
+                        self.bit_table_model.update_data(data)
+                        self.logger.write_log(f"完全更新标志位数据，共 {len(data)} 条记录")
+                    else:
+                        updates = {}
+                        for i, new_unit in enumerate(data):
+                            old_unit = self.bit_table_model._original_data[i]
+                            if old_unit[0] != new_unit[0] or old_unit[2] != new_unit[2]:
+                                updates[i] = new_unit
+                        if updates:
+                            self.bit_table_model.update_partial_data(updates)
+                            self.logger.write_log(f"部分更新标志位数据，更新了 {len(updates)} 条记录")
 
         except Exception as e:
             self.logger.write_log(f"bit windows写入失败: {e}")
@@ -2889,8 +2832,8 @@ class load_ui_dynamically(QMainWindow):
 
         self.bluetooth_tool.blue_write_log(f"提取的命令名: {command_name}")
 
-        # ============== 更新状态位显示 ==============
-        if command_name == 'PC_GET_SBS' and hasattr(self, 'status_widget'):
+        # ============== 更新状态位显示（使用DataDisplayManager）==============
+        if command_name == 'PC_GET_SBS' and hasattr(self, 'data_display_mgr'):
             try:
                 # 将嵌套字典转换为扁平字典
                 flat_dict = {}
@@ -2908,9 +2851,8 @@ class load_ui_dynamically(QMainWindow):
                             except (ValueError, TypeError):
                                 flat_dict[name] = value_str
 
-                # 更新状态位显示
-                status_bits = get_all_status_bits_for_display(flat_dict)
-                self.status_widget.update_status_bits(status_bits)
+                # ⭐ 使用管理器的统一接口更新状态位
+                self.data_display_mgr.update_status_data(flat_dict)
 
             except Exception as e:
                 self.logger.write_log(f"更新状态位失败: {e}")
@@ -3057,11 +2999,16 @@ class load_ui_dynamically(QMainWindow):
                 return int(value_str)
 
     def send_modified_values(self):
-        """获取修改的值并发送到设备"""
+        """获取修改的值并发送到设备（使用DataDisplayManager）"""
         try:
             self.bluetooth_tool.blue_write_log("=== 开始发送修改值流程 ===")
 
-            modified_data = self.bit_table_model.get_modified_data()
+            # ⭐ 使用管理器的统一接口获取修改数据
+            modified_data = self.data_display_mgr.get_modified_values() if hasattr(self, 'data_display_mgr') else []
+
+            # 兼容性：如果管理器不可用，尝试直接使用模型
+            if not modified_data and hasattr(self, 'bit_table_model'):
+                modified_data = self.bit_table_model.get_modified_data()
 
             if not modified_data:
                 self.bluetooth_tool.blue_write_log("没有需要发送的修改值")
@@ -3221,10 +3168,16 @@ class load_ui_dynamically(QMainWindow):
             return []
 
     def clear_modified_values(self):
-        """清空所有修改的写入值"""
+        """清空所有修改的写入值（使用DataDisplayManager）"""
         try:
-            self.bit_table_model.clear_write_values()
-            self.logger.write_log("已清空所有修改值")
+            # ⭐ 使用管理器的统一接口清空修改值
+            if hasattr(self, 'data_display_mgr'):
+                self.data_display_mgr.clear_bit_write_values()
+                self.logger.write_log("✅ 已清空所有修改值（通过管理器）")
+            elif hasattr(self, 'bit_table_model'):
+                # 兼容性：如果管理器不可用，直接使用模型
+                self.bit_table_model.clear_write_values()
+                self.logger.write_log("已清空所有修改值")
         except Exception as e:
             self.logger.write_log(f"清空修改值失败: {e}")
             traceback.print_exc()
