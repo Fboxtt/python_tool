@@ -956,8 +956,6 @@ class SplashScreen(QSplashScreen):
 # 修改现有的BluetoothTool类为二级窗口
 class BluetoothTool(QWidget):
     receive_ok_signal = pyqtSignal(int,bytes)
-    decode_data_ok_signal = pyqtSignal(str,dict)
-    pass
     def __init__(self):
         super().__init__()
         self.client = None  # 当前连接的蓝牙设备
@@ -1588,7 +1586,6 @@ class BluetoothTool(QWidget):
 
     def on_connect_device_clicked(self):
         """同步方法，用于触发异步连接"""
-        self.decode_data_ok_signal.emit(None,{"connect" : {'nothing':('nothing','nothing','nothing')}})
         asyncio.create_task(self.connect_device())
 
     def on_disconnect_device_clicked(self):
@@ -1917,34 +1914,45 @@ class BluetoothTool(QWidget):
         self.data_timer.start(100)  # 100ms
 
     def process_complete_data(self):
-        """处理完整的数据包"""
-        # 在这里处理完整的数据包
-        # self.blue_write_log(f"Received complete data packet: {self.received_data_buffer}")
-
-        # 先检查是否是新的密码命令响应格式
+        """处理完整的数据包（使用data_display_mgr解析）"""
         if self.check_new_password_response(self.received_data_buffer):
-            # 处理新的密码命令响应
             self.handle_new_password_response(self.received_data_buffer)
         else:
-            # 处理普通数据
-            print("3收完数据")
-            self.text_decode.split_data(self.received_data_buffer)
-            if self.text_decode.have_hex:
-                # self.blue_write_log(f"发送信号给数据解析模块")
-                struct_name,dict_data = self.hex_parser.decode_cmd_hex_data(self.text_decode.no80_cmd,bytes(self.text_decode.data_hex))
-                print("4解析完数据")
-                if dict_data:
-                    header = f"RX->,{self.commu_type},{self.device_name},{struct_name}"
-                    """csv记录监控数据"""
-                    """外部窗口展示 监控数据 |字典数据|纯参数数据|"""
-                    self.decode_data_ok_signal.emit(header,dict_data)
-                    print("5发射完字典")
-                    # 发射到函数 get_dict_from_receive_data (str,dict)
-        """log记录调试数据"""
-        """内部窗口展示 调试数据 |hex数据|字符串数据|"""
+            if hasattr(self, 'data_display_mgr') and hasattr(self.data_display_mgr, 'data_parser'):
+                success, result = self.data_display_mgr.parse_raw_data(self.received_data_buffer)
+                if success:
+                    struct_name = result['struct_name']
+                    dict_data = result['data']
+                    if dict_data:
+                        # data_display_mgr内部已经自动更新显示，这里只需要记录和显示文本
+                        formatted_data = []
+                        for category, items in dict_data.items():
+                            for item in items:
+                                if len(item) >= 3:
+                                    formatted_data.append((item[0], item[2], item[2]))
+                        if formatted_data:
+                            self.data_display_mgr.update_bit_data(formatted_data)
+                        # 如果是SBS数据，更新状态位
+                        if struct_name == 'PC_GET_SBS':
+                            flat_dict = {}
+                            for category, items in dict_data.items():
+                                for item in items:
+                                    if len(item) >= 3:
+                                        name, value_str = item[0], item[2]
+                                        try:
+                                            flat_dict[name] = int(value_str.replace('0x',''), 16) if isinstance(value_str, str) and value_str.startswith('0x') else int(value_str)
+                                        except:
+                                            flat_dict[name] = value_str
+                            self.data_display_mgr.update_status_data(flat_dict)
+                        # 记录CSV
+                        header = f"RX->,{self.commu_type},{self.device_name},{struct_name}"
+                        csv_data = ",".join([item[2] for items in dict_data.values() for item in items if len(item) >= 3])
+                        ComunManager.get_instance().write_csv(f"{header},{csv_data}")
+                else:
+                    self.blue_write_log(f"数据解析失败: {result}")
+            else:
+                self.blue_write_log("错误：data_display_mgr未初始化")
         self.display_received_data(self.received_data_buffer)
-        print("6显示完数据")
-        # 清空缓冲区
         self.received_data_buffer.clear()
 
     def check_new_password_response(self, data):
@@ -2695,8 +2703,7 @@ class load_ui_dynamically(QMainWindow):
             # 初始化电池状态查询
             widgets.pushButton_5.clicked.connect(self.bluetooth_tool.send_tbs_cmd)
 
-            # 连接数据解析模块到主窗口
-            self.bluetooth_tool.decode_data_ok_signal.connect(self.get_dict_from_receive_data)
+            # 数据解析和显示已由data_display_mgr内部处理，不需要信号连接
 
 
             # 初始化结构体模型列表 到csv文件
@@ -2716,6 +2723,11 @@ class load_ui_dynamically(QMainWindow):
                 logger=self.logger,
                 standalone=False
             )
+
+            # ⭐ 将data_display_mgr传递给bluetooth_tool，使其能使用统一的解析功能
+            if hasattr(self, 'bluetooth_tool'):
+                self.bluetooth_tool.data_display_mgr = self.data_display_mgr
+                self.logger.write_log("✅ 已将data_display_mgr传递给bluetooth_tool")
 
             # 创建所有显示窗口
             self.data_display_mgr.create_windows(parent_widget=self)
@@ -2744,7 +2756,7 @@ class load_ui_dynamically(QMainWindow):
             self.key_label_list = []
             self.value_label_list = []
 
-            self.logger.write_log("✅ 数据显示管理器初始化成功（bit_window + status_widget）")
+            self.logger.write_log("✅ 数据显示管理器初始化成功（bit_window + status_widget + 数据解析）")
 
         except Exception as e:
             self.logger.write_log(f"加载UI文件失败: {e}")
@@ -2762,36 +2774,7 @@ class load_ui_dynamically(QMainWindow):
         if hasattr(self, 'status_widget'):
             self.status_widget.update_single_status_bit(index, name, value)
 
-    # ============== 原有的标志位显示方法 ==============
-    def visualize_bit_flags(self, data: list):
-        """更新位标志显示（使用DataDisplayManager）"""
-        try:
-            # ⭐ 使用管理器的统一接口更新位标志数据
-            if hasattr(self, 'data_display_mgr'):
-                self.data_display_mgr.update_bit_data(data)
-                self.logger.write_log(f"更新位标志数据: {len(data)} 条记录")
-            else:
-                # 兼容旧方法（如果管理器不存在）
-                if hasattr(self, 'bit_table_model') and self.bit_table_model:
-                    if len(self.bit_table_model._original_data) != len(data):
-                        self.bit_table_model.update_data(data)
-                        self.logger.write_log(f"完全更新标志位数据，共 {len(data)} 条记录")
-                    else:
-                        updates = {}
-                        for i, new_unit in enumerate(data):
-                            old_unit = self.bit_table_model._original_data[i]
-                            if old_unit[0] != new_unit[0] or old_unit[2] != new_unit[2]:
-                                updates[i] = new_unit
-                        if updates:
-                            self.bit_table_model.update_partial_data(updates)
-                            self.logger.write_log(f"部分更新标志位数据，更新了 {len(updates)} 条记录")
-
-        except Exception as e:
-            self.logger.write_log(f"bit windows写入失败: {e}")
-            traceback.print_exc()
-            # 出错时回退到完全更新
-            self.bit_table_model.update_data(data)
-        pass
+    # visualize_bit_flags 已删除，由 data_display_mgr 内部处理
     def disconnect_device(self):
         """断开连接"""
         if self.scan_task:
@@ -2815,85 +2798,7 @@ class load_ui_dynamically(QMainWindow):
     def start_find_bat_status(self):
         self.bluetooth_tool.blue_write_log("查询一次电池状态")
 
-    def get_dict_from_receive_data(self, header:str, dict_data:dict):
-        """从结构模型中获取字典，并按列打印到窗口"""
-        widgets.mainWindowTextEdit.clear()
-
-        # 从接收字符串中提取纯命令名
-        # header 格式: "RX->,bluetooth,L-12100BNNA70-A88888,PC_GET_BMS"
-        # 需要提取最后的命令名部分
-        if ',' in header:
-            command_name = header.split(',')[-1]  # 提取最后一部分
-        else:
-            command_name = header
-
-        # 保存当前数据来源，用于发送修改值时确定命令
-        self.current_data_source = command_name
-
-        self.bluetooth_tool.blue_write_log(f"提取的命令名: {command_name}")
-
-        # ============== 更新状态位显示（使用DataDisplayManager）==============
-        if command_name == 'PC_GET_SBS' and hasattr(self, 'data_display_mgr'):
-            try:
-                # 将嵌套字典转换为扁平字典
-                flat_dict = {}
-                for category, items in dict_data.items():
-                    for item in items:
-                        if len(item) >= 3:
-                            name = item[0]
-                            value_str = item[2]
-                            # 尝试转换为整数
-                            try:
-                                if isinstance(value_str, str) and value_str.startswith('0x'):
-                                    flat_dict[name] = int(value_str, 16)
-                                else:
-                                    flat_dict[name] = int(value_str)
-                            except (ValueError, TypeError):
-                                flat_dict[name] = value_str
-
-                # ⭐ 使用管理器的统一接口更新状态位
-                self.data_display_mgr.update_status_data(flat_dict)
-
-            except Exception as e:
-                self.logger.write_log(f"更新状态位失败: {e}")
-                traceback.print_exc()
-
-        # 更新BitWindow的命令信息显示
-        if hasattr(self, 'command_info_label') and self.command_info_label:
-            write_cmd_name = get_write_command_from_read(command_name)
-            if write_cmd_name:
-                self.command_info_label.setText(f"当前命令: {command_name} → {write_cmd_name}")
-                self.command_info_label.setStyleSheet("QLabel { color: green; font-weight: bold; }")
-            else:
-                self.command_info_label.setText(f"当前命令: {command_name} (只读)")
-                self.command_info_label.setStyleSheet("QLabel { color: red; font-weight: bold; }")
-
-        # 构建列格式化字符串
-        formatted_text = ""
-        for category, items in dict_data.items():
-            formatted_text += f"[{category}]\n"
-            self.visualize_bit_flags(list(items)) # 删 改，影响程序运行时间
-            for item in items:
-                # 假设item为[name, unit, value, ...]
-                if len(item) >= 3:
-                    name = item[0] if len(item) > 0 else ""
-                    unit = item[1] if len(item) > 1 else ""
-                    value = item[2] if len(item) > 2 else ""
-                    formatted_text += f"{name:>10}\t{value:>10}\t{unit:>10}\n"
-            formatted_text += "\n"
-        # 显示到窗口
-        widgets.mainWindowTextEdit.append(formatted_text)
-        self.bluetooth_tool.blue_write_log(f"接收到数据: {header}")
-        self.bluetooth_tool.blue_write_log(f"命令名: {command_name}")
-        csv_data_str = ""
-        try:
-            for lst in dict_data.values():
-                for value in lst:
-                    csv_data_str += value[2] + ","
-        except Exception as e:
-            self.bluetooth_tool.blue_write_log(f"写入日志失败: {e}")
-            traceback.print_exc()
-        ComunManager.get_instance().write_csv(f"{header},{csv_data_str[:-1]}")
+    # get_dict_from_receive_data 已删除，由 data_display_mgr 内部处理
     async def get_data_from_device(self, time_interval = 1):
         """异步方法，从设备获取数据"""
         self.bluetooth_tool.blue_write_log(f"进入发送0x13命令函数")
