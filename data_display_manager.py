@@ -248,23 +248,31 @@ class DataDisplayManager(QMainWindow):
     可作为独立窗口运行用于调试，支持数据解析功能
     """
 
-    def __init__(self, parent=None, logger=None, standalone=False):
+    def __init__(self, parent=None, logger=None, standalone=False, device_id=None, device_name=None):
         """
         Args:
             parent: 父窗口（嵌入模式时使用）
             logger: 日志记录器
             standalone: 是否独立窗口模式
+            device_id: 设备ID（多设备模式使用）
+            device_name: 设备名称（多设备模式使用）
         """
         super().__init__(parent)
         self.logger = logger
         self.standalone = standalone
+        self.device_id = device_id or "default"
+        self.device_name = device_name or "默认设备"
 
         # 窗口管理器
         self.bit_window_manager = None
         self.status_window_manager = None
 
-        # 数据解析管理器
+        # 数据解析管理器（每个设备独立）
         self.data_parser = DataParserManager(logger=logger)
+
+        # 统计信息
+        self.data_count = 0
+        self.last_update_time = None
 
         if standalone:
             self.init_standalone_ui()
@@ -641,8 +649,9 @@ class DataDisplayManager(QMainWindow):
         """
         hex_string = hex_bytes.hex()
         return self.data_parser.parse_hex_string(hex_string)
+
     def parse_and_update_displays(self, hex_bytes):
-        """一站式：解析数据并自动更新显示（方案A优化）
+        """一站式：解析数据并自动更新显示
 
         Args:
             hex_bytes: bytearray或bytes对象
@@ -653,7 +662,20 @@ class DataDisplayManager(QMainWindow):
         success, result = self.parse_raw_data(hex_bytes)
         if success:
             self.process_parsed_data(result['struct_name'], result['data'])
+            # 更新统计
+            self.data_count += 1
+            import time
+            self.last_update_time = time.time()
         return success, result
+
+    def get_parser_info(self):
+        """获取解析器信息（用于调试）"""
+        return {
+            'device_id': self.device_id,
+            'device_name': self.device_name,
+            'data_count': self.data_count,
+            'last_update': self.last_update_time
+        }
 
     def update_bit_data(self, parsed_data):
         """更新位标志数据
