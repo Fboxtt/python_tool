@@ -1037,6 +1037,8 @@ class BluetoothTool(QWidget):
         # 设备扫描部分
         self.label = QLabel('发现的蓝牙设备:')
         self.device_list = QListWidget()
+        # 添加双击连接功能
+        self.device_list.itemDoubleClicked.connect(self.on_device_double_clicked)
         bluetooth_layout.addWidget(self.label)
         bluetooth_layout.addWidget(self.device_list)
 
@@ -1064,6 +1066,19 @@ class BluetoothTool(QWidget):
         self.connect_layout.addWidget(self.connect_button)
         self.connect_layout.addWidget(self.disconnect_button)
         bluetooth_layout.addLayout(self.connect_layout)
+
+        # 蓝牙连接状态显示
+        self.bluetooth_status_label = QLabel('蓝牙状态: 未连接')
+        self.bluetooth_status_label.setStyleSheet("""
+            QLabel {
+                padding: 5px;
+                border: 1px solid #ccc;
+                border-radius: 3px;
+                background-color: #f0f0f0;
+                color: #666;
+            }
+        """)
+        bluetooth_layout.addWidget(self.bluetooth_status_label)
 
         # ========== 右侧：串口连接部分 ==========
         serial_layout = QVBoxLayout()
@@ -1609,6 +1624,10 @@ class BluetoothTool(QWidget):
         asyncio.create_task(self.disconnect_device())
         asyncio.create_task(self.disconnect_serial())
 
+    def on_device_double_clicked(self, item):
+        """双击设备列表项时触发连接"""
+        asyncio.create_task(self.connect_device())
+
     def on_send_data_clicked(self):
         """同步方法，用于触发异步发送数据"""
         data = self.send_input.text()
@@ -1616,6 +1635,27 @@ class BluetoothTool(QWidget):
             asyncio.create_task(self.send_data(data))
         else:
             QMessageBox.warning(self, '警告', '请输入要发送的数据')
+
+    def update_bluetooth_status(self, status, color='#666', bg_color='#f0f0f0'):
+        """更新蓝牙连接状态显示
+        
+        Args:
+            status: 状态文本，如 '未连接', '正在连接...', '已连接'
+            color: 文字颜色
+            bg_color: 背景颜色
+        """
+        self.bluetooth_status_label.setText(f'蓝牙状态: {status}')
+        self.bluetooth_status_label.setStyleSheet(f"""
+            QLabel {{
+                padding: 5px;
+                border: 1px solid #ccc;
+                border-radius: 3px;
+                background-color: {bg_color};
+                color: {color};
+                font-weight: bold;
+            }}
+        """)
+
     def on_test_send_buttoned(self):
         """同步方法,用于测试"""
         if self.task_flag == True:
@@ -1750,9 +1790,16 @@ class BluetoothTool(QWidget):
                 QMessageBox.warning(self, '警告', '无法找到设备地址，请重新扫描')
                 return
             try:
-                self.client = BleakClient(device_address)
+                # 更新状态：正在连接
+                self.update_bluetooth_status('正在连接...', color='#ff8c00', bg_color='#fff3cd')
+                
+                self.client = BleakClient(device_address, disconnected_callback=self.on_bluetooth_disconnected)
                 await self.client.connect()
                 self.commu_type = "bluetooth"
+                
+                # 更新状态：已连接
+                self.update_bluetooth_status('已连接', color='#28a745', bg_color='#d4edda')
+                
                 # 创建消息框实例
                 connectMessage = QMessageBox(QMessageBox.Icon.Information, '连接成功', f'已连接到 {device_address}')
                 # 设置定时器自动关闭 (3000毫秒后)
@@ -1769,6 +1816,8 @@ class BluetoothTool(QWidget):
                 QTimer.singleShot(1000, self.send_find_version_cmd)
             except Exception as e:
                 self.commu_type = "none"
+                # 更新状态：连接失败，回到未连接
+                self.update_bluetooth_status('未连接', color='#666', bg_color='#f0f0f0')
                 QMessageBox.critical(self, '连接失败', str(e))
         else:
             QMessageBox.warning(self, '警告', '请先选择一个设备')
@@ -1778,6 +1827,9 @@ class BluetoothTool(QWidget):
         if self.client and self.client.is_connected:
             try:
                 await self.client.disconnect()
+
+                # 更新状态：未连接
+                self.update_bluetooth_status('未连接', color='#666', bg_color='#f0f0f0')
 
                 # 创建消息框
                 msg_box = QMessageBox(QMessageBox.Icon.Information, '断开成功', '设备已断开')
@@ -1924,6 +1976,18 @@ class BluetoothTool(QWidget):
             self.blue_write_log(f"发送失败: {str(e)}")
             raise Exception("发送失败")
 
+    def on_bluetooth_disconnected(self, client):
+        """蓝牙断开连接回调函数"""
+        self.blue_write_log("蓝牙设备已断开连接（从机断开）")
+        # 更新状态：未连接
+        self.update_bluetooth_status('未连接', color='#666', bg_color='#f0f0f0')
+        # 禁用断开按钮和发送按钮
+        self.disconnect_button.setEnabled(False)
+        self.send_button.setEnabled(False)
+        self.client = None
+        self.commu_type = "none"
+        # 弹出提示消息
+        QMessageBox.warning(self, '连接已断开', '蓝牙设备已断开连接')
 
     async def on_data_received(self, sender, data):
         """回调函数，处理接收到的数据"""
