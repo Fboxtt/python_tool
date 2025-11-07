@@ -641,6 +641,19 @@ class DataDisplayManager(QMainWindow):
         """
         hex_string = hex_bytes.hex()
         return self.data_parser.parse_hex_string(hex_string)
+    def parse_and_update_displays(self, hex_bytes):
+        """一站式：解析数据并自动更新显示（方案A优化）
+
+        Args:
+            hex_bytes: bytearray或bytes对象
+
+        Returns:
+            (success, result) 元组
+        """
+        success, result = self.parse_raw_data(hex_bytes)
+        if success:
+            self.process_parsed_data(result['struct_name'], result['data'])
+        return success, result
 
     def update_bit_data(self, parsed_data):
         """更新位标志数据

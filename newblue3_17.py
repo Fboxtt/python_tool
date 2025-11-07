@@ -1918,18 +1918,16 @@ class BluetoothTool(QWidget):
         if self.check_new_password_response(self.received_data_buffer):
             self.handle_new_password_response(self.received_data_buffer)
         else:
-            if hasattr(self, 'data_display_mgr') and hasattr(self.data_display_mgr, 'data_parser'):
-                success, result = self.data_display_mgr.parse_raw_data(self.received_data_buffer)
+            if hasattr(self, 'data_display_mgr') and hasattr(self.data_display_mgr, 'parse_and_update_displays'):
+                # 一站式：解析 + 自动更新显示（方案A优化）
+                success, result = self.data_display_mgr.parse_and_update_displays(self.received_data_buffer)
                 if success:
+                    # 只需处理CSV记录
                     struct_name = result['struct_name']
                     dict_data = result['data']
-                    if dict_data:
-                        # 让data_display_mgr统一处理数据显示更新
-                        self.data_display_mgr.process_parsed_data(struct_name, dict_data)
-                        # 记录CSV
-                        header = f"RX->,{self.commu_type},{self.device_name},{struct_name}"
-                        csv_data = ",".join([item[2] for items in dict_data.values() for item in items if len(item) >= 3])
-                        ComunManager.get_instance().write_csv(f"{header},{csv_data}")
+                    header = f"RX->,{self.commu_type},{self.device_name},{struct_name}"
+                    csv_data = ",".join([item[2] for items in dict_data.values() for item in items if len(item) >= 3])
+                    ComunManager.get_instance().write_csv(f"{header},{csv_data}")
                 else:
                     self.blue_write_log(f"数据解析失败: {result}")
             else:
