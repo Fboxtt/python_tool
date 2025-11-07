@@ -1374,6 +1374,7 @@ class BluetoothTool(QWidget):
         """刷新可用串口列表"""
         self.port_combo.clear()
         ports = [port.device for port in serial.tools.list_ports.comports()]
+        
         if ports:
             self.port_combo.addItems(ports)
             self.serial_connect_button.setEnabled(True)
@@ -1385,10 +1386,13 @@ class BluetoothTool(QWidget):
         """处理串口连接/断开"""
         if not self.is_serial_connected:
             # 使用异步方法避免UI阻塞
-            asyncio.create_task(self.connect_serial_async())
+            try:
+                asyncio.create_task(self.connect_serial_async())
+            except Exception as e:
+                self.blue_write_log(f"创建串口连接任务失败: {str(e)}")
+                traceback.print_exc()
         else:
             # 断开连接
-            # asyncio.create_task(self.disconnect_serial())
             if self.serial_receive_task:
                 self.serial_receive_task.cancel()
                 self.serial_receive_task = None
@@ -1433,11 +1437,16 @@ class BluetoothTool(QWidget):
                 self.is_serial_connected = True
                 self.serial_connect_button.setText('断开串口')
                 self.blue_write_log(f"串口 {port} 连接成功")
+                
                 # 禁用参数设置
                 self.disable_serial_settings(True)
+                
                 # 启动接收任务
                 self.send_button.setEnabled(True)
                 self.serial_receive_task = asyncio.create_task(self.serial_receive_loop())
+            else:
+                self.blue_write_log(f"串口 {port} 未能成功打开")
+                
         except Exception as e:
             self.blue_write_log(f"串口连接失败: {str(e)}")
 
@@ -1456,8 +1465,8 @@ class BluetoothTool(QWidget):
         if self.serial_port:
             try:
                 self.serial_port.close()
-            except:
-                pass
+            except Exception as e:
+                self.blue_write_log(f"关闭串口时出错: {str(e)}")
 
         # 重置状态
         self.is_serial_connected = False
@@ -1484,8 +1493,13 @@ class BluetoothTool(QWidget):
         """串口数据接收循环"""
         while self.is_serial_connected:
             try:
-                if self.serial_port.in_waiting:
-                    data = self.serial_port.read(self.serial_port.in_waiting)
+                # 在线程池中检查串口是否有数据等待
+                loop = asyncio.get_event_loop()
+                in_waiting = await loop.run_in_executor(None, lambda: self.serial_port.in_waiting)
+                
+                if in_waiting:
+                    # 在线程池中执行阻塞的串口读取操作
+                    data = await loop.run_in_executor(None, self.serial_port.read, in_waiting)
                     if data:
                         # 调用 on_data_received 函数处理接收到的数据
                         await self.on_data_received(None, data)
@@ -1500,9 +1514,11 @@ class BluetoothTool(QWidget):
                             except UnicodeDecodeError:
                                 hex_data = ' '.join([f'{b:02X}' for b in data])
                                 # self.blue_write_log(f"接收(HEX): {hex_data}")
+                    
                 await asyncio.sleep(0.01)
-            except (serial.SerialException, PermissionError, OSError):
+            except (serial.SerialException, PermissionError, OSError) as e:
                 # 串口异常，自动断开
+                self.blue_write_log(f"串口异常: {type(e).__name__} - {str(e)}")
                 await self.handle_serial_disconnect()
                 break
             except asyncio.CancelledError:
@@ -1895,7 +1911,11 @@ class BluetoothTool(QWidget):
                 # 检查串口连接状态
                 if not self.is_serial_connected:
                     raise Exception("串口连接已断开")
-                self.serial_port.write(data)
+                
+                self.blue_write_log(f"byte_send: 向串口写入 {len(data)} 字节...")
+                # 在线程池中执行阻塞的串口写入操作
+                loop = asyncio.get_event_loop()
+                await loop.run_in_executor(None, self.serial_port.write, data)
         except (serial.SerialException, PermissionError) as e:
             # 串口异常，自动断开
             await self.handle_serial_disconnect()
