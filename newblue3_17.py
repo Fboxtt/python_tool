@@ -2684,7 +2684,7 @@ class load_ui_dynamically(QMainWindow):
             # 初始化连接窗口
             self.bluetooth_tool = BluetoothTool()
             # self.bluetooth_tool.setWindowModality(Qt.WindowModality.ApplicationModal)
-            widgets.pushButton.clicked.connect(self.bluetooth_tool.show)
+            widgets.pushButton.clicked.connect(self.show_bluetooth_tool_on_top)
             widgets.pushButton_6.clicked.connect(self.disconnect_device)
             # widgets.pushButton_2.clicked.connect()
 
@@ -2775,6 +2775,12 @@ class load_ui_dynamically(QMainWindow):
             self.status_widget.update_single_status_bit(index, name, value)
 
     # visualize_bit_flags 已删除，由 data_display_mgr 内部处理
+    def show_bluetooth_tool_on_top(self):
+        """显示蓝牙工具窗口并将其置顶"""
+        self.bluetooth_tool.show()
+        self.bluetooth_tool.raise_()  # 将窗口提升到最前面
+        self.bluetooth_tool.activateWindow()  # 激活窗口
+
     def disconnect_device(self):
         """断开连接"""
         if self.scan_task:
