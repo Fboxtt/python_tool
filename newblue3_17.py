@@ -1924,26 +1924,8 @@ class BluetoothTool(QWidget):
                     struct_name = result['struct_name']
                     dict_data = result['data']
                     if dict_data:
-                        # data_display_mgr内部已经自动更新显示，这里只需要记录和显示文本
-                        formatted_data = []
-                        for category, items in dict_data.items():
-                            for item in items:
-                                if len(item) >= 3:
-                                    formatted_data.append((item[0], item[2], item[2]))
-                        if formatted_data:
-                            self.data_display_mgr.update_bit_data(formatted_data)
-                        # 如果是SBS数据，更新状态位
-                        if struct_name == 'PC_GET_SBS':
-                            flat_dict = {}
-                            for category, items in dict_data.items():
-                                for item in items:
-                                    if len(item) >= 3:
-                                        name, value_str = item[0], item[2]
-                                        try:
-                                            flat_dict[name] = int(value_str.replace('0x',''), 16) if isinstance(value_str, str) and value_str.startswith('0x') else int(value_str)
-                                        except:
-                                            flat_dict[name] = value_str
-                            self.data_display_mgr.update_status_data(flat_dict)
+                        # 让data_display_mgr统一处理数据显示更新
+                        self.data_display_mgr.process_parsed_data(struct_name, dict_data)
                         # 记录CSV
                         header = f"RX->,{self.commu_type},{self.device_name},{struct_name}"
                         csv_data = ",".join([item[2] for items in dict_data.values() for item in items if len(item) >= 3])

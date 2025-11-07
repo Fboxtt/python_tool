@@ -553,7 +553,8 @@ class DataDisplayManager(QMainWindow):
             # 更新bit_window
             if formatted_data:
                 self.update_bit_data(formatted_data)
-                self.parse_output.append(f"📈 已更新位标志窗口: {len(formatted_data)} 个参数")
+                if hasattr(self, 'parse_output'):
+                    self.parse_output.append(f"📈 已更新位标志窗口: {len(formatted_data)} 个参数")
 
             # 如果是SBS数据，更新状态位
             if struct_name == 'PC_GET_SBS':
@@ -576,10 +577,12 @@ class DataDisplayManager(QMainWindow):
                 status_bits = get_all_status_bits_for_display(flat_dict)
                 if status_bits:
                     self.update_status_bits_direct(status_bits)
-                    self.parse_output.append(f"🚦 已更新状态位窗口: {len(status_bits)} 个状态位")
+                    if hasattr(self, 'parse_output'):
+                        self.parse_output.append(f"🚦 已更新状态位窗口: {len(status_bits)} 个状态位")
 
         except Exception as e:
-            self.parse_output.append(f"⚠️ 更新显示窗口时出错: {str(e)}")
+            if hasattr(self, 'parse_output'):
+                self.parse_output.append(f"⚠️ 更新显示窗口时出错: {str(e)}")
             if self.logger:
                 self.logger.write_log(f"处理解析数据失败: {e}\n{traceback.format_exc()}")
 
