@@ -14,8 +14,101 @@ from PyQt6.QtGui import QPainter
 from PyQt6.QtWidgets import QStyle
 
 
+# ==================== 🔄 全局定时器管理器（单例模式）====================
+
+class GlobalRefreshTimerManager:
+    """全局刷新定时器管理器（单例模式）
+    
+    所有需要定时刷新的模型（BatteryTableModel、BitFlagsTableModel）共享同一个定时器，
+    实现同步刷新，避免多窗口时定时器不同步导致的性能开销。
+    """
+    _instance = None
+    _timer = None
+    _subscribers = set()  # 订阅者集合
+    _interval = 1000  # 默认1秒刷新（兼顾渐变颜色和超时检查）
+    _debug_mode = False  # 调试模式（生产环境设为False）
+    
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+        return cls._instance
+    
+    def __init__(self):
+        """初始化全局定时器（只会执行一次）"""
+        if self._timer is None:
+            self._timer = QTimer()
+            self._timer.timeout.connect(self._on_timer_tick)
+            if self._debug_mode:
+                print(f"✅ 全局渐变定时器已创建（间隔: {self._interval}ms）")
+    
+    def subscribe(self, model):
+        """订阅定时器事件
+        
+        Args:
+            model: BatteryTableModel 实例
+        """
+        self._subscribers.add(model)
+        
+        # 如果是第一个订阅者，启动定时器
+        if len(self._subscribers) == 1 and not self._timer.isActive():
+            self._timer.start(self._interval)
+            if self._debug_mode:
+                print(f"▶️ 全局渐变定时器已启动（订阅者数: {len(self._subscribers)}）")
+        else:
+            if self._debug_mode:
+                print(f"📝 新订阅者已注册（订阅者数: {len(self._subscribers)}）")
+    
+    def unsubscribe(self, model):
+        """取消订阅定时器事件
+        
+        Args:
+            model: BatteryTableModel 实例
+        """
+        self._subscribers.discard(model)
+        
+        # 如果没有订阅者了，停止定时器以节省资源
+        if len(self._subscribers) == 0 and self._timer.isActive():
+            self._timer.stop()
+            if self._debug_mode:
+                print(f"⏹️ 全局渐变定时器已停止（无订阅者）")
+        else:
+            if self._debug_mode:
+                print(f"📝 订阅者已移除（剩余订阅者数: {len(self._subscribers)}）")
+    
+    def _on_timer_tick(self):
+        """定时器回调：通知所有订阅者刷新"""
+        # 通知所有订阅的模型实例（支持不同类型的刷新方法）
+        for model in list(self._subscribers):  # 使用list()避免迭代时修改集合
+            # BatteryTableModel: 刷新渐变颜色
+            if hasattr(model, '_refresh_gradient'):
+                model._refresh_gradient()
+            # BitFlagsTableModel: 检查超时状态
+            elif hasattr(model, '_on_global_timer_tick'):
+                model._on_global_timer_tick()
+    
+    def get_subscriber_count(self):
+        """获取当前订阅者数量"""
+        return len(self._subscribers)
+    
+    def is_active(self):
+        """定时器是否在运行"""
+        return self._timer.isActive() if self._timer else False
+    
+    def set_debug_mode(self, enabled=True):
+        """设置调试模式
+        
+        Args:
+            enabled: 是否启用调试输出
+        """
+        self._debug_mode = enabled
+
+
+# 全局单例实例
+_global_refresh_timer_manager = GlobalRefreshTimerManager()
+
+
 class BatteryTableModel(QAbstractTableModel):
-    """电池参数表格模型（性能优化版）"""
+    """电池参数表格模型（性能优化版 + 渐变颜色功能）"""
     def __init__(self, data=None, parent=None):
         super().__init__(parent)
         self._original_data = data if data is not None else []
@@ -31,7 +124,30 @@ class BatteryTableModel(QAbstractTableModel):
         # 性能优化：缓存显示值，避免重复格式化
         self._display_value_cache = {}
 
+        # 🎨 渐变颜色配置（新增功能）
+        self._gradient_enabled = True  # 是否启用渐变效果（默认启用）
+        self._gradient_duration = 5.0  # 渐变持续时间（秒）
+        self._update_timestamps = {}   # 记录每个参数的最后更新时间 {original_row_index: timestamp}
+        
+        # 颜色配置
+        self._color_fresh = QColor(255, 200, 150)      # 橙色 - 新鲜数据（刚更新）
+        self._color_stale = QColor(220, 220, 220)      # 灰色 - 陈旧数据（5秒未更新）
+        self._color_modified = QColor(255, 255, 200)   # 浅黄色 - 有待发送的修改
+        
+        # 🔄 使用全局定时器管理器（多窗口同步刷新，节省性能）
+        self._gradient_timer_manager = _global_refresh_timer_manager
+        if self._gradient_enabled:
+            self._gradient_timer_manager.subscribe(self)
+
         self._organize_data()
+    
+    def __del__(self):
+        """析构函数：清理时取消订阅全局定时器"""
+        try:
+            if hasattr(self, '_gradient_timer_manager'):
+                self._gradient_timer_manager.unsubscribe(self)
+        except:
+            pass  # 避免析构时出错
 
     def _organize_data(self):
         """重新组织数据，超过25行时分成新的列组（性能优化版）"""
@@ -107,6 +223,76 @@ class BatteryTableModel(QAbstractTableModel):
             return row + 2 * self._max_rows_per_column
         return -1
 
+    # ==================== 🎨 渐变颜色功能（新增）====================
+
+    def enable_gradient_colors(self, enabled=True, duration=5.0):
+        """启用/禁用渐变颜色功能
+        
+        Args:
+            enabled: 是否启用渐变效果
+            duration: 渐变持续时间（秒）
+        """
+        was_enabled = self._gradient_enabled
+        self._gradient_enabled = enabled
+        self._gradient_duration = duration
+        
+        # 根据状态变化订阅/取消订阅全局定时器
+        if enabled and not was_enabled:
+            # 从禁用变为启用：订阅全局定时器
+            self._gradient_timer_manager.subscribe(self)
+        elif not enabled and was_enabled:
+            # 从启用变为禁用：取消订阅全局定时器
+            self._gradient_timer_manager.unsubscribe(self)
+            # 刷新一次以清除颜色
+            if self.rowCount() > 0:
+                top_left = self.index(0, 0)
+                bottom_right = self.index(self.rowCount() - 1, self.columnCount() - 1)
+                self.dataChanged.emit(top_left, bottom_right, [Qt.ItemDataRole.BackgroundRole])
+
+    def _refresh_gradient(self):
+        """定时器回调：刷新渐变颜色（性能优化版）"""
+        if not self._gradient_enabled or self.rowCount() == 0:
+            return
+        
+        # 批量刷新所有单元格的背景颜色
+        # 只刷新"当前值"列（1, 4, 7）以优化性能
+        for col in [1, 4, 7]:
+            if self.rowCount() > 0:
+                top_left = self.index(0, col)
+                bottom_right = self.index(self.rowCount() - 1, col)
+                self.dataChanged.emit(top_left, bottom_right, [Qt.ItemDataRole.BackgroundRole])
+
+    def _get_gradient_color(self, original_row_index):
+        """计算指定参数的渐变颜色（基于时间线性插值）
+        
+        Args:
+            original_row_index: 原始数据行索引
+        
+        Returns:
+            QColor: 插值后的颜色（白色→橙色）
+        """
+        if original_row_index not in self._update_timestamps:
+            # 没有更新记录，返回陈旧颜色
+            return self._color_stale
+        
+        # 计算距离上次更新的时间
+        elapsed = time.time() - self._update_timestamps[original_row_index]
+        
+        # 计算渐变进度 (0.0 = 刚更新/白色, 1.0 = 已超时/橙色)
+        progress = min(elapsed / self._gradient_duration, 1.0)
+        
+        # RGB线性插值
+        r = int(self._color_fresh.red() + 
+                (self._color_stale.red() - self._color_fresh.red()) * progress)
+        g = int(self._color_fresh.green() + 
+                (self._color_stale.green() - self._color_fresh.green()) * progress)
+        b = int(self._color_fresh.blue() + 
+                (self._color_stale.blue() - self._color_fresh.blue()) * progress)
+        
+        return QColor(r, g, b)
+
+    # ==================== 数据模型接口 ====================
+
     def data(self, index, role):
         if not index.isValid():
             return None
@@ -114,9 +300,29 @@ class BatteryTableModel(QAbstractTableModel):
         row = index.row()
         col = index.column()
 
+        # 显示数据
         if role == Qt.ItemDataRole.DisplayRole or role == Qt.ItemDataRole.EditRole:
             if row < len(self._organized_data) and col < self._columns:
                 return self._organized_data[row][col]
+        
+        # 🎨 背景颜色（新增功能）
+        elif role == Qt.ItemDataRole.BackgroundRole:
+            if not self._gradient_enabled:
+                return None  # 渐变功能禁用时不显示背景色
+            
+            # "当前值"列（1, 4, 7）显示渐变颜色
+            if col in [1, 4, 7]:
+                original_idx = self._get_original_index(row, col)
+                if 0 <= original_idx < len(self._original_data):
+                    return self._get_gradient_color(original_idx)
+            
+            # "写入值"列（2, 5, 8）有值时显示黄色高亮
+            elif col in [2, 5, 8]:
+                if row < len(self._organized_data):
+                    write_value = self._organized_data[row][col]
+                    if write_value and str(write_value).strip():
+                        return self._color_modified
+        
         return None
 
     def setData(self, index, value, role):
@@ -131,7 +337,8 @@ class BatteryTableModel(QAbstractTableModel):
                 if 0 <= original_idx < len(self._original_data):
                     self._write_values[original_idx] = str(value)
                     self._organized_data[row][col] = str(value)
-                    self.dataChanged.emit(index, index)
+                    # 刷新该单元格的显示和背景色
+                    self.dataChanged.emit(index, index, [Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.BackgroundRole])
                     return True
         return False
 
@@ -158,12 +365,17 @@ class BatteryTableModel(QAbstractTableModel):
         return None
 
     def update_data(self, data):
-        """完全更新所有数据（性能优化版）"""
+        """完全更新所有数据（性能优化版 + 记录更新时间）"""
         old_row_count = len(self._original_data)
         self._original_data = data
 
         # 清除缓存
         self._display_value_cache.clear()
+
+        # 🎨 记录更新时间（用于渐变颜色）
+        current_time = time.time()
+        for idx in range(len(data)):
+            self._update_timestamps[idx] = current_time
 
         self._organize_data()
 
@@ -174,13 +386,14 @@ class BatteryTableModel(QAbstractTableModel):
             self.endResetModel()
         else:
             # 行数未变，使用dataChanged信号（更高效）
+            # 🎨 立即刷新背景色（数据更新后立即显示白色）
             if new_row_count > 0:
                 top_left = self.index(0, 0)
                 bottom_right = self.index(new_row_count - 1, self._columns - 1)
-                self.dataChanged.emit(top_left, bottom_right)
+                self.dataChanged.emit(top_left, bottom_right, [Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.BackgroundRole])
 
     def update_row(self, row, row_data):
-        """更新指定行的数据（性能优化版）"""
+        """更新指定行的数据（性能优化版 + 记录更新时间）"""
         if 0 <= row < len(self._original_data):
             self._original_data[row] = row_data
 
@@ -189,13 +402,16 @@ class BatteryTableModel(QAbstractTableModel):
             if cache_key in self._display_value_cache:
                 del self._display_value_cache[cache_key]
 
+            # 🎨 记录更新时间
+            self._update_timestamps[row] = time.time()
+
             # 性能优化：只更新受影响的单元格
             self._update_affected_cells(row)
             return True
         return False
 
     def update_cell(self, row, col, value):
-        """更新指定单元格的数据（性能优化版）"""
+        """更新指定单元格的数据（性能优化版 + 记录更新时间）"""
         if 0 <= row < len(self._original_data) and 0 <= col < 2:
             if col == 0:
                 # 更新参数名
@@ -208,13 +424,16 @@ class BatteryTableModel(QAbstractTableModel):
                 if cache_key in self._display_value_cache:
                     del self._display_value_cache[cache_key]
 
+            # 🎨 记录更新时间
+            self._update_timestamps[row] = time.time()
+
             # 性能优化：只更新受影响的单元格
             self._update_affected_cells(row)
             return True
         return False
 
     def _update_affected_cells(self, original_row):
-        """只更新受影响的单元格（性能优化）"""
+        """只更新受影响的单元格（性能优化 + 立即刷新背景色）"""
         # 找出该原始行在组织后的数据中的位置
         if original_row < self._max_rows_per_column:
             # 第一列组
@@ -237,10 +456,10 @@ class BatteryTableModel(QAbstractTableModel):
                 self._organized_data[display_row][display_cols[1]] = self._get_cached_display_value(
                     original_row, self._original_data[original_row][2])
 
-            # 只发送受影响单元格的变化信号
+            # 🎨 发送变化信号，包括背景色（数据更新后立即显示白色）
             for col in display_cols[:2]:  # 只更新参数名和当前值列
                 idx = self.index(display_row, col)
-                self.dataChanged.emit(idx, idx)
+                self.dataChanged.emit(idx, idx, [Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.BackgroundRole])
 
     def update_partial_data(self, updates):
         """批量更新部分数据（性能优化版）
@@ -372,18 +591,18 @@ class BatteryTableModel(QAbstractTableModel):
 
         self._write_values.clear()
 
-        # 性能优化：只更新受影响的单元格
+        # 性能优化：只更新受影响的单元格（包括背景色）
         if affected_cells:
             if len(affected_cells) <= 10:
                 for row, col in affected_cells:
                     idx = self.index(row, col)
-                    self.dataChanged.emit(idx, idx)
+                    self.dataChanged.emit(idx, idx, [Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.BackgroundRole])
             else:
                 # 大量更新时，批量发送信号
                 if len(self._organized_data) > 0:
                     top_left = self.index(0, 0)
                     bottom_right = self.index(len(self._organized_data) - 1, self._columns - 1)
-                    self.dataChanged.emit(top_left, bottom_right)
+                    self.dataChanged.emit(top_left, bottom_right, [Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.BackgroundRole])
 
     def set_write_value(self, row, value):
         """设置指定行的写入值"""
@@ -454,6 +673,23 @@ class BitFlagsTableModel(QAbstractTableModel):
         # 性能优化：缓存当前时间，避免每个单元格都调用time.time()
         self._cached_time = time.time()
         self._cache_update_threshold = 0.1  # 缓存更新阈值（秒）
+        
+        # 🔄 使用全局定时器管理器（与 BatteryTableModel 同步刷新，节省性能）
+        self._global_timer_manager = _global_refresh_timer_manager
+        self._global_timer_manager.subscribe(self)
+    
+    def __del__(self):
+        """析构函数：清理时取消订阅全局定时器"""
+        try:
+            if hasattr(self, '_global_timer_manager'):
+                self._global_timer_manager.unsubscribe(self)
+        except:
+            pass  # 避免析构时出错
+    
+    def _on_global_timer_tick(self):
+        """全局定时器回调：检查超时状态（性能优化版）"""
+        if self.has_data():
+            self.check_timeout()
 
     def rowCount(self, parent=QModelIndex()):
         # 返回所有列中最长的那列的行数
@@ -710,19 +946,8 @@ class BitFlagsWidget(QWidget):
         self.clear_button.clicked.connect(self.clear_status_bits)
         self.test_button.clicked.connect(self.test_status_bits)
 
-        # 创建定时器，每2秒检查一次超时状态（性能优化）
-        self.check_timer = QTimer(self)
-        self.check_timer.timeout.connect(self.check_timeout)
-        self.check_timer.start(2000)
-
-    def check_timeout(self):
-        """定时器回调：检查位标志是否超时（性能优化版）"""
-        try:
-            if self.table_model.has_data():
-                self.table_model.check_timeout()
-        except Exception as e:
-            if self.logger:
-                self.logger.write_log(f"检查位标志超时失败: {e}")
+        # ⚠️ 注意：超时检查已通过全局定时器管理器实现，无需创建独立定时器
+        # 这样可以与 BatteryTableModel 同步刷新，节省性能
 
     def clear_status_bits(self):
         """清空所有位标志"""
