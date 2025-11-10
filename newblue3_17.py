@@ -482,9 +482,9 @@ class StatusBitsDelegate(QStyledItemDelegate):
             painter.drawText(text_rect, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, str(text))
 
 
-# ============== 状态位显示模型（三色状态：置起绿色、置0红色、5秒未刷新灰色）==============
-class StatusBitsTableModel(QAbstractTableModel):
-    """状态位表格模型，支持三色状态显示，每种状态位单独一列（性能优化版）"""
+# ============== 位标志显示模型（三色状态：置起绿色、置0红色、5秒未刷新灰色）==============
+class BitFlagsTableModel(QAbstractTableModel):
+    """位标志表格模型，支持三色状态显示，每种状态位单独一列（性能优化版）"""
     def __init__(self, parent=None):
         super().__init__(parent)
         # 状态位按类型分组存储
@@ -706,9 +706,9 @@ class StatusBitsTableModel(QAbstractTableModel):
         return any(len(bits) > 0 for bits in self._status_bits.values())
 
 
-# ============== 状态位显示窗口组件（封装UI和逻辑）==============
-class StatusBitsWidget(QWidget):
-    """状态位显示窗口，包含UI和业务逻辑的完整封装"""
+# ============== 位标志显示窗口组件（封装UI和逻辑）==============
+class BitFlagsWidget(QWidget):
+    """位标志显示窗口，包含UI和业务逻辑的完整封装"""
 
     def __init__(self, parent=None, logger=None):
         super().__init__(parent)
@@ -718,7 +718,7 @@ class StatusBitsWidget(QWidget):
     def init_ui(self):
         """初始化UI组件"""
         # 创建标题标签
-        self.title_label = QLabel('状态位监控（绿=0正常 红=1告警 灰=未刷新）')
+        self.title_label = QLabel('位标志监控（绿=0正常 红=1告警 灰=未刷新）')
         self.title_label.setStyleSheet("QLabel { color: blue; font-weight: bold; font-size: 8px; }")
 
         # 创建按钮布局
@@ -739,9 +739,9 @@ class StatusBitsWidget(QWidget):
         button_layout.addWidget(self.test_button)
         button_layout.addStretch()
 
-        # 创建QTableView和状态位模型
+        # 创建QTableView和位标志模型
         self.table_view = QTableView()
-        self.table_model = StatusBitsTableModel()
+        self.table_model = BitFlagsTableModel()
         self.table_view.setModel(self.table_model)
 
         # 设置自定义委托以确保背景颜色正确显示（已禁用，测试不使用委托）
@@ -810,24 +810,24 @@ class StatusBitsWidget(QWidget):
         self.check_timer.start(2000)  # 每2000毫秒（2秒）触发一次，降低CPU占用
 
     def check_timeout(self):
-        """定时器回调：检查状态位是否超时（性能优化版）"""
+        """定时器回调：检查位标志是否超时（性能优化版）"""
         try:
             # 性能优化：只在有数据时检查超时
             if self.table_model.has_data():
                 self.table_model.check_timeout()
         except Exception as e:
             if self.logger:
-                self.logger.write_log(f"检查状态位超时失败: {e}")
+                self.logger.write_log(f"检查位标志超时失败: {e}")
 
     def clear_status_bits(self):
-        """清空所有状态位"""
+        """清空所有位标志"""
         try:
             self.table_model.clear_all()
             if self.logger:
-                self.logger.write_log("已清空所有状态位")
+                self.logger.write_log("已清空所有位标志")
         except Exception as e:
             if self.logger:
-                self.logger.write_log(f"清空状态位失败: {e}")
+                self.logger.write_log(f"清空位标志失败: {e}")
 
     def test_status_bits(self):
         """测试按钮：生成测试数据"""
@@ -865,14 +865,14 @@ class StatusBitsWidget(QWidget):
 
             self.table_model.batch_update_status_bits(test_data)
             if self.logger:
-                self.logger.write_log(f"已生成 {len(test_data)} 个测试状态位（告警14+保护21+失效12+信息21）")
+                self.logger.write_log(f"已生成 {len(test_data)} 个测试位标志（告警14+保护21+失效12+信息21）")
         except Exception as e:
             if self.logger:
                 self.logger.write_log(f"生成测试数据失败: {e}")
                 traceback.print_exc()
 
     def update_status_bits(self, status_list):
-        """更新状态位（供外部调用）
+        """更新位标志（供外部调用）
         Args:
             status_list: 列表，每项为字典 {'name': str, 'value': int} 或元组 (name, value)
         """
@@ -880,28 +880,28 @@ class StatusBitsWidget(QWidget):
             self.table_model.batch_update_status_bits(status_list)
         except Exception as e:
             if self.logger:
-                self.logger.write_log(f"更新状态位失败: {e}")
+                self.logger.write_log(f"更新位标志失败: {e}")
                 traceback.print_exc()
 
     def update_single_status_bit(self, index, name, value):
-        """更新单个状态位
+        """更新单个位标志
         Args:
-            index: 状态位索引（0-based）
-            name: 状态位名称
-            value: 状态位值（0或1）
+            index: 位标志索引（0-based）
+            name: 位标志名称
+            value: 位标志值（0或1）
         """
         try:
             self.table_model.update_status_bit(index, name, value)
         except Exception as e:
             if self.logger:
-                self.logger.write_log(f"更新单个状态位失败: {e}")
+                self.logger.write_log(f"更新单个位标志失败: {e}")
 
     def set_timeout_seconds(self, seconds):
         """设置超时时间"""
         self.table_model.set_timeout_seconds(seconds)
 
     def get_status_bit(self, col, row):
-        """获取指定位置的状态位信息
+        """获取指定位置的位标志信息
         Args:
             col: 列索引（0=告警，1=保护，2=失效，3=其他）
             row: 行索引
@@ -2865,9 +2865,6 @@ class load_ui_dynamically(QMainWindow):
             widgets.pushButton_4.setText("开始监控")
             self.scan_task = None
 
-    def start_find_bat_status(self):
-        self.bluetooth_tool.blue_write_log("查询一次电池状态")
-
     # get_dict_from_receive_data 已删除，由 data_display_mgr 内部处理
     async def get_data_from_device(self, time_interval = 1):
         """异步方法，从设备获取数据"""
@@ -2982,8 +2979,8 @@ class load_ui_dynamically(QMainWindow):
             modified_data = self.data_display_mgr.get_modified_values() if hasattr(self, 'data_display_mgr') else []
 
             # 兼容性：如果管理器不可用，尝试直接使用模型
-            if not modified_data and hasattr(self, 'bit_table_model'):
-                modified_data = self.bit_table_model.get_modified_data()
+            if not modified_data and hasattr(self, 'battery_table_model'):
+                modified_data = self.battery_table_model.get_modified_data()
 
             if not modified_data:
                 self.bluetooth_tool.blue_write_log("没有需要发送的修改值")
@@ -3040,7 +3037,7 @@ class load_ui_dynamically(QMainWindow):
             self.bluetooth_tool.blue_write_log("开始构造数据包:")
 
             for i, var_name in enumerate(variables):
-                current_hex_value = self.bit_table_model._data[i][1] if i < len(self.bit_table_model._data) else '0x00'
+                current_hex_value = self.battery_table_model._original_data[i][1] if i < len(self.battery_table_model._original_data) else '0x00'
 
                 # 检查是否有修改值
                 modified_value = None
@@ -3149,9 +3146,9 @@ class load_ui_dynamically(QMainWindow):
             if hasattr(self, 'data_display_mgr'):
                 self.data_display_mgr.clear_bit_write_values()
                 self.logger.write_log("✅ 已清空所有修改值（通过管理器）")
-            elif hasattr(self, 'bit_table_model'):
+            elif hasattr(self, 'battery_table_model'):
                 # 兼容性：如果管理器不可用，直接使用模型
-                self.bit_table_model.clear_write_values()
+                self.battery_table_model.clear_write_values()
                 self.logger.write_log("已清空所有修改值")
         except Exception as e:
             self.logger.write_log(f"清空修改值失败: {e}")
@@ -3160,9 +3157,9 @@ class load_ui_dynamically(QMainWindow):
     def set_write_value_by_name(self, param_name, value):
         """根据参数名设置写入值"""
         try:
-            row = self.bit_table_model.find_row_by_name(param_name)
+            row = self.battery_table_model.find_row_by_name(param_name)
             if row >= 0:
-                return self.bit_table_model.set_write_value(row, value)
+                return self.battery_table_model.set_write_value(row, value)
             else:
                 self.logger.write_log(f"未找到参数: {param_name}")
                 return False
