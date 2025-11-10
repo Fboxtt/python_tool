@@ -1,5 +1,5 @@
 """
-数据显示管理器 - 统一管理bit_window和status_widget
+数据显示管理器 - 统一管理battery_window和bit_window
 可独立运行用于调试和测试，支持数据解析功能
 """
 import sys
@@ -15,12 +15,12 @@ from PyQt6.QtGui import QFont
 
 # 导入显示组件（从独立模块，避免循环导入）
 try:
-    from display_widgets import BitFlagsTableModel, StatusBitsWidget
+    from display_widgets import BatteryTableModel, BitFlagsWidget
 except ImportError as e:
-    print(f"警告：无法导入BitFlagsTableModel和StatusBitsWidget: {e}")
+    print(f"警告：无法导入BatteryTableModel和BitFlagsWidget: {e}")
     print("请确保display_widgets.py在同一目录下")
-    BitFlagsTableModel = None
-    StatusBitsWidget = None
+    BatteryTableModel = None
+    BitFlagsWidget = None
 
 from struct_model import (
     get_all_status_bits_for_display, parse_all_status_from_sbs,
@@ -112,8 +112,8 @@ class DataParserManager:
             return False, error_msg
 
 
-class BitWindowManager:
-    """位标志窗口管理器"""
+class BatteryWindowManager:
+    """电池参数窗口管理器"""
 
     def __init__(self, parent=None):
         self.parent = parent
@@ -128,7 +128,7 @@ class BitWindowManager:
         layout = QVBoxLayout()
 
         # 创建标题
-        title_label = QLabel('位标志参数配置窗口')
+        title_label = QLabel('电池参数配置窗口')
         title_label.setStyleSheet("QLabel { color: blue; font-weight: bold; font-size: 12px; }")
         layout.addWidget(title_label)
 
@@ -142,9 +142,9 @@ class BitWindowManager:
         layout.addLayout(button_layout)
 
         # 创建表格视图
-        if BitFlagsTableModel:
+        if BatteryTableModel:
             self.table_view = QTableView()
-            self.table_model = BitFlagsTableModel()
+            self.table_model = BatteryTableModel()
             self.table_view.setModel(self.table_model)
 
             # 设置表格属性
@@ -159,7 +159,7 @@ class BitWindowManager:
 
             layout.addWidget(self.table_view)
         else:
-            error_label = QLabel('错误：无法加载BitFlagsTableModel')
+            error_label = QLabel('错误：无法加载BatteryTableModel')
             error_label.setStyleSheet("QLabel { color: red; }")
             layout.addWidget(error_label)
 
@@ -198,26 +198,26 @@ class BitWindowManager:
         self.widget.setGeometry(x, y, width, height)
 
 
-class StatusWindowManager:
-    """状态位窗口管理器"""
+class BitWindowManager:
+    """位标志窗口管理器"""
 
     def __init__(self, parent=None, logger=None):
         self.parent = parent
         self.logger = logger
 
-        if StatusBitsWidget:
-            self.widget = StatusBitsWidget(parent=parent, logger=logger)
+        if BitFlagsWidget:
+            self.widget = BitFlagsWidget(parent=parent, logger=logger)
         else:
             # 备用方案：创建简单的错误显示
             self.widget = QWidget(parent)
             layout = QVBoxLayout()
-            error_label = QLabel('错误：无法加载StatusBitsWidget')
+            error_label = QLabel('错误：无法加载BitFlagsWidget')
             error_label.setStyleSheet("QLabel { color: red; }")
             layout.addWidget(error_label)
             self.widget.setLayout(layout)
 
     def update_status_bits(self, status_list):
-        """更新状态位
+        """更新位标志
         Args:
             status_list: 列表，每项格式为 {'name': str, 'value': int}
         """
@@ -225,7 +225,7 @@ class StatusWindowManager:
             self.widget.update_status_bits(status_list)
 
     def clear_status_bits(self):
-        """清空状态位"""
+        """清空位标志"""
         if hasattr(self.widget, 'clear_status_bits'):
             self.widget.clear_status_bits()
 
@@ -264,8 +264,8 @@ class DataDisplayManager(QMainWindow):
         self.device_name = device_name or "默认设备"
 
         # 窗口管理器
+        self.battery_window_manager = None
         self.bit_window_manager = None
-        self.status_window_manager = None
 
         # 数据解析管理器（每个设备独立）
         self.data_parser = DataParserManager(logger=logger)
@@ -306,15 +306,15 @@ class DataDisplayManager(QMainWindow):
         display_panel = QWidget()
         display_layout = QHBoxLayout()
 
-        # 创建bit_window
-        self.bit_window_manager = BitWindowManager(parent=display_panel)
-        self.bit_window_manager.widget.setMinimumSize(580, 400)
-        display_layout.addWidget(self.bit_window_manager.widget)
+        # 创建battery_window（电池参数窗口）
+        self.battery_window_manager = BatteryWindowManager(parent=display_panel)
+        self.battery_window_manager.widget.setMinimumSize(580, 400)
+        display_layout.addWidget(self.battery_window_manager.widget)
 
-        # 创建status_widget
-        self.status_window_manager = StatusWindowManager(parent=display_panel, logger=self.logger)
-        self.status_window_manager.widget.setMinimumSize(390, 400)
-        display_layout.addWidget(self.status_window_manager.widget)
+        # 创建bit_window（位标志窗口）
+        self.bit_window_manager = BitWindowManager(parent=display_panel, logger=self.logger)
+        self.bit_window_manager.widget.setMinimumSize(390, 400)
+        display_layout.addWidget(self.bit_window_manager.widget)
 
         display_panel.setLayout(display_layout)
         splitter.addWidget(display_panel)
@@ -327,8 +327,8 @@ class DataDisplayManager(QMainWindow):
         central_widget.setLayout(main_layout)
 
         # 连接信号
-        if self.bit_window_manager and hasattr(self.bit_window_manager, 'send_button'):
-            self.bit_window_manager.send_button.clicked.connect(self.on_send_modified)
+        if self.battery_window_manager and hasattr(self.battery_window_manager, 'send_button'):
+            self.battery_window_manager.send_button.clicked.connect(self.on_send_modified)
 
     def create_control_panel(self):
         """创建控制面板（用于独立调试）"""
@@ -550,7 +550,7 @@ class DataDisplayManager(QMainWindow):
     def process_parsed_data(self, struct_name, dict_data):
         """处理解析后的数据，更新显示窗口"""
         try:
-            # 格式化数据为bit_window需要的格式
+            # 格式化数据为battery_window需要的格式
             formatted_data = []
             for category, items in dict_data.items():
                 for item in items:
@@ -558,13 +558,13 @@ class DataDisplayManager(QMainWindow):
                         name, unit, value = item[0], item[1], item[2]
                         formatted_data.append((name, value, value))  # (名称, 十六进制, 十进制)
 
-            # 更新bit_window
+            # 更新battery_window
             if formatted_data:
                 self.update_bit_data(formatted_data)
                 if hasattr(self, 'parse_output'):
-                    self.parse_output.append(f"📈 已更新位标志窗口: {len(formatted_data)} 个参数")
+                    self.parse_output.append(f"📈 已更新电池参数窗口: {len(formatted_data)} 个参数")
 
-            # 如果是SBS数据，更新状态位
+            # 如果是SBS数据，更新位标志
             if struct_name == 'PC_GET_SBS':
                 # 将dict_data转换为flat_dict
                 flat_dict = {}
@@ -581,12 +581,12 @@ class DataDisplayManager(QMainWindow):
                             except (ValueError, TypeError):
                                 flat_dict[name] = value_str
 
-                # 更新状态位
+                # 更新位标志
                 status_bits = get_all_status_bits_for_display(flat_dict)
                 if status_bits:
                     self.update_status_bits_direct(status_bits)
                     if hasattr(self, 'parse_output'):
-                        self.parse_output.append(f"🚦 已更新状态位窗口: {len(status_bits)} 个状态位")
+                        self.parse_output.append(f"🚦 已更新位标志窗口: {len(status_bits)} 个位标志")
 
         except Exception as e:
             if hasattr(self, 'parse_output'):
@@ -607,34 +607,34 @@ class DataDisplayManager(QMainWindow):
         Args:
             parent_widget: 父窗口部件
         """
-        self.bit_window_manager = BitWindowManager(parent=parent_widget)
-        self.status_window_manager = StatusWindowManager(parent=parent_widget, logger=self.logger)
+        self.battery_window_manager = BatteryWindowManager(parent=parent_widget)
+        self.bit_window_manager = BitWindowManager(parent=parent_widget, logger=self.logger)
 
-    def setup_windows_geometry(self, bit_geom, status_geom):
+    def setup_windows_geometry(self, battery_geom, bit_geom):
         """设置窗口位置和大小
 
         Args:
-            bit_geom: (x, y, width, height) 元组
-            status_geom: (x, y, width, height) 元组
+            battery_geom: (x, y, width, height) 元组 - 电池参数窗口
+            bit_geom: (x, y, width, height) 元组 - 位标志窗口
         """
+        if self.battery_window_manager:
+            self.battery_window_manager.set_geometry(*battery_geom)
         if self.bit_window_manager:
             self.bit_window_manager.set_geometry(*bit_geom)
-        if self.status_window_manager:
-            self.status_window_manager.set_geometry(*status_geom)
 
     def show_windows(self):
         """显示所有窗口"""
+        if self.battery_window_manager:
+            self.battery_window_manager.show()
         if self.bit_window_manager:
             self.bit_window_manager.show()
-        if self.status_window_manager:
-            self.status_window_manager.show()
 
     def hide_windows(self):
         """隐藏所有窗口"""
+        if self.battery_window_manager:
+            self.battery_window_manager.hide()
         if self.bit_window_manager:
             self.bit_window_manager.hide()
-        if self.status_window_manager:
-            self.status_window_manager.hide()
 
     # ==================== 数据输入接口 ====================
 
@@ -678,37 +678,37 @@ class DataDisplayManager(QMainWindow):
         }
 
     def update_bit_data(self, parsed_data):
-        """更新位标志数据
+        """更新电池参数数据
 
         Args:
             parsed_data: 解析后的数据列表，格式：[(name, hex_value, dec_value), ...]
         """
-        if self.bit_window_manager:
-            self.bit_window_manager.update_data(parsed_data)
+        if self.battery_window_manager:
+            self.battery_window_manager.update_data(parsed_data)
             if self.logger:
-                self.logger.write_log(f"更新位标志数据: {len(parsed_data)} 行")
+                self.logger.write_log(f"更新电池参数数据: {len(parsed_data)} 行")
 
     def update_status_data(self, sbs_data_dict):
-        """更新状态位数据（从SBS数据字典）
+        """更新位标志数据（从SBS数据字典）
 
         Args:
             sbs_data_dict: PC_GET_SBS解析后的字典
         """
-        if self.status_window_manager:
-            # 使用struct_model中的函数解析状态位
+        if self.bit_window_manager:
+            # 使用struct_model中的函数解析位标志
             status_bits = get_all_status_bits_for_display(sbs_data_dict)
-            self.status_window_manager.update_status_bits(status_bits)
+            self.bit_window_manager.update_status_bits(status_bits)
             if self.logger:
-                self.logger.write_log(f"更新状态位数据: {len(status_bits)} 个状态位")
+                self.logger.write_log(f"更新位标志数据: {len(status_bits)} 个位标志")
 
     def update_status_bits_direct(self, status_list):
-        """直接更新状态位数据（已解析格式）
+        """直接更新位标志数据（已解析格式）
 
         Args:
-            status_list: 状态位列表，格式：[{'name': str, 'value': int}, ...]
+            status_list: 位标志列表，格式：[{'name': str, 'value': int}, ...]
         """
-        if self.status_window_manager:
-            self.status_window_manager.update_status_bits(status_list)
+        if self.bit_window_manager:
+            self.bit_window_manager.update_status_bits(status_list)
 
     # ==================== 数据输出接口 ====================
 
@@ -718,8 +718,8 @@ class DataDisplayManager(QMainWindow):
         Returns:
             list: [(row, param_name, current_value, write_value), ...]
         """
-        if self.bit_window_manager:
-            return self.bit_window_manager.get_modified_data()
+        if self.battery_window_manager:
+            return self.battery_window_manager.get_modified_data()
         return []
 
     def get_write_values_dict(self):
@@ -728,21 +728,21 @@ class DataDisplayManager(QMainWindow):
         Returns:
             dict: {row: write_value, ...}
         """
-        if self.bit_window_manager and self.bit_window_manager.table_model:
-            return self.bit_window_manager.table_model.get_write_values()
+        if self.battery_window_manager and self.battery_window_manager.table_model:
+            return self.battery_window_manager.table_model.get_write_values()
         return {}
 
     # ==================== 控制接口 ====================
 
     def clear_bit_write_values(self):
-        """清空位标志的写入值"""
-        if self.bit_window_manager:
-            self.bit_window_manager.clear_write_values()
+        """清空电池参数的写入值"""
+        if self.battery_window_manager:
+            self.battery_window_manager.clear_write_values()
 
     def clear_status_bits(self):
-        """清空状态位"""
-        if self.status_window_manager:
-            self.status_window_manager.clear_status_bits()
+        """清空位标志"""
+        if self.bit_window_manager:
+            self.bit_window_manager.clear_status_bits()
 
     def clear_all(self):
         """清空所有数据"""

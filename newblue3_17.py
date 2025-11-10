@@ -2798,45 +2798,45 @@ class load_ui_dynamically(QMainWindow):
 
             # 设置窗口位置和大小
             self.data_display_mgr.setup_windows_geometry(
-                bit_geom=(150, 10, 580, 580),    # bit_window: x, y, width, height
-                status_geom=(740, 10, 390, 580)  # status_widget: x, y, width, height
+                battery_geom=(150, 10, 580, 580),    # battery_window: x, y, width, height
+                bit_geom=(740, 10, 390, 580)  # bit_window: x, y, width, height
             )
 
             # 显示所有窗口
             self.data_display_mgr.show_windows()
 
             # 获取内部组件引用（为了兼容性）
+            self.battery_window = self.data_display_mgr.battery_window_manager.widget if self.data_display_mgr.battery_window_manager else None
             self.bit_window = self.data_display_mgr.bit_window_manager.widget if self.data_display_mgr.bit_window_manager else None
-            self.status_widget = self.data_display_mgr.status_window_manager.widget if self.data_display_mgr.status_window_manager else None
-            self.bit_table_model = self.data_display_mgr.bit_window_manager.table_model if self.data_display_mgr.bit_window_manager else None
+            self.battery_table_model = self.data_display_mgr.battery_window_manager.table_model if self.data_display_mgr.battery_window_manager else None
             self.command_info_label = None  # 标签已在manager内部管理
 
             # 连接发送按钮信号（从管理器内部获取按钮）
-            if self.data_display_mgr.bit_window_manager:
-                self.data_display_mgr.bit_window_manager.send_button.clicked.connect(self.send_modified_values)
-                self.data_display_mgr.bit_window_manager.clear_button.clicked.connect(self.clear_modified_values)
+            if self.data_display_mgr.battery_window_manager:
+                self.data_display_mgr.battery_window_manager.send_button.clicked.connect(self.send_modified_values)
+                self.data_display_mgr.battery_window_manager.clear_button.clicked.connect(self.clear_modified_values)
 
             # 保留原有的标签列表（为了兼容性）
             self.key_label_list = []
             self.value_label_list = []
 
-            self.logger.write_log("✅ 数据显示管理器初始化成功（bit_window + status_widget + 数据解析）")
+            self.logger.write_log("✅ 数据显示管理器初始化成功（battery_window + bit_window + 数据解析）")
 
         except Exception as e:
             self.logger.write_log(f"加载UI文件失败: {e}")
             traceback.print_exc()
             # return None
 
-    # ============== 状态位显示相关方法（委托给StatusBitsWidget）==============
+    # ============== 位标志显示相关方法（委托给BitFlagsWidget）==============
     def update_status_bits(self, status_list):
-        """更新状态位（供外部调用）- 委托给状态位组件"""
-        if hasattr(self, 'status_widget'):
-            self.status_widget.update_status_bits(status_list)
+        """更新位标志（供外部调用）- 委托给位标志组件"""
+        if hasattr(self, 'bit_window'):
+            self.bit_window.update_status_bits(status_list)
 
     def update_single_status_bit(self, index, name, value):
-        """更新单个状态位 - 委托给状态位组件"""
-        if hasattr(self, 'status_widget'):
-            self.status_widget.update_single_status_bit(index, name, value)
+        """更新单个位标志 - 委托给位标志组件"""
+        if hasattr(self, 'bit_window'):
+            self.bit_window.update_single_status_bit(index, name, value)
 
     # visualize_bit_flags 已删除，由 data_display_mgr 内部处理
     def show_bluetooth_tool_on_top(self):

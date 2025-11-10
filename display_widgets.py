@@ -1,5 +1,5 @@
 """
-显示窗口组件 - 位标志和状态位的模型、委托和窗口类
+显示窗口组件 - 电池参数和位标志的模型、委托和窗口类
 独立文件，避免循环导入
 """
 import time
@@ -14,8 +14,8 @@ from PyQt6.QtGui import QPainter
 from PyQt6.QtWidgets import QStyle
 
 
-class BitFlagsTableModel(QAbstractTableModel):
-    """位标志表格模型（性能优化版）"""
+class BatteryTableModel(QAbstractTableModel):
+    """电池参数表格模型（性能优化版）"""
     def __init__(self, data=None, parent=None):
         super().__init__(parent)
         self._original_data = data if data is not None else []
@@ -425,9 +425,9 @@ class StatusBitsDelegate(QStyledItemDelegate):
             painter.drawText(text_rect, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, str(text))
 
 
-# ============== 状态位显示模型（三色状态：置起绿色、置0红色、5秒未刷新灰色）==============
-class StatusBitsTableModel(QAbstractTableModel):
-    """状态位表格模型，支持三色状态显示，每种状态位单独一列（性能优化版）"""
+# ============== 位标志显示模型（三色状态：置起绿色、置0红色、5秒未刷新灰色）==============
+class BitFlagsTableModel(QAbstractTableModel):
+    """位标志表格模型，支持三色状态显示，每种状态位单独一列（性能优化版）"""
     def __init__(self, parent=None):
         super().__init__(parent)
         # 状态位按类型分组存储
@@ -635,9 +635,9 @@ class StatusBitsTableModel(QAbstractTableModel):
         return any(len(bits) > 0 for bits in self._status_bits.values())
 
 
-# ============== 状态位显示窗口组件（封装UI和逻辑）==============
-class StatusBitsWidget(QWidget):
-    """状态位显示窗口，包含UI和业务逻辑的完整封装"""
+# ============== 位标志显示窗口组件（封装UI和逻辑）==============
+class BitFlagsWidget(QWidget):
+    """位标志显示窗口，包含UI和业务逻辑的完整封装"""
 
     def __init__(self, parent=None, logger=None):
         super().__init__(parent)
@@ -647,7 +647,7 @@ class StatusBitsWidget(QWidget):
     def init_ui(self):
         """初始化UI组件"""
         # 创建标题标签
-        self.title_label = QLabel('状态位监控（绿=0正常 红=1告警 灰=未刷新）')
+        self.title_label = QLabel('位标志监控（绿=0正常 红=1告警 灰=未刷新）')
         self.title_label.setStyleSheet("QLabel { color: blue; font-weight: bold; font-size: 8px; }")
 
         # 创建按钮布局
@@ -668,9 +668,9 @@ class StatusBitsWidget(QWidget):
         button_layout.addWidget(self.test_button)
         button_layout.addStretch()
 
-        # 创建QTableView和状态位模型
+        # 创建QTableView和位标志模型
         self.table_view = QTableView()
-        self.table_model = StatusBitsTableModel()
+        self.table_model = BitFlagsTableModel()
         self.table_view.setModel(self.table_model)
 
         # 设置表格属性
@@ -716,23 +716,23 @@ class StatusBitsWidget(QWidget):
         self.check_timer.start(2000)
 
     def check_timeout(self):
-        """定时器回调：检查状态位是否超时（性能优化版）"""
+        """定时器回调：检查位标志是否超时（性能优化版）"""
         try:
             if self.table_model.has_data():
                 self.table_model.check_timeout()
         except Exception as e:
             if self.logger:
-                self.logger.write_log(f"检查状态位超时失败: {e}")
+                self.logger.write_log(f"检查位标志超时失败: {e}")
 
     def clear_status_bits(self):
-        """清空所有状态位"""
+        """清空所有位标志"""
         try:
             self.table_model.clear_all()
             if self.logger:
-                self.logger.write_log("已清空所有状态位")
+                self.logger.write_log("已清空所有位标志")
         except Exception as e:
             if self.logger:
-                self.logger.write_log(f"清空状态位失败: {e}")
+                self.logger.write_log(f"清空位标志失败: {e}")
 
     def test_status_bits(self):
         """测试按钮：生成测试数据"""
@@ -770,13 +770,13 @@ class StatusBitsWidget(QWidget):
 
             self.update_status_bits(test_data)
             if self.logger:
-                self.logger.write_log(f"生成测试状态位数据: {len(test_data)} 个")
+                self.logger.write_log(f"生成测试位标志数据: {len(test_data)} 个")
         except Exception as e:
             if self.logger:
                 self.logger.write_log(f"生成测试数据失败: {e}")
 
     def update_status_bits(self, status_list):
-        """更新状态位
+        """更新位标志
         Args:
             status_list: 列表，每项格式为 {'name': str, 'value': int}
         """
@@ -784,10 +784,10 @@ class StatusBitsWidget(QWidget):
             self.table_model.batch_update_status_bits(status_list)
         except Exception as e:
             if self.logger:
-                self.logger.write_log(f"更新状态位失败: {e}")
+                self.logger.write_log(f"更新位标志失败: {e}")
 
     def update_single_status_bit(self, index, name, value):
-        """更新单个状态位（已废弃，建议使用 update_status_bits）"""
+        """更新单个位标志（已废弃，建议使用 update_status_bits）"""
         print(f"警告：update_single_status_bit 方法已废弃，请使用 update_status_bits")
         self.update_status_bits([{'name': name, 'value': value}])
 
