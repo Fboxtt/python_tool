@@ -220,74 +220,22 @@ class EnhancedMainWindow(QMainWindow):
         return panel
         
     def setup_data_windows(self):
-        """配置数据窗口"""
-        # 【可写入窗口 - 3列模式】
+        """自动配置数据窗口（从 struct_model 获取）"""
+        from struct_model import get_all_display_windows
         
-        # 1. 写保护参数配置
-        self.multi_window_manager.add_window_config(
-            window_id='PC_SET_WRITE_PROTECT',
-            title='📝 写保护参数配置',
-            column_mode=3,
-            default_visible=True
-        )
+        # 获取所有窗口配置
+        window_configs = get_all_display_windows()
         
-        # 2. 电池保护参数配置
-        self.multi_window_manager.add_window_config(
-            window_id='PC_SET_PROTECT_PARAMS',
-            title='🔋 电池保护参数',
-            column_mode=3,
-            default_visible=True
-        )
+        # 自动添加所有窗口
+        for config in window_configs:
+            self.multi_window_manager.add_window_config(
+                window_id=config['window_id'],
+                title=config['title'],
+                column_mode=config['column_mode'],
+                default_visible=config['default_visible']
+            )
         
-        # 【只读窗口 - 2列模式】
-        
-        # 3. SBS数据
-        self.multi_window_manager.add_window_config(
-            window_id='PC_GET_SBS',
-            title='📊 SBS数据',
-            column_mode=2,
-            default_visible=True
-        )
-        
-        # 4. TBS数据
-        self.multi_window_manager.add_window_config(
-            window_id='PC_GET_TBS',
-            title='📈 TBS数据',
-            column_mode=2,
-            default_visible=False
-        )
-        
-        # 5. BMS状态
-        self.multi_window_manager.add_window_config(
-            window_id='PC_GET_BMS',
-            title='⚙️ BMS状态',
-            column_mode=2,
-            default_visible=False
-        )
-        
-        # 6. 单体电压
-        self.multi_window_manager.add_window_config(
-            window_id='PC_GET_CELL_VOLTAGE',
-            title='🔌 单体电压',
-            column_mode=2,
-            default_visible=True
-        )
-        
-        # 7. 温度数据
-        self.multi_window_manager.add_window_config(
-            window_id='PC_GET_TEMP',
-            title='🌡️ 温度数据',
-            column_mode=2,
-            default_visible=True
-        )
-        
-        # 8. 生命周期数据
-        self.multi_window_manager.add_window_config(
-            window_id='PC_GET_LIFE_TIME',
-            title='📅 生命周期',
-            column_mode=2,
-            default_visible=False
-        )
+        self.logger.write_log(f"✅ 已自动配置 {len(window_configs)} 个数据窗口")
         
     def setup_timers(self):
         """设置定时器"""
@@ -403,8 +351,9 @@ class EnhancedMainWindow(QMainWindow):
         """处理窗口读取请求"""
         self.logger.write_log(f"收到读取请求: {window_id}")
         
-        # 根据window_id获取对应的命令码
-        cmd_code = STRUCT_COMMANDS.get(window_id, {}).get('read')
+        # 根据window_id获取对应的命令码（直接从STRUCT_COMMANDS获取）
+        from struct_model import STRUCT_COMMANDS
+        cmd_code = STRUCT_COMMANDS.get(window_id)
         
         if cmd_code:
             asyncio.create_task(self.queue_send_command(cmd_code, window_id))
@@ -414,35 +363,79 @@ class EnhancedMainWindow(QMainWindow):
     def on_window_write(self, window_id, modified_data):
         """处理窗口写入请求"""
         self.logger.write_log(f"收到写入请求: {window_id}, 修改项数: {len(modified_data)}")
-        
-        # 处理写入请求
         asyncio.create_task(self.process_write_request(window_id, modified_data))
         
     async def process_write_request(self, window_id, modified_data):
         """处理写入请求"""
         try:
             # 获取写入命令码
-            cmd_code = STRUCT_COMMANDS.get(window_id, {}).get('write')
+            from struct_model import get_write_command_code, STRUCT_FORMATS
+            import struct
             
+            cmd_code = get_write_command_code(window_id)
             if not cmd_code:
                 self.logger.write_log(f"窗口 {window_id} 不支持写入")
                 return
+            
+            # 获取当前窗口的所有数据
+            window = self.multi_window_manager.windows.get(window_id)
+            if not window or not window.table_model:
+                self.logger.write_log(f"无法获取窗口数据")
+                return
+            
+            original_data = window.table_model._original_data
+            
+            # 构建修改映射 {row: write_value}
+            modifications = {}
+            for row, param_name, current_value, write_value in modified_data:
+                modifications[row] = write_value
+            
+            # 准备要写入的值列表（有写入值用写入值，否则用当前值）
+            write_values = []
+            for row_idx, row_data in enumerate(original_data):
+                if row_idx in modifications:
+                    value_str = modifications[row_idx]
+                else:
+                    value_str = row_data[2] if len(row_data) > 2 else row_data[1]
                 
-            # 构造写入数据包（这里需要根据实际协议实现）
-            # 示例：假设写入数据需要打包成特定格式
+                # 转换为整数
+                try:
+                    if isinstance(value_str, str) and value_str.startswith('0x'):
+                        value = int(value_str, 16)
+                    else:
+                        value = int(value_str)
+                    write_values.append(value)
+                except (ValueError, TypeError):
+                    self.logger.write_log(f"行{row_idx}值转换失败: {value_str}")
+                    write_values.append(0)
             
-            # 1. 获取当前窗口的所有数据
-            # 2. 用修改的值替换对应字段
-            # 3. 打包成二进制数据
-            # 4. 使用text_decode.send_hex_fill构造完整命令
+            # 根据结构体格式打包
+            if window_id not in STRUCT_FORMATS:
+                self.logger.write_log(f"未找到结构体格式: {window_id}")
+                return
             
-            self.logger.write_log(f"写入命令构造完成: {window_id}")
+            fmt = STRUCT_FORMATS[window_id]
             
-            # 通过优先队列发送
-            # await self.multi_window_manager.queue_send(write_packet, priority=True)
+            try:
+                packed_data = struct.pack(fmt, *write_values)
+            except struct.error as e:
+                self.logger.write_log(f"数据打包失败: {str(e)}")
+                return
             
-            # 发送成功后清空写入值
-            self.multi_window_manager.clear_window_write_values(window_id)
+            # 构造完整命令
+            try:
+                full_command = self.bluetooth_tool.text_decode.send_hex_fill(cmd_code, packed_data)
+                self.logger.write_log(f"写入命令已构造: {len(full_command)} 字节")
+            except Exception as e:
+                self.logger.write_log(f"命令构造失败: {str(e)}")
+                return
+            
+            # 通过队列发送
+            await self.multi_window_manager.queue_send(full_command, priority=True)
+            self.logger.write_log(f"✅ 写入命令已发送: {window_id}")
+            
+            # 不清空写入值，保留用户输入
+            # self.multi_window_manager.clear_window_write_values(window_id)
             
         except Exception as e:
             self.logger.write_log(f"处理写入请求失败: {str(e)}")

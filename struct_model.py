@@ -413,6 +413,12 @@ STRUCT_VARIABLES = {
         "usBattStatus", "usSOC_Percent",
         "ulSOH_Percent", "ulDisTimes", "ulTotalDisAH"
     ],
+    "PC_GET_VER": [
+        "usMajorVer", "usMinorVer", "usRevision", "usCompileYear",
+        "ucCompileMonth", "ucCompileDay",
+        "cHWversion",
+        "cFuncVersion"
+    ],
     "PC_GET_INF": [
         "bootVer.usMajorVer", "bootVer.usMinorVer", "bootVer.usRevision", "bootVer.usYear", "bootVer.ucMonth", "bootVer.ucDay","bootVer.reserved","bootVer.reserved",
         "app_Ver.usMajorVer", "app_Ver.usMinorVer", "app_Ver.usRevision", "app_Ver.usYear", "app_Ver.ucMonth", "app_Ver.ucDay","app_Ver.reserved","app_Ver.reserved",
@@ -611,6 +617,78 @@ def get_all_writable_commands():
         dict: 所有可写入的命令对应关系字典
     """
     return READ_WRITE_COMMAND_MAPPING.copy()
+
+def get_all_display_windows():
+    """
+    获取所有可显示的窗口配置（自动生成）
+    
+    Returns:
+        list: 窗口配置列表，每项格式：
+            {
+                'window_id': str,        # 窗口ID（命令名称）
+                'title': str,            # 窗口标题
+                'column_mode': int,      # 列模式：2=只读，3=可读写
+                'default_visible': bool, # 是否默认显示
+                'cmd_code': int         # 命令码
+            }
+    """
+    windows = []
+    
+    # 遍历所有有格式定义的结构体
+    for struct_name in STRUCT_FORMATS.keys():
+        # 只为 PC_GET_* 命令生成窗口
+        if not struct_name.startswith('PC_GET_'):
+            continue
+        
+        # 判断是否可写（在 READ_WRITE_COMMAND_MAPPING 中）
+        is_writable = struct_name in READ_WRITE_COMMAND_MAPPING
+        column_mode = 3 if is_writable else 2
+        
+        # 自动生成标题（去掉 PC_GET_ 前缀）
+        display_name = struct_name.replace('PC_GET_', '')
+        
+        # 根据名称添加图标和中文描述
+        title_map = {
+            'SBS': '📊 SBS数据',
+            'BMS': '⚙️ BMS参数',
+            'KB': '📐 校准参数',
+            'OCP_DELAYTIME': '⏱️ 过流延时',
+            'CELL_CAP_PARA': '🔋 电芯容量',
+            'MOSHTDATA': '🌡️ MOS温度',
+            'LIFE_PARA': '📅 生命周期',
+            'VER': '📋 版本信息',
+            'INF': 'ℹ️ 系统信息',
+        }
+        
+        title = title_map.get(display_name, f'📄 {display_name}')
+        
+        # 获取命令码
+        cmd_code = STRUCT_COMMANDS.get(struct_name, 0)
+        
+        # 默认显示规则：SBS 默认显示，其他默认隐藏
+        default_visible = (struct_name == 'PC_GET_SBS')
+        
+        windows.append({
+            'window_id': struct_name,
+            'title': title,
+            'column_mode': column_mode,
+            'default_visible': default_visible,
+            'cmd_code': cmd_code
+        })
+    
+    return windows
+
+def get_window_column_mode(struct_name):
+    """
+    获取指定结构体的列模式
+    
+    Args:
+        struct_name: 结构体名称（如 'PC_GET_SBS'）
+        
+    Returns:
+        int: 2=只读（两列），3=可读写（三列）
+    """
+    return 3 if struct_name in READ_WRITE_COMMAND_MAPPING else 2
 
 # 更新配置数据，包含写入读出对应关系
 config_data.update({
@@ -943,63 +1021,44 @@ class HexParserApp(QMainWindow):
             dec_values = []
             hex_byte_array = []
 
-            # 首先找到icName字段在values中的索引
-            icname_index = None
-            for i, var_name in enumerate(STRUCT_VARIABLES[struct_name]):
-                if var_name == "icName":
-                    icname_index = i
-                    break
-
             for i, (var_name, value) in enumerate(zip(STRUCT_VARIABLES[struct_name], values)):
-                if var_name == "icName":
-                    # 检查value的类型并相应处理
-                    if isinstance(value, bytes):
-                        # 如果已经是bytes类型，直接解码
-                        str_value = value.decode('utf-8', errors='replace').rstrip('\x00')
-                        dec_values.append(str_value)
-                        hex_bytes = ''.join([f"{b:02X}" for b in value])
-                        hex_byte_array.append(hex_bytes)
-                    else:
-                        # 如果不是bytes类型，从原始数据中提取
-                        # 假设icName是15字节长度，并且在数据中的位置可以计算
-                        # 这里我们需要找到icName在data_bytes中的偏移量
-                        # 一个简单的方法是从结尾往前数16字节（15字节icName + 1字节writableArea + 4字节pcAddr）
-                        icname_bytes = data_bytes[-20:-5]  # 从末尾往前15字节
-                        str_value = icname_bytes.decode('utf-8', errors='replace').rstrip('\x00')
-                        dec_values.append(str_value)
-                        hex_bytes = ''.join([f"{b:02X}" for b in icname_bytes])
-                        hex_byte_array.append(hex_bytes)
-                else:
+                # 处理字符串字段（bytes类型）
+                if isinstance(value, bytes):
+                    # 字节串类型，解码为字符串
+                    str_value = value.decode('utf-8', errors='replace').rstrip('\x00')
+                    dec_values.append(str_value)
+                    hex_bytes = ''.join([f"{b:02X}" for b in value])
+                    hex_byte_array.append(hex_bytes)
+                elif isinstance(value, int):
                     # 处理数值字段
-                    if isinstance(value, int):
-                        if value < 256:
-                            hex_byte_array.append(f"0x{value:02X}")
-                        elif value < 65536:
-                            hex_byte_array.append(f"0x{value:04X}")
-                        else:
-                            hex_byte_array.append(f"0x{value:08X}")
-
-                        # 检查是否需要显示十六进制格式
-                        hex_vars = HEX_DISPLAY_VARIABLES.get(struct_name, [])
-                        if var_name in hex_vars:
-                            # 为指定变量只显示十六进制字符串
-                            if value < 256:
-                                hex_str = f"0x{value:02X}"
-                            elif value < 65536:
-                                hex_str = f"0x{value:04X}"
-                            else:
-                                hex_str = f"0x{value:08X}"
-                            dec_values.append(hex_str)  # 只显示十六进制
-                        else:
-                            # 根据约定确定符号
-                            if var_name.startswith('s') or var_name.startswith('l'):
-                                dec_values.append(str(value))  # 保留符号
-                            else:
-                                dec_values.append(str(value & 0xFFFF_FFFF))  # 无符号显示
+                    if value < 256:
+                        hex_byte_array.append(f"0x{value:02X}")
+                    elif value < 65536:
+                        hex_byte_array.append(f"0x{value:04X}")
                     else:
-                        # 其他类型的值
-                        hex_byte_array.append(str(value))
-                        dec_values.append(str(value))
+                        hex_byte_array.append(f"0x{value:08X}")
+
+                    # 检查是否需要显示十六进制格式
+                    hex_vars = HEX_DISPLAY_VARIABLES.get(struct_name, [])
+                    if var_name in hex_vars:
+                        # 为指定变量只显示十六进制字符串
+                        if value < 256:
+                            hex_str = f"0x{value:02X}"
+                        elif value < 65536:
+                            hex_str = f"0x{value:04X}"
+                        else:
+                            hex_str = f"0x{value:08X}"
+                        dec_values.append(hex_str)  # 只显示十六进制
+                    else:
+                        # 根据约定确定符号
+                        if var_name.startswith('s') or var_name.startswith('l'):
+                            dec_values.append(str(value))  # 保留符号
+                        else:
+                            dec_values.append(str(value & 0xFFFF_FFFF))  # 无符号显示
+                else:
+                    # 其他类型的值
+                    hex_byte_array.append(str(value))
+                    dec_values.append(str(value))
 
             # 按字节对齐显示
             display_data = []

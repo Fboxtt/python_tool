@@ -170,17 +170,20 @@ class DataDisplayWindow(QWidget):
         
         layout.addWidget(self.table_view)
         
-        # 如果是3列模式，添加按钮
+        # 添加按钮（所有窗口都有读取按钮）
+        button_layout = QHBoxLayout()
+        self.read_button = QPushButton('🔄 读取')
+        self.read_button.setMaximumWidth(70)
+        button_layout.addWidget(self.read_button)
+        
+        # 3列模式额外添加写入按钮
         if self.column_mode == 3:
-            button_layout = QHBoxLayout()
-            self.read_button = QPushButton('读取')
-            self.write_button = QPushButton('写入')
-            self.read_button.setMaximumWidth(60)
-            self.write_button.setMaximumWidth(60)
-            button_layout.addWidget(self.read_button)
+            self.write_button = QPushButton('✏️ 写入')
+            self.write_button.setMaximumWidth(70)
             button_layout.addWidget(self.write_button)
-            button_layout.addStretch()
-            layout.addLayout(button_layout)
+        
+        button_layout.addStretch()
+        layout.addLayout(button_layout)
         
         self.setLayout(layout)
         
@@ -222,8 +225,8 @@ class DataDisplayWindow(QWidget):
         row_height = self.table_view.verticalHeader().defaultSectionSize()
         header_height = self.table_view.horizontalHeader().height()
         
-        # 标题和按钮的高度
-        extra_height = 60 if self.column_mode == 3 else 40
+        # 标题和按钮的高度（现在所有窗口都有按钮）
+        extra_height = 60
         
         # 计算总高度
         total_height = header_height + row_count * row_height + extra_height
@@ -414,9 +417,11 @@ class MultiWindowManager(QWidget):
             
         window = DataDisplayWindow(window_id, title, column_mode, parent=self.window_container)
         
-        # 连接信号
+        # 连接读取按钮信号（所有窗口都有）
+        window.read_button.clicked.connect(lambda checked=False, wid=window_id: self.on_read_clicked(wid))
+        
+        # 3列模式额外连接写入按钮
         if column_mode == 3:
-            window.read_button.clicked.connect(lambda checked=False, wid=window_id: self.on_read_clicked(wid))
             window.write_button.clicked.connect(lambda checked=False, wid=window_id: self.on_write_clicked(wid))
             
         self.windows[window_id] = window
