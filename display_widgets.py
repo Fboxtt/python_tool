@@ -251,15 +251,16 @@ class BatteryTableModel(QAbstractTableModel):
 
     def _refresh_gradient(self):
         """定时器回调：刷新渐变颜色（性能优化版）"""
-        if not self._gradient_enabled or self.rowCount() == 0:
+        row_count = self.rowCount()
+        if not self._gradient_enabled or row_count == 0:
             return
         
         # 批量刷新所有单元格的背景颜色
         # 只刷新"当前值"列（1, 4, 7）以优化性能
         for col in [1, 4, 7]:
-            if self.rowCount() > 0:
+            if col < self.columnCount():  # 确保列存在
                 top_left = self.index(0, col)
-                bottom_right = self.index(self.rowCount() - 1, col)
+                bottom_right = self.index(row_count - 1, col)
                 self.dataChanged.emit(top_left, bottom_right, [Qt.ItemDataRole.BackgroundRole])
 
     def _get_gradient_color(self, original_row_index):
@@ -366,6 +367,16 @@ class BatteryTableModel(QAbstractTableModel):
 
     def update_data(self, data):
         """完全更新所有数据（性能优化版 + 记录更新时间）"""
+        # 检查数据有效性
+        if not data:
+            old_row_count = len(self._original_data)
+            self._original_data = []
+            self._organize_data()
+            if old_row_count > 0:
+                self.beginResetModel()
+                self.endResetModel()
+            return
+        
         old_row_count = len(self._original_data)
         self._original_data = data
 
@@ -769,6 +780,16 @@ class BitFlagsTableModel(QAbstractTableModel):
         Args:
             status_list: 列表，每项格式为 {'name': str, 'value': int} 或 (name, value) 元组
         """
+        # 检查数据有效性
+        if not status_list:
+            old_row_count = self.rowCount()
+            for key in self._status_bits:
+                self._status_bits[key] = []
+            if old_row_count > 0:
+                self.beginResetModel()
+                self.endResetModel()
+            return
+        
         current_time = time.time()
 
         # 性能优化：记录旧的行数

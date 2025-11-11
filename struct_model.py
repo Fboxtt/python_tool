@@ -820,17 +820,15 @@ class HexParserApp(QMainWindow):
             cell_count = sum(1 for var in sbs_variables if var.startswith("usCellV["))
 
             if cell_count == 16:
-                print("当前配置：16串")
                 return 16
             elif cell_count == 32:
-                print("当前配置：32串")
                 return 32
             else:
-                print(f"警告：未知的电芯数量 {cell_count}")
+                LogManager.get_instance().write_log(f"警告：未知的电芯数量 {cell_count}")
                 return -1
 
         except Exception as e:
-            print(f"检测配置失败: {str(e)}")
+            LogManager.get_instance().write_log(f"检测配置失败: {str(e)}")
             traceback.print_exc()
             return -1
 
@@ -876,10 +874,6 @@ class HexParserApp(QMainWindow):
                 values = struct.unpack(fmt, data_bytes)
                 # 转换为十六进制字符串
                 hex_values = [f"0x{b:02X}" for b in data_bytes]
-                print(struct_name, data_bytes)
-                print(type(hex_values))
-                print(type(hex_values[0]))
-                print(type(data_bytes))
                 hex_byte_array = []
 
                 # 处理有符号值
@@ -937,10 +931,8 @@ class HexParserApp(QMainWindow):
             return struct_name, None
         try:
             fmt = STRUCT_FORMATS[struct_name]
-            print(fmt)
             size = struct.calcsize(fmt)
             if size != len(data_bytes):
-                print(f"解析 {struct_name} 失败: 数据长度不匹配, 目标长度: {size}, 实际长度: {len(data_bytes)}")
                 LogManager.get_instance().write_log(f"解析 {struct_name} 失败: 数据长度不匹配, 目标长度: {size}, 实际长度: {len(data_bytes)}")
                 return None, None
 
@@ -1023,7 +1015,6 @@ class HexParserApp(QMainWindow):
             traceback.print_exc()
             LogManager.get_instance().write_log(f"解析 {struct_name} 失败: {str(e)}")
 
-        LogManager.get_instance().write_log("发射dic信号")
         return struct_name, parsed_data
 
 
