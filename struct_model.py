@@ -629,7 +629,8 @@ def get_all_display_windows():
                 'title': str,            # 窗口标题
                 'column_mode': int,      # 列模式：2=只读，3=可读写
                 'default_visible': bool, # 是否默认显示
-                'cmd_code': int         # 命令码
+                'cmd_code': int,        # 命令码
+                'expected_row_count': int # 预期数据行数
             }
     """
     windows = []
@@ -668,12 +669,16 @@ def get_all_display_windows():
         # 默认显示规则：SBS 默认显示，其他默认隐藏
         default_visible = (struct_name == 'PC_GET_SBS')
         
+        # 获取预期的数据行数（从 STRUCT_VARIABLES 中获取变量数量）
+        expected_row_count = len(STRUCT_VARIABLES.get(struct_name, []))
+        
         windows.append({
             'window_id': struct_name,
             'title': title,
             'column_mode': column_mode,
             'default_visible': default_visible,
-            'cmd_code': cmd_code
+            'cmd_code': cmd_code,
+            'expected_row_count': expected_row_count
         })
     
     return windows

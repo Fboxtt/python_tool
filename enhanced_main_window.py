@@ -232,7 +232,8 @@ class EnhancedMainWindow(QMainWindow):
                 window_id=config['window_id'],
                 title=config['title'],
                 column_mode=config['column_mode'],
-                default_visible=config['default_visible']
+                default_visible=config['default_visible'],
+                expected_row_count=config['expected_row_count']
             )
         
         self.logger.write_log(f"✅ 已自动配置 {len(window_configs)} 个数据窗口")
