@@ -314,13 +314,16 @@ class EnhancedMainWindow(QMainWindow):
         """监控循环 - 定期查询数据"""
         try:
             while True:
+                # 获取监控间隔时间
+                interval = self.bluetooth_tool.monitor_interval_spinbox.value()
+                
                 # 查询SBS数据
                 await self.queue_send_command(0x13, "PC_GET_SBS")
-                await asyncio.sleep(1)
+                await asyncio.sleep(interval)
                 
                 # 查询TBS数据
                 # await self.queue_send_command(0x15, "PC_GET_TBS")
-                # await asyncio.sleep(1)
+                # await asyncio.sleep(interval)
                 
         except asyncio.CancelledError:
             self.logger.write_log("监控循环已停止")

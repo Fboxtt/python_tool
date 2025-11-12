@@ -11,7 +11,7 @@ from PyQt6.QtCore import QTimer  # 导入 QTimer
 from PyQt6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QPushButton, QListWidget, QLabel, QMessageBox, QTextEdit, QLineEdit, QHBoxLayout,
     QCheckBox, QFileDialog, QComboBox, QGridLayout, QMainWindow, QSplashScreen, QSizePolicy, QTableView, QHeaderView, QAbstractItemView,
-    QStyledItemDelegate, QStyle
+    QStyledItemDelegate, QStyle, QDoubleSpinBox
 )
 from PyQt6.QtCore import Qt, QAbstractTableModel, QModelIndex
 from PyQt6.QtGui import QPixmap, QFont, QColor, QPainter
@@ -273,6 +273,20 @@ class BluetoothTool(QWidget):
         self.serial_connect_button = QPushButton('连接串口')
         self.serial_connect_button.clicked.connect(self.on_serial_connect_clicked)
         serial_layout.addWidget(self.serial_connect_button)
+        
+        # 监控间隔设置
+        interval_layout = QHBoxLayout()
+        interval_label = QLabel('监控间隔(秒):')
+        self.monitor_interval_spinbox = QDoubleSpinBox()
+        self.monitor_interval_spinbox.setMinimum(0.5)
+        self.monitor_interval_spinbox.setMaximum(100.0)
+        self.monitor_interval_spinbox.setSingleStep(0.1)
+        self.monitor_interval_spinbox.setValue(1.0)
+        self.monitor_interval_spinbox.setDecimals(1)
+        self.monitor_interval_spinbox.setToolTip('设置监控指令发送间隔时间')
+        interval_layout.addWidget(interval_label)
+        interval_layout.addWidget(self.monitor_interval_spinbox)
+        serial_layout.addLayout(interval_layout)
 
         serial_layout.addStretch(1)  # 添加弹性空间
 
