@@ -666,8 +666,8 @@ def get_all_display_windows():
         # 获取命令码
         cmd_code = STRUCT_COMMANDS.get(struct_name, 0)
         
-        # 默认显示规则：SBS 默认显示，其他默认隐藏
-        default_visible = (struct_name == 'PC_GET_SBS')
+        # 默认显示规则：SBS、BMS、KB（校准参数）、VER（版本信息）默认显示
+        default_visible = struct_name in ['PC_GET_SBS', 'PC_GET_BMS', 'PC_GET_KB', 'PC_GET_VER']
         
         # 获取预期的数据行数（从 STRUCT_VARIABLES 中获取变量数量）
         expected_row_count = len(STRUCT_VARIABLES.get(struct_name, []))
@@ -690,7 +690,7 @@ def get_all_display_windows():
         'window_id': 'BIT_FLAGS',
         'title': '🚦 位标志监控',
         'column_mode': 2,  # 位标志窗口不需要列模式
-        'default_visible': False,  # 默认隐藏
+        'default_visible': True,  # 默认显示
         'cmd_code': 0,  # 位标志窗口没有特定命令码
         'expected_row_count': bit_flags_row_count,  # 4列显示，每行2个位
         'window_type': 'bitflags'  # 标记为位标志窗口
