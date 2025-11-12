@@ -657,21 +657,13 @@ class StatusBitsDelegate(QStyledItemDelegate):
 
 # ============== 位标志显示模型（三色状态：置起绿色、置0红色、5秒未刷新灰色）==============
 class BitFlagsTableModel(QAbstractTableModel):
-    """位标志表格模型，支持三色状态显示，每种状态位单独一列（性能优化版）"""
+    """位标志表格模型，支持三色状态显示，2列模式（名称 | 状态值）"""
     def __init__(self, parent=None):
         super().__init__(parent)
-        # 状态位按类型分组存储
-        self._status_bits = {
-            'alarm': [],    # 告警状态（告_）
-            'protect': [],  # 保护状态（护_）
-            'fault': [],    # 失效状态（错_）
-            'info': []      # 其他信息（另_）
-        }
-        self._headers = ['告警', '保护', '失效', '其他']  # 四列显示
+        # 所有状态位存储在一个列表中（不分类）
+        self._status_bits = []  # 列表形式：[{'name': str, 'value': int, 'last_update': float}, ...]
+        self._headers = ['参数名', '状态值']  # 两列显示
         self._timeout_seconds = 5.0  # 超时时间（秒）
-
-        # 列到类型的映射
-        self._col_to_type = ['alarm', 'protect', 'fault', 'info']
 
         # 性能优化：缓存QColor对象，避免重复创建
         self._color_cache = {
@@ -703,13 +695,11 @@ class BitFlagsTableModel(QAbstractTableModel):
             self.check_timeout()
 
     def rowCount(self, parent=QModelIndex()):
-        # 返回所有列中最长的那列的行数
-        if not any(self._status_bits.values()):
-            return 0
-        return max(len(bits) for bits in self._status_bits.values())
+        # 返回状态位的总数
+        return len(self._status_bits)
 
     def columnCount(self, parent=QModelIndex()):
-        return 4  # 四列
+        return 2  # 两列：名称 | 状态值
 
     def headerData(self, section, orientation, role):
         if role == Qt.ItemDataRole.DisplayRole:
@@ -718,12 +708,6 @@ class BitFlagsTableModel(QAbstractTableModel):
             else:
                 return str(section + 1)
         return None
-
-    def _get_status_list_for_column(self, col):
-        """根据列号获取对应的状态位列表"""
-        if 0 <= col < len(self._col_to_type):
-            return self._status_bits[self._col_to_type[col]]
-        return []
 
     def _update_cached_time(self):
         """更新缓存的时间（按需更新）"""
@@ -738,32 +722,33 @@ class BitFlagsTableModel(QAbstractTableModel):
         row = index.row()
         col = index.column()
 
-        # 获取该列对应的状态位列表
-        status_list = self._get_status_list_for_column(col)
-
         # 检查行索引是否有效
-        if row >= len(status_list):
+        if row >= len(self._status_bits):
             return None
 
-        bit_info = status_list[row]
+        bit_info = self._status_bits[row]
 
         # 性能优化：使用缓存的时间，只在必要时更新
         self._update_cached_time()
         time_diff = self._cached_time - bit_info['last_update']
         is_timeout = time_diff > self._timeout_seconds
 
-        # 显示数据：名称（状态由背景颜色表示）
+        # 显示数据
         if role == Qt.ItemDataRole.DisplayRole:
-            return bit_info['name']
+            if col == 0:  # 名称列
+                return bit_info['name']
+            elif col == 1:  # 状态值列
+                return str(bit_info['value'])
 
-        # 背景颜色（0=绿色，1=红色）- 使用缓存的QColor对象
+        # 背景颜色（仅在状态值列显示）
         elif role == Qt.ItemDataRole.BackgroundRole:
-            if is_timeout:
-                return self._color_cache['gray']
-            elif bit_info['value'] == 1:
-                return self._color_cache['red']
-            else:
-                return self._color_cache['green']
+            if col == 1:  # 只在状态值列显示颜色
+                if is_timeout:
+                    return self._color_cache['gray']
+                elif bit_info['value'] == 1:
+                    return self._color_cache['red']
+                else:
+                    return self._color_cache['green']
 
         # 前景色（文字颜色）- 使用缓存的QColor对象
         elif role == Qt.ItemDataRole.ForegroundRole:
@@ -776,15 +761,14 @@ class BitFlagsTableModel(QAbstractTableModel):
         return None
 
     def batch_update_status_bits(self, status_list):
-        """批量更新状态位，根据前缀自动分组到对应列（性能优化版）
+        """批量更新状态位（2列模式，不分组）
         Args:
             status_list: 列表，每项格式为 {'name': str, 'value': int} 或 (name, value) 元组
         """
         # 检查数据有效性
         if not status_list:
             old_row_count = self.rowCount()
-            for key in self._status_bits:
-                self._status_bits[key] = []
+            self._status_bits = []
             if old_row_count > 0:
                 self.beginResetModel()
                 self.endResetModel()
@@ -795,11 +779,10 @@ class BitFlagsTableModel(QAbstractTableModel):
         # 性能优化：记录旧的行数
         old_row_count = self.rowCount()
 
-        # 清空所有列表
-        for key in self._status_bits:
-            self._status_bits[key] = []
+        # 清空列表
+        self._status_bits = []
 
-        # 根据前缀分组
+        # 添加所有状态位
         for item in status_list:
             if isinstance(item, dict):
                 name = item.get('name', '')
@@ -812,19 +795,7 @@ class BitFlagsTableModel(QAbstractTableModel):
                 'value': value,
                 'last_update': current_time
             }
-
-            # 根据前缀分组到对应的列表
-            if name.startswith('告_'):
-                self._status_bits['alarm'].append(bit_data)
-            elif name.startswith('护_'):
-                self._status_bits['protect'].append(bit_data)
-            elif name.startswith('错_'):
-                self._status_bits['fault'].append(bit_data)
-            elif name.startswith('另_'):
-                self._status_bits['info'].append(bit_data)
-            else:
-                # 未知类型，默认放到其他信息列
-                self._status_bits['info'].append(bit_data)
+            self._status_bits.append(bit_data)
 
         # 性能优化：只在行数变化时使用resetModel，否则使用dataChanged
         new_row_count = self.rowCount()
@@ -847,28 +818,27 @@ class BitFlagsTableModel(QAbstractTableModel):
         current_time = time.time()
         self._cached_time = current_time  # 更新时间缓存
 
-        # 性能优化：记录需要更新的单元格
-        changed_cells = []
+        # 性能优化：记录需要更新的行
+        changed_rows = []
 
-        # 检查所有列的所有状态位
-        for col_idx, col_type in enumerate(self._col_to_type):
-            status_list = self._status_bits[col_type]
-            for row_idx, bit_info in enumerate(status_list):
-                time_diff = current_time - bit_info['last_update']
-                # 检查是否刚好跨越超时阈值（前后1秒的窗口）
-                if self._timeout_seconds - 1 < time_diff < self._timeout_seconds + 1:
-                    changed_cells.append((row_idx, col_idx))
+        # 检查所有状态位
+        for row_idx, bit_info in enumerate(self._status_bits):
+            time_diff = current_time - bit_info['last_update']
+            # 检查是否刚好跨越超时阈值（前后1秒的窗口）
+            if self._timeout_seconds - 1 < time_diff < self._timeout_seconds + 1:
+                changed_rows.append(row_idx)
 
-        # 性能优化：只更新变化的单元格
-        if changed_cells:
-            # 如果变化的单元格少于10个，逐个发送信号（更精确）
-            if len(changed_cells) <= 10:
-                for row, col in changed_cells:
-                    idx = self.index(row, col)
+        # 性能优化：只更新变化的行
+        if changed_rows:
+            # 如果变化的行少于10个，逐个发送信号（更精确）
+            if len(changed_rows) <= 10:
+                for row in changed_rows:
+                    # 只更新状态值列（第1列）
+                    idx = self.index(row, 1)
                     self.dataChanged.emit(idx, idx, [Qt.ItemDataRole.BackgroundRole])
             else:
                 # 变化较多时，刷新整个视图（避免信号风暴）
-                if any(self._status_bits.values()):
+                if self._status_bits:
                     top_left = self.index(0, 0)
                     bottom_right = self.index(self.rowCount() - 1, self.columnCount() - 1)
                     self.dataChanged.emit(top_left, bottom_right, [Qt.ItemDataRole.BackgroundRole])
@@ -883,13 +853,12 @@ class BitFlagsTableModel(QAbstractTableModel):
     def clear_all(self):
         """清空所有状态位"""
         self.beginResetModel()
-        for key in self._status_bits:
-            self._status_bits[key] = []
+        self._status_bits = []
         self.endResetModel()
 
     def has_data(self):
         """检查是否有数据（用于优化定时器）"""
-        return any(len(bits) > 0 for bits in self._status_bits.values())
+        return len(self._status_bits) > 0
 
 
 # ============== 位标志显示窗口组件（封装UI和逻辑）==============
@@ -946,11 +915,9 @@ class BitFlagsWidget(QWidget):
         header_font.setPointSize(7)
         self.table_view.horizontalHeader().setFont(header_font)
 
-        # 设置列宽（四列，适应390宽度窗口）
-        self.table_view.setColumnWidth(0, 70)
-        self.table_view.setColumnWidth(1, 70)
-        self.table_view.setColumnWidth(2, 70)
-        self.table_view.setColumnWidth(3, 70)
+        # 设置列宽度（2列模式：名称 | 状态值）
+        self.table_view.setColumnWidth(0, 120)  # 名称列
+        self.table_view.setColumnWidth(1, 50)   # 状态值列
 
         # 设置行高
         self.table_view.verticalHeader().setDefaultSectionSize(18)

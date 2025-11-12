@@ -3,14 +3,15 @@
 支持checkbox控制窗口显示/隐藏，自适应布局
 """
 import asyncio
+import time
 from collections import deque
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGridLayout,
     QCheckBox, QLabel, QPushButton, QScrollArea,
-    QGroupBox, QTableView, QAbstractItemView, QSizePolicy
+    QGroupBox, QTableView, QAbstractItemView, QSizePolicy, QHeaderView
 )
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal
-from PyQt6.QtGui import QFont
+from PyQt6.QtGui import QFont, QColor
 from display_widgets import BatteryTableModel
 
 
@@ -92,6 +93,367 @@ class BluetoothQueueSender:
         return len(self.send_queue)
 
 
+# ============== 位标志紧凑模型（4列显示：名称|值|名称|值） ==============
+class BitFlagsCompactModel(BatteryTableModel):
+    """位标志紧凑模型，4列显示，带超时渐变色"""
+    
+    def __init__(self, data=None, parent=None):
+        super().__init__(data, parent)
+        self._columns = 4
+        self._headers = ['参数名', '值', '参数名', '值']
+        # 指定哪些列需要渐变色（第1、3列：值列）
+        self._gradient_columns = [1, 3]
+        # 启用渐变功能
+        self._gradient_enabled = True
+        # 渐变持续时间（与其他窗口保持统一：5秒）
+        self._gradient_duration = 5.0
+        # 位标志的新鲜色和陈旧色
+        self._color_green_fresh = QColor(144, 238, 144)  # 鲜艳绿色（0值，刚更新）
+        self._color_green_stale = QColor(200, 220, 200)  # 淡绿色（0值，陈旧）
+        self._color_red_fresh = QColor(255, 160, 160)    # 鲜艳红色（1值，刚更新）
+        self._color_red_stale = QColor(230, 200, 200)    # 淡红色（1值，陈旧）
+        
+    def _get_gradient_color_for_bit(self, original_idx, value):
+        """计算位标志的渐变颜色（与其他窗口保持统一的渐变算法）
+        
+        Args:
+            original_idx: 原始数据索引
+            value: 位标志值（0或1）
+        
+        Returns:
+            QColor: 插值后的颜色
+        """
+        if original_idx not in self._update_timestamps:
+            # 没有更新记录，返回陈旧颜色
+            return self._color_green_stale if value == 0 else self._color_red_stale
+        
+        # 计算距离上次更新的时间
+        elapsed = time.time() - self._update_timestamps[original_idx]
+        
+        # 计算渐变进度 (0.0 = 刚更新, 1.0 = 已超时)
+        progress = min(elapsed / self._gradient_duration, 1.0)
+        
+        # 根据值选择颜色对
+        if value == 0:
+            color_fresh = self._color_green_fresh
+            color_stale = self._color_green_stale
+        else:
+            color_fresh = self._color_red_fresh
+            color_stale = self._color_red_stale
+        
+        # RGB线性插值（与其他窗口统一的算法）
+        r = int(color_fresh.red() + 
+                (color_stale.red() - color_fresh.red()) * progress)
+        g = int(color_fresh.green() + 
+                (color_stale.green() - color_fresh.green()) * progress)
+        b = int(color_fresh.blue() + 
+                (color_stale.blue() - color_fresh.blue()) * progress)
+        
+        return QColor(r, g, b)
+        
+    def _organize_data(self):
+        """将位标志数据重新组织为4列显示（2个名称-值对一行）"""
+        self._organized_data = []
+        
+        # 将数据按2个一组排列
+        for i in range(0, len(self._original_data), 2):
+            row = []
+            
+            # 第1对：名称和值
+            if i < len(self._original_data):
+                item = self._original_data[i]
+                if isinstance(item, dict):
+                    row.append(item.get('name', ''))
+                    row.append(str(item.get('value', '')))
+                elif isinstance(item, (tuple, list)) and len(item) >= 2:
+                    row.append(item[0])  # 名称
+                    row.append(str(item[1]))  # 值
+                else:
+                    row.extend(['', ''])
+            else:
+                row.extend(['', ''])
+            
+            # 第2对：名称和值
+            if i + 1 < len(self._original_data):
+                item = self._original_data[i + 1]
+                if isinstance(item, dict):
+                    row.append(item.get('name', ''))
+                    row.append(str(item.get('value', '')))
+                elif isinstance(item, (tuple, list)) and len(item) >= 2:
+                    row.append(item[0])  # 名称
+                    row.append(str(item[1]))  # 值
+                else:
+                    row.extend(['', ''])
+            else:
+                row.extend(['', ''])
+            
+            self._organized_data.append(row)
+    
+    def data(self, index, role):
+        """重写data方法，实现位标志的渐变色（与其他窗口保持统一）"""
+        if not index.isValid():
+            return None
+        
+        row = index.row()
+        col = index.column()
+        
+        if row >= len(self._organized_data):
+            return None
+        
+        # 显示数据
+        if role == Qt.ItemDataRole.DisplayRole:
+            return self._organized_data[row][col]
+        
+        # 背景颜色（使用与其他窗口统一的渐变算法）
+        elif role == Qt.ItemDataRole.BackgroundRole:
+            if col in self._gradient_columns:  # 第1、3列：值列
+                # 计算原始数据索引
+                if col == 1:
+                    original_idx = row * 2
+                else:  # col == 3
+                    original_idx = row * 2 + 1
+                
+                # 获取值
+                if original_idx < len(self._original_data):
+                    value_str = self._organized_data[row][col]
+                    if value_str:
+                        try:
+                            value = int(value_str)
+                            # 使用统一的渐变色算法
+                            return self._get_gradient_color_for_bit(original_idx, value)
+                        except (ValueError, TypeError):
+                            pass
+        
+        # 文字对齐
+        elif role == Qt.ItemDataRole.TextAlignmentRole:
+            return int(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+        
+        return None
+    
+    def update_single_bit(self, name, value):
+        """增量更新单个位标志（用于提高效率）
+        
+        Args:
+            name: 位标志名称
+            value: 位标志值（0或1）
+        """
+        current_time = time.time()
+        
+        # 查找该位标志在原始数据中的索引
+        for idx, item in enumerate(self._original_data):
+            item_name = item.get('name') if isinstance(item, dict) else item[0]
+            if item_name == name:
+                # 更新值
+                if isinstance(item, dict):
+                    item['value'] = value
+                else:
+                    self._original_data[idx] = (name, value)
+                
+                # 更新时间戳
+                self._update_timestamps[idx] = current_time
+                
+                # 计算该位标志在组织后的数据中的位置
+                table_row = idx // 2
+                table_col = 1 if idx % 2 == 0 else 3
+                
+                # 更新组织后的数据
+                if table_row < len(self._organized_data):
+                    self._organized_data[table_row][table_col] = str(value)
+                    
+                    # 发射dataChanged信号，只刷新该单元格
+                    cell_index = self.index(table_row, table_col)
+                    self.dataChanged.emit(cell_index, cell_index, 
+                                        [Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.BackgroundRole])
+                return
+        
+        # 如果没找到，说明是新的位标志，添加到末尾
+        self._original_data.append({'name': name, 'value': value})
+        self._update_timestamps[len(self._original_data) - 1] = current_time
+        self._organize_data()
+        self.beginResetModel()
+        self.endResetModel()
+    
+    def flags(self, index):
+        """所有单元格都不可编辑"""
+        return Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable
+
+
+# ============== 位标志显示窗口 ==============
+class BitFlagsDisplayWindow(QWidget):
+    """位标志显示窗口（使用与DataDisplayWindow相同的架构）"""
+    
+    def __init__(self, window_id, title, expected_row_count=50, parent=None):
+        super().__init__(parent)
+        self.window_id = window_id
+        self.title = title
+        self.expected_row_count = expected_row_count
+        self.init_ui()
+        
+        # 启动定时器，定期刷新颜色（每500ms刷新一次，用于超时变灰）
+        self.refresh_timer = QTimer(self)
+        self.refresh_timer.timeout.connect(self._refresh_colors)
+        self.refresh_timer.start(500)  # 500ms刷新一次
+    
+    def _refresh_colors(self):
+        """定时刷新颜色（用于超时变灰）"""
+        if hasattr(self.table_model, '_gradient_columns'):
+            row_count = self.table_model.rowCount()
+            if row_count > 0:
+                # 刷新所有值列的背景色
+                for col in self.table_model._gradient_columns:
+                    top_left = self.table_model.index(0, col)
+                    bottom_right = self.table_model.index(row_count - 1, col)
+                    self.table_model.dataChanged.emit(top_left, bottom_right, 
+                                                     [Qt.ItemDataRole.BackgroundRole])
+        
+    def init_ui(self):
+        """初始化UI"""
+        layout = QVBoxLayout()
+        layout.setContentsMargins(2, 2, 2, 2)
+        layout.setSpacing(1)
+        
+        # 标题
+        title_label = QLabel(self.title)
+        title_label.setStyleSheet("""
+            QLabel { 
+                color: #2c3e50; 
+                font-weight: bold; 
+                font-size: 10px;
+                padding: 2px;
+                background-color: #ecf0f1;
+                border-radius: 3px;
+            }
+        """)
+        layout.addWidget(title_label)
+        
+        # 创建表格视图（使用2列模型，但分4列显示）
+        self.table_view = QTableView()
+        self.table_model = BitFlagsCompactModel()  # 使用新的紧凑模型
+        self.table_view.setModel(self.table_model)
+        
+        # 设置4列的列宽（名称 | 值 | 名称 | 值）
+        # 名称列减少2/5：90 - 36 = 54
+        self.table_view.setColumnWidth(0, 54)   # 第1列名称
+        self.table_view.setColumnWidth(1, 30)   # 第1列值
+        self.table_view.setColumnWidth(2, 54)   # 第2列名称
+        self.table_view.setColumnWidth(3, 30)   # 第2列值
+        
+        # 固定列宽
+        for col in range(4):
+            self.table_view.horizontalHeader().setSectionResizeMode(col, QHeaderView.ResizeMode.Fixed)
+        
+        # 设置表格属性
+        self.table_view.setAlternatingRowColors(True)
+        self.table_view.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.table_view.horizontalHeader().setStretchLastSection(False)
+        self.table_view.verticalHeader().setVisible(False)
+        
+        # 设置字体
+        table_font = self.table_view.font()
+        table_font.setPointSize(8)
+        self.table_view.setFont(table_font)
+        
+        # 设置行高（12像素）
+        self.table_view.verticalHeader().setDefaultSectionSize(12)
+        self.table_view.verticalHeader().setMinimumSectionSize(12)
+        # 强制固定行高
+        self.table_view.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Fixed)
+        
+        # 设置表头字体
+        header_font = self.table_view.horizontalHeader().font()
+        header_font.setPointSize(8)
+        header_font.setBold(True)
+        self.table_view.horizontalHeader().setFont(header_font)
+        
+        self.table_view.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        layout.addWidget(self.table_view)
+        
+        self.setLayout(layout)
+        
+        # 设置窗口边框和样式
+        self.setStyleSheet("""
+            BitFlagsDisplayWindow {
+                border: 1px solid #bdc3c7;
+                border-radius: 3px;
+                background-color: white;
+                padding: 2px;
+            }
+            QTableView {
+                border: 1px solid #dce0e3;
+                gridline-color: #ecf0f1;
+            }
+            QTableView::item {
+                height: 12px;
+                padding: 0px;
+            }
+            QTableView::item:selected {
+                background-color: #3498db;
+                color: white;
+            }
+            QTableView::item:hover {
+                background-color: #ecf0f1;
+            }
+        """)
+        
+        # 样式表设置后再次强制设置行高（确保生效）
+        self.table_view.verticalHeader().setDefaultSectionSize(12)
+        self.table_view.verticalHeader().setMinimumSectionSize(12)
+        self.table_view.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Fixed)
+        
+    def update_data(self, status_list):
+        """更新位标志数据"""
+        if self.table_model:
+            self.table_model.update_data(status_list)
+            
+    def adjust_size_to_content(self, max_container_height=None):
+        """根据内容自适应调整大小"""
+        # 在计算前再次强制设置行高（防止被重置）
+        self.table_view.verticalHeader().setDefaultSectionSize(12)
+        self.table_view.verticalHeader().setMinimumSectionSize(12)
+        self.table_view.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Fixed)
+        
+        # 获取实际行数（4列显示，行数为数据总数/2向上取整）
+        data_count = len(self.table_model._original_data) if hasattr(self.table_model, '_original_data') else 0
+        if data_count == 0:
+            row_count = (self.expected_row_count + 1) // 2  # 向上取整
+        else:
+            row_count = (data_count + 1) // 2  # 向上取整
+        
+        row_height = self.table_view.verticalHeader().defaultSectionSize()
+        header_height = self.table_view.horizontalHeader().height()
+        if header_height == 0:
+            header_height = 30
+        
+        extra_height = 40  # 标题 + 边距
+        
+        # 计算总高度
+        total_height = header_height + row_count * row_height + extra_height
+        
+        # 设置最小高度（至少显示3行）
+        min_height = header_height + 3 * row_height + extra_height
+        total_height = max(total_height, min_height)
+        
+        # 限制最大高度（99%，除了读取写入按钮）
+        if max_container_height and max_container_height > 0:
+            max_window_height = int(max_container_height * 0.99)
+            total_height = min(total_height, max_window_height)
+        
+        # 计算所需宽度（4列：54+30+54+30+边距 = 178）
+        total_width = 54 + 30 + 54 + 30 + 10
+        
+        # 设置固定大小
+        self.setMinimumHeight(total_height)
+        self.setMaximumHeight(total_height)
+        self.setMinimumWidth(total_width)
+        self.setMaximumWidth(total_width)
+        
+        return total_height
+    
+    def print_column_widths(self):
+        """打印窗口信息（位标志窗口）- 用于调试"""
+        pass  # 调试日志已移除
+
+
 # ============== 单个数据显示窗口 ==============
 class DataDisplayWindow(QWidget):
     """单个数据显示窗口
@@ -160,7 +522,6 @@ class DataDisplayWindow(QWidget):
         self.table_view.verticalHeader().setVisible(False)
         
         # 固定列宽，防止自动调整
-        from PyQt6.QtWidgets import QHeaderView
         for col in range(self.table_model.columnCount()):
             self.table_view.horizontalHeader().setSectionResizeMode(col, QHeaderView.ResizeMode.Fixed)
         
@@ -169,9 +530,11 @@ class DataDisplayWindow(QWidget):
         table_font.setPointSize(8)
         self.table_view.setFont(table_font)
         
-        # 设置行高（压缩以节省空间）
-        self.table_view.verticalHeader().setDefaultSectionSize(20)
-        self.table_view.verticalHeader().setMinimumSectionSize(18)
+        # 设置行高（压缩以节省空间，12像素）
+        self.table_view.verticalHeader().setDefaultSectionSize(12)
+        self.table_view.verticalHeader().setMinimumSectionSize(12)
+        # 强制固定行高
+        self.table_view.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Fixed)
         
         # 设置表头字体（压缩以节省空间）
         header_font = self.table_view.horizontalHeader().font()
@@ -252,6 +615,10 @@ class DataDisplayWindow(QWidget):
                 border: 1px solid #dce0e3;
                 gridline-color: #ecf0f1;
             }
+            QTableView::item {
+                height: 12px;
+                padding: 0px;
+            }
             QTableView::item:selected {
                 background-color: #3498db;
                 color: white;
@@ -260,6 +627,11 @@ class DataDisplayWindow(QWidget):
                 background-color: #ecf0f1;
             }
         """)
+        
+        # 样式表设置后再次强制设置行高（确保生效）
+        self.table_view.verticalHeader().setDefaultSectionSize(12)
+        self.table_view.verticalHeader().setMinimumSectionSize(12)
+        self.table_view.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Fixed)
         
     def update_data(self, data):
         """更新数据
@@ -284,15 +656,8 @@ class DataDisplayWindow(QWidget):
             self.table_model.clear_write_values()
             
     def print_column_widths(self):
-        """打印表格每一列的实际宽度"""
-        print(f"\n{'='*50}")
-        print(f"窗口: {self.title} ({self.column_mode}列模式)")
-        print(f"{'-'*50}")
-        for col in range(self.table_model.columnCount()):
-            header = self.table_model.headerData(col, Qt.Orientation.Horizontal, Qt.ItemDataRole.DisplayRole)
-            width = self.table_view.columnWidth(col)
-            print(f"  列{col} [{header}]: {width}px")
-        print(f"{'='*50}\n")
+        """打印表格每一列的实际宽度 - 用于调试"""
+        pass  # 调试日志已移除
     
     def adjust_size_to_content(self, max_container_height=None):
         """根据内容自适应调整大小
@@ -300,6 +665,11 @@ class DataDisplayWindow(QWidget):
         Args:
             max_container_height: 容器的最大高度限制
         """
+        # 在计算前再次强制设置行高（防止被重置）
+        self.table_view.verticalHeader().setDefaultSectionSize(12)
+        self.table_view.verticalHeader().setMinimumSectionSize(12)
+        self.table_view.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Fixed)
+        
         # 获取实际行数，如果没有数据则使用预期行数
         row_count = self.table_model.rowCount()
         if row_count == 0:
@@ -322,10 +692,10 @@ class DataDisplayWindow(QWidget):
         min_height = header_height + 3 * row_height + extra_height
         total_height = max(total_height, min_height)
         
-        # 限制最大高度为容器高度的90%（如果有容器高度限制）
+        # 限制最大高度为容器高度的99%（如果有容器高度限制）
         # 超出部分会显示滚动条
         if max_container_height and max_container_height > 0:
-            max_window_height = int(max_container_height * 0.9)
+            max_window_height = int(max_container_height * 0.99)
             total_height = min(total_height, max_window_height)
         
         # 计算所需宽度（列宽总和 + 10px，避免横向滚动条）
@@ -538,7 +908,7 @@ class MultiWindowManager(QWidget):
         if hasattr(self, 'rearrange_timer'):
             self.rearrange_timer.start(500)
         
-    def add_window_config(self, window_id, title, column_mode=2, default_visible=False, expected_row_count=10):
+    def add_window_config(self, window_id, title, column_mode=2, default_visible=False, expected_row_count=10, window_type='data'):
         """添加窗口配置
         
         Args:
@@ -547,13 +917,15 @@ class MultiWindowManager(QWidget):
             column_mode: 列数模式（2或3）
             default_visible: 默认是否可见
             expected_row_count: 预期的数据行数
+            window_type: 窗口类型（'data'数据窗口 或 'bitflags'位标志窗口）
         """
         config = {
             'id': window_id,
             'title': title,
             'column_mode': column_mode,
             'visible': default_visible,
-            'expected_row_count': expected_row_count
+            'expected_row_count': expected_row_count,
+            'window_type': window_type
         }
         self.window_configs.append(config)
         
@@ -566,29 +938,34 @@ class MultiWindowManager(QWidget):
         
         # 如果默认可见，创建窗口
         if default_visible:
-            self.create_window(window_id, title, column_mode, expected_row_count)
+            self.create_window(window_id, title, column_mode, expected_row_count, window_type)
             
-    def create_window(self, window_id, title, column_mode, expected_row_count=10):
-        """创建数据显示窗口"""
+    def create_window(self, window_id, title, column_mode, expected_row_count=10, window_type='data'):
+        """创建显示窗口（数据窗口或位标志窗口）"""
         if window_id in self.windows:
             return  # 窗口已存在
+        
+        # 根据窗口类型创建不同的窗口
+        if window_type == 'bitflags':
+            window = BitFlagsDisplayWindow(window_id, title, expected_row_count, parent=self.window_container)
+        else:
+            window = DataDisplayWindow(window_id, title, column_mode, expected_row_count, parent=self.window_container)
             
-        window = DataDisplayWindow(window_id, title, column_mode, expected_row_count, parent=self.window_container)
-        
-        # 连接读取按钮信号（所有窗口都有）
-        window.read_button.clicked.connect(lambda checked=False, wid=window_id: self.on_read_clicked(wid))
-        
-        # 3列模式额外连接写入按钮
-        if column_mode == 3:
-            window.write_button.clicked.connect(lambda checked=False, wid=window_id: self.on_write_clicked(wid))
+            # 连接读取按钮信号（数据窗口都有）
+            window.read_button.clicked.connect(lambda checked=False, wid=window_id: self.on_read_clicked(wid))
+            
+            # 3列模式额外连接写入按钮
+            if column_mode == 3:
+                window.write_button.clicked.connect(lambda checked=False, wid=window_id: self.on_write_clicked(wid))
             
         self.windows[window_id] = window
         
-        # 添加到网格布局
+        # 添加到布局
         self.rearrange_windows()
         
         if self.logger:
-            self.logger.write_log(f"创建数据窗口: {title} ({column_mode}列)")
+            window_type_name = "位标志窗口" if window_type == 'bitflags' else f"数据窗口({column_mode}列)"
+            self.logger.write_log(f"创建{window_type_name}: {title}")
             
     def remove_window(self, window_id):
         """移除数据显示窗口"""
@@ -654,28 +1031,35 @@ class MultiWindowManager(QWidget):
         for window, win_height, win_width in window_info:
             if win_height > container_height:
                 columns.append([(window, win_height, win_width)])
-                if self.bluetooth_tool:
-                    self.bluetooth_tool.blue_write_log(f"超高窗口 {window.title}({win_height}px) 单独占列{len(columns)}")
             else:
                 remaining_windows.append((window, win_height, win_width))
         
-        # 第2步：对剩余窗口进行动态规划拼接
+        # 第2步：对剩余窗口进行动态规划拼接（持续填充直到真的放不下）
         while remaining_windows:
             # 选出最高的窗口作为新列的起始
             remaining_windows.sort(key=lambda x: x[1], reverse=True)
             new_column = [remaining_windows.pop(0)]
             current_height = new_column[0][1] + spacing
             
-            # 动态规划：在剩余窗口中找能放入当前列的最大窗口
-            i = 0
-            while i < len(remaining_windows):
-                window, win_height, win_width = remaining_windows[i]
-                if current_height + win_height <= container_height:
-                    # 能放入，添加到当前列
-                    new_column.append(remaining_windows.pop(i))
-                    current_height += win_height + spacing
+            # 持续循环：每次找剩余窗口中最大的能放入的窗口
+            while True:
+                # 找到能放入的最大窗口
+                best_idx = -1
+                best_height = 0
+                
+                for i, (window, win_height, win_width) in enumerate(remaining_windows):
+                    if current_height + win_height <= container_height:
+                        if win_height > best_height:
+                            best_idx = i
+                            best_height = win_height
+                
+                # 如果找到了能放入的窗口，添加到当前列
+                if best_idx >= 0:
+                    new_column.append(remaining_windows.pop(best_idx))
+                    current_height += best_height + spacing
                 else:
-                    i += 1
+                    # 没有能放入的窗口了，结束当前列
+                    break
             
             columns.append(new_column)
         
@@ -683,10 +1067,6 @@ class MultiWindowManager(QWidget):
         num_columns = len(columns)
         
         # 为每个窗口分配位置（每列根据实际宽度紧密排列）
-        if self.bluetooth_tool:
-            self.bluetooth_tool.blue_write_log("=" * 60)
-            self.bluetooth_tool.blue_write_log(f"动态规划布局（共{num_columns}列）：")
-        
         column_heights = []
         column_windows = []
         column_widths = []  # 记录每列的实际宽度
@@ -713,14 +1093,8 @@ class MultiWindowManager(QWidget):
                 window.setGeometry(x, y, w, h)
                 window.show()
                 
-                # 打印窗口列宽信息
-                window.print_column_widths()
-                
-                # 打印窗口位置信息
-                if self.bluetooth_tool:
-                    self.bluetooth_tool.blue_write_log(
-                        f"  {window.title}: 位置({x}, {y}), 大小({w}×{h}), 列{col_idx+1}"
-                    )
+                # 记录窗口信息（简化日志）
+                pass
                 
                 y_current += h + spacing
                 col_window_names.append(window.title)
@@ -729,24 +1103,23 @@ class MultiWindowManager(QWidget):
             column_windows.append(col_window_names)
             column_widths.append(max_col_width)  # 记录当前列的宽度
         
+        # 计算所有列的总宽度（用于设置容器最小宽度，确保横向滚动条）
+        total_width = spacing  # 左边距
+        for col_width in column_widths:
+            total_width += col_width + spacing
+        
         # 设置容器的最小尺寸（以便滚动）
         max_height = max(column_heights)
-        self.window_container.setMinimumSize(container_width, max_height + spacing)
+        self.window_container.setMinimumSize(total_width, max_height + spacing)
         
-        # 输出布局总结信息
+        # 输出简化的布局总结信息
         if self.bluetooth_tool:
-            self.bluetooth_tool.blue_write_log("=" * 60)
-            self.bluetooth_tool.blue_write_log("布局总结：")
-            for col_idx, windows in enumerate(column_windows):
-                if windows:
-                    self.bluetooth_tool.blue_write_log(
-                        f"  列{col_idx+1}: 高度={column_heights[col_idx]}px, 窗口数={len(windows)}个"
-                    )
-            remaining = container_height - max_height
-            self.bluetooth_tool.blue_write_log(
-                f"📐 容器总高度={max_height}px, 可视高度={container_height}px, 剩余空间={remaining}px"
-            )
-            self.bluetooth_tool.blue_write_log("=" * 60)
+            total_used_height = sum(column_heights)
+            avg_utilization = (total_used_height / (num_columns * container_height) * 100) if num_columns > 0 else 0
+            # self.bluetooth_tool.blue_write_log(
+            #     f"📊 布局完成: {num_columns}列, {len(visible_windows)}窗口, "
+            #     f"容器({total_width}×{max_height}px), 利用率{avg_utilization:.1f}%"
+            # )
             
     def on_checkbox_changed(self, window_id, state):
         """checkbox状态改变处理"""
@@ -757,7 +1130,8 @@ class MultiWindowManager(QWidget):
             config = next((c for c in self.window_configs if c['id'] == window_id), None)
             if config:
                 expected_row_count = config.get('expected_row_count', 10)
-                self.create_window(window_id, config['title'], config['column_mode'], expected_row_count)
+                window_type = config.get('window_type', 'data')
+                self.create_window(window_id, config['title'], config['column_mode'], expected_row_count, window_type)
         else:
             # 移除窗口
             self.remove_window(window_id)
@@ -799,6 +1173,23 @@ class MultiWindowManager(QWidget):
         else:
             if self.logger:
                 self.logger.write_log(f"窗口未显示: {window_id}（请先勾选对应的checkbox）")
+    
+    def update_bit_flags_incremental(self, window_id, status_bits):
+        """增量更新位标志窗口（只更新变化的位）
+        
+        Args:
+            window_id: 窗口ID
+            status_bits: 位标志列表 [{'name': str, 'value': int}, ...]
+        """
+        if window_id in self.windows:
+            window = self.windows[window_id]
+            if isinstance(window, BitFlagsDisplayWindow):
+                # 逐个更新位标志
+                for bit in status_bits:
+                    if isinstance(bit, dict):
+                        name = bit.get('name', '')
+                        value = bit.get('value', 0)
+                        window.table_model.update_single_bit(name, value)
             
     def get_window_modified_data(self, window_id):
         """获取指定窗口的修改数据"""

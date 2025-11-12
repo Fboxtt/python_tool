@@ -67,9 +67,22 @@ class EnhancedMainWindow(QMainWindow):
         """初始化UI"""
         self.setWindowTitle('增强版BMS调试工具 - 多窗口管理')
         
-        # 设置自适应大小
-        self.setMinimumSize(1400, 900)
-        self.resize(1600, 1000)
+        # 获取屏幕大小，设置窗口为屏幕的2/3
+        screen = QApplication.primaryScreen().geometry()
+        screen_width = screen.width()
+        screen_height = screen.height()
+        
+        window_width = int(screen_width * 2 / 3)
+        window_height = int(screen_height * 2 / 3)
+        
+        # 设置最小尺寸和默认尺寸
+        self.setMinimumSize(int(window_width * 0.8), int(window_height * 0.8))
+        self.resize(window_width, window_height)
+        
+        # 居中显示
+        x = (screen_width - window_width) // 2
+        y = (screen_height - window_height) // 2
+        self.move(x, y)
         
         # 创建中心部件
         central_widget = QWidget()
@@ -228,15 +241,17 @@ class EnhancedMainWindow(QMainWindow):
         
         # 自动添加所有窗口
         for config in window_configs:
+            window_type = config.get('window_type', 'data')  # 获取窗口类型，默认为数据窗口
             self.multi_window_manager.add_window_config(
                 window_id=config['window_id'],
                 title=config['title'],
                 column_mode=config['column_mode'],
                 default_visible=config['default_visible'],
-                expected_row_count=config['expected_row_count']
+                expected_row_count=config['expected_row_count'],
+                window_type=window_type
             )
         
-        self.logger.write_log(f"✅ 已自动配置 {len(window_configs)} 个数据窗口")
+        self.logger.write_log(f"✅ 已自动配置 {len(window_configs)} 个显示窗口")
         
     def setup_timers(self):
         """设置定时器"""
@@ -469,6 +484,10 @@ class EnhancedMainWindow(QMainWindow):
                         # 更新多窗口管理器
                         self.update_window_data_from_parsed_result(struct_name, dict_data)
                         
+                        # 更新位标志窗口（如果有SBS数据）
+                        if struct_name == 'PC_GET_SBS':
+                            self.update_bit_flags_window(dict_data)
+                        
                         # 记录CSV
                         from log_controller import ComunManager
                         header = f"RX->,{self.bluetooth_tool.commu_type},{self.bluetooth_tool.device_name},{struct_name}"
@@ -509,6 +528,46 @@ class EnhancedMainWindow(QMainWindow):
                 
         except Exception as e:
             self.logger.write_log(f"更新窗口数据失败: {str(e)}")
+            traceback.print_exc()
+    
+    def update_bit_flags_window(self, dict_data):
+        """增量更新位标志窗口（只更新变化的位，提高效率）
+        
+        Args:
+            dict_data: SBS解析后的字典数据
+        """
+        try:
+            from struct_model import get_all_status_bits_for_display
+            
+            # 将dict_data转换为flat_dict（需要转换为整数）
+            flat_dict = {}
+            for category, items in dict_data.items():
+                for item in items:
+                    if len(item) >= 3:
+                        name, unit, value_str = item[0], item[1], item[2]
+                        # 尝试将字符串转换为整数（对于状态位字段）
+                        try:
+                            # 如果是十六进制字符串
+                            if isinstance(value_str, str) and value_str.startswith('0x'):
+                                flat_dict[name] = int(value_str, 16)
+                            else:
+                                flat_dict[name] = int(value_str)
+                        except (ValueError, TypeError):
+                            # 如果转换失败，保持原值
+                            flat_dict[name] = value_str
+            
+            # 提取位标志数据
+            status_bits = get_all_status_bits_for_display(flat_dict)
+            
+            # 使用增量更新位标志窗口（只更新变化的位）
+            if status_bits and 'BIT_FLAGS' in self.multi_window_manager.windows:
+                self.multi_window_manager.update_bit_flags_incremental('BIT_FLAGS', status_bits)
+            # 如果窗口不存在但有数据，使用全量更新（初始化）
+            elif status_bits and 'BIT_FLAGS' in self.multi_window_manager.window_configs:
+                self.multi_window_manager.update_window_data('BIT_FLAGS', status_bits)
+                
+        except Exception as e:
+            self.logger.write_log(f"更新位标志窗口失败: {str(e)}")
             traceback.print_exc()
             
     def closeEvent(self, event):

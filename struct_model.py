@@ -681,6 +681,21 @@ def get_all_display_windows():
             'expected_row_count': expected_row_count
         })
     
+    # 添加位标志窗口
+    # 计算位标志总数（告警32 + 保护32 + 失效32 + 其他32 = 128位）
+    # 4列显示，每行2个状态位，所以总行数为 128 / 2 = 64
+    total_status_bits = 128
+    bit_flags_row_count = (total_status_bits + 1) // 2  # 向上取整
+    windows.append({
+        'window_id': 'BIT_FLAGS',
+        'title': '🚦 位标志监控',
+        'column_mode': 2,  # 位标志窗口不需要列模式
+        'default_visible': False,  # 默认隐藏
+        'cmd_code': 0,  # 位标志窗口没有特定命令码
+        'expected_row_count': bit_flags_row_count,  # 4列显示，每行2个位
+        'window_type': 'bitflags'  # 标记为位标志窗口
+    })
+    
     return windows
 
 def get_window_column_mode(struct_name):
