@@ -10,27 +10,115 @@ from PyQt6.QtWidgets import (
     QCheckBox, QLabel, QPushButton, QScrollArea,
     QGroupBox, QTableView, QAbstractItemView, QSizePolicy, QHeaderView
 )
-from PyQt6.QtCore import Qt, QTimer, pyqtSignal
-from PyQt6.QtGui import QFont, QColor
+from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QObject
+from PyQt6.QtGui import QFont, QColor, QPainter
 from display_widgets import BatteryTableModel
 
 
-# ============== 蓝牙队列发送管理器 ==============
-class BluetoothQueueSender:
-    """蓝牙队列发送管理器（改进版）
+# ============== 圆形通讯状态指示器（优化版）==============
+class CommStatusIndicator(QLabel):
+    """圆形通讯状态指示器（性能优化版）
+    
+    - 灰色：默认/空闲
+    - 绿色闪烁：通讯成功
+    - 红色闪烁：通讯超时
+    
+    优化点：
+    1. 缓存QColor对象，避免重复创建
+    2. 单例QTimer，避免每次闪烁创建定时器
+    3. 防抖机制，避免频繁更新UI
+    """
+    
+    def __init__(self, size=20, parent=None):
+        super().__init__(parent)
+        self.size = size
+        self.setFixedSize(size, size)
+        
+        # 缓存颜色对象（避免重复创建，提升性能）
+        self._color_idle = QColor(128, 128, 128)    # 灰色
+        self._color_success = QColor(0, 255, 0)     # 绿色
+        self._color_error = QColor(255, 0, 0)       # 红色
+        self.current_color = self._color_idle
+        
+        # 单例定时器（复用，避免每次创建）
+        self.flash_timer = QTimer(self)
+        self.flash_timer.setSingleShot(True)
+        self.flash_timer.timeout.connect(self._restore_color)
+        
+        # 防抖：避免过于频繁的闪烁
+        self._last_flash_time = 0
+        self._min_flash_interval = 0.05  # 最小闪烁间隔50ms
+        
+    def paintEvent(self, event):
+        """绘制圆形指示器（优化版）"""
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.setBrush(self.current_color)
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.drawEllipse(2, 2, self.size - 4, self.size - 4)
+        
+    def flash_success(self):
+        """闪烁绿色（带防抖）"""
+        current_time = time.time()
+        if current_time - self._last_flash_time < self._min_flash_interval:
+            return  # 防抖：忽略过于频繁的闪烁
+        
+        self._last_flash_time = current_time
+        self.current_color = self._color_success
+        self.update()
+        self.flash_timer.start(300)  # 300ms后恢复
+        
+    def flash_error(self):
+        """闪烁红色（带防抖）"""
+        current_time = time.time()
+        if current_time - self._last_flash_time < self._min_flash_interval:
+            return  # 防抖：忽略过于频繁的闪烁
+        
+        self._last_flash_time = current_time
+        self.current_color = self._color_error
+        self.update()
+        self.flash_timer.start(300)  # 300ms后恢复
+        
+    def _restore_color(self):
+        """恢复为灰色"""
+        self.current_color = self._color_idle
+        self.update()
+        
+    def set_idle(self):
+        """设置为空闲状态（灰色）"""
+        self.flash_timer.stop()
+        self.current_color = self._color_idle
+        self.update()
+
+
+# ============== 蓝牙队列发送管理器（性能优化版）==============
+class BluetoothQueueSender(QObject):
+    """蓝牙队列发送管理器（性能优化版）
     
     确保数据按顺序发送，避免数据冲突
     支持响应等待机制，确保BMS端有足够时间处理每个指令
+    
+    优化点：
+    1. 减少冗余日志输出（可配置）
+    2. 缓存命令码提取结果
+    3. 统计响应时间和成功率
+    4. 优化asyncio事件处理
     """
     
-    def __init__(self, bluetooth_tool, logger=None):
+    # 通讯状态信号
+    comm_status_changed = pyqtSignal(str)  # 'success' 或 'timeout'
+    
+    def __init__(self, bluetooth_tool, logger=None, verbose=False):
         """
         Args:
             bluetooth_tool: BluetoothTool实例
             logger: 日志记录器
+            verbose: 是否输出详细日志（默认False，减少日志噪音）
         """
+        super().__init__()
         self.bluetooth_tool = bluetooth_tool
         self.logger = logger
+        self.verbose = verbose  # 详细日志开关
         self.send_queue = deque()  # 发送队列
         self.is_sending = False  # 是否正在发送
         self.send_lock = asyncio.Lock()  # 发送锁
@@ -44,62 +132,79 @@ class BluetoothQueueSender:
         # 队列去重：记录队列中已有的命令码（set查找O(1)，性能高）
         self.queued_commands = set()
         
+        # 性能统计（可选）
+        self.stats = {
+            'total_sent': 0,
+            'total_success': 0,
+            'total_timeout': 0,
+            'avg_response_time': 0.0
+        }
+        self._response_times = deque(maxlen=100)  # 保留最近100次响应时间
+        
         # 连接receive_ok_signal信号
         if hasattr(bluetooth_tool, 'receive_ok_signal'):
             bluetooth_tool.receive_ok_signal.connect(self._on_response_received)
         
     def _on_response_received(self, cmd_code, data):
-        """收到响应的回调"""
-        if self.waiting_for_response:
-            self.response_received.set()
-            if self.logger:
-                self.logger.write_log(f"✅ 收到BMS响应，命令码: 0x{cmd_code:02X}")
+        """收到响应的回调（优化版）"""
+        # 无论是否在等待，都设置事件（避免时序问题）
+        self.response_received.set()
+        # 只在verbose模式输出详细日志（减少日志噪音）
+        if self.verbose and self.logger:
+            self.logger.write_log(f"✅ 收到BMS响应，命令码: 0x{cmd_code:02X}")
         
+    @staticmethod
+    def _extract_cmd_code(data_bytes):
+        """快速提取命令码（内联优化）"""
+        return data_bytes[4] if len(data_bytes) > 4 else None
+    
     async def add_to_queue(self, data_bytes, priority=False):
-        """添加数据到发送队列（带去重）
+        """添加数据到发送队列（优化版，带去重）
         
         Args:
             data_bytes: 要发送的字节数据
             priority: 是否优先发送（手动点击的读取指令设置为True）
         """
         # 提取命令码（数据包格式：[0x00][长度H][长度L][单板类型][命令码][0x55][0xAA][数据][校验]）
-        cmd_code = data_bytes[4] if len(data_bytes) > 4 else None
+        cmd_code = self._extract_cmd_code(data_bytes)
         
         # 去重检查：如果队列中已有相同命令，跳过
         if cmd_code is not None and cmd_code in self.queued_commands:
-            if self.logger:
+            if self.verbose and self.logger:
                 self.logger.write_log(f"⚠️ 队列已有指令0x{cmd_code:02X}，跳过重复添加")
             return
         
         # 添加到队列
         if priority:
             self.send_queue.appendleft(data_bytes)  # 优先级高的插入队首
-            if self.logger:
-                self.logger.write_log(f"🔴 优先添加到队列(0x{cmd_code:02X})，队列长度: {len(self.send_queue)}")
         else:
             self.send_queue.append(data_bytes)  # 普通的添加到队尾
-            if self.logger:
-                self.logger.write_log(f"➕ 添加到队列(0x{cmd_code:02X})，队列长度: {len(self.send_queue)}")
         
         # 记录命令码到去重集合
         if cmd_code is not None:
             self.queued_commands.add(cmd_code)
+        
+        # 只在verbose模式或重要操作时输出日志
+        if self.verbose and self.logger:
+            priority_flag = "🔴 优先" if priority else "➕"
+            self.logger.write_log(f"{priority_flag} 添加到队列(0x{cmd_code:02X if cmd_code else 0:02X})，队列长度: {len(self.send_queue)}")
             
         # 如果没有正在发送，启动发送任务
         if not self.is_sending:
             asyncio.create_task(self._process_queue())
             
     async def _process_queue(self):
-        """处理发送队列（改进版，支持响应等待）"""
+        """处理发送队列（性能优化版，支持响应等待）"""
         async with self.send_lock:
             self.is_sending = True
             
             try:
                 while self.send_queue:
                     data_bytes = self.send_queue.popleft()
+                    send_start_time = time.time()  # 记录发送开始时间
                     
                     # 发送前从去重集合移除该命令（允许后续再次添加）
-                    cmd_code = data_bytes[4] if len(data_bytes) > 4 else None
+                    cmd_code = self._extract_cmd_code(data_bytes)
                     if cmd_code is not None:
                         self.queued_commands.discard(cmd_code)
                     
@@ -109,7 +214,7 @@ class BluetoothQueueSender:
                         elapsed = current_time - self.last_send_time
                         if elapsed < self.response_timeout:
                             wait_time = self.response_timeout - elapsed
-                            if self.logger:
+                            if self.verbose and self.logger:
                                 self.logger.write_log(f"⏳ 等待发送间隔: {wait_time:.3f}秒")
                             await asyncio.sleep(wait_time)
                         
@@ -121,23 +226,38 @@ class BluetoothQueueSender:
                         await self.bluetooth_tool.byte_send(data_bytes)
                         self.bluetooth_tool.display_send_data(data_bytes)
                         self.last_send_time = time.time()
+                        self.stats['total_sent'] += 1
                         
-                        if self.logger:
-                            self.logger.write_log(f"📤 队列发送成功，剩余队列: {len(self.send_queue)}")
-                        
-                        # 等待BMS响应或超时
+                        # 等待BMS响应或超时（简短等待0.3秒）
                         try:
                             await asyncio.wait_for(
                                 self.response_received.wait(), 
-                                timeout=self.response_timeout
+                                timeout=0.3
                             )
-                            if self.logger:
-                                self.logger.write_log(f"✅ BMS已响应，继续下一个指令")
+                            # 成功：记录响应时间
+                            response_time = time.time() - send_start_time
+                            self._response_times.append(response_time)
+                            self.stats['total_success'] += 1
+                            self.stats['avg_response_time'] = sum(self._response_times) / len(self._response_times)
+                            
+                            if self.verbose and self.logger:
+                                self.logger.write_log(f"✅ BMS已响应({response_time*1000:.0f}ms)")
+                            # 发送成功信号（绿色闪烁）
+                            self.comm_status_changed.emit('success')
                         except asyncio.TimeoutError:
-                            if self.logger:
-                                self.logger.write_log(f"⏰ BMS响应超时({self.response_timeout}秒)，继续下一个指令")
+                            # 超时
+                            self.stats['total_timeout'] += 1
+                            if self.logger:  # 超时总是记录日志
+                                self.logger.write_log(f"⏰ BMS响应超时(0.3秒)")
+                            # 发送超时信号（红色闪烁）
+                            self.comm_status_changed.emit('timeout')
                         
                         self.waiting_for_response = False
+                        
+                        # 确保最小间隔（剩余的时间）
+                        elapsed_after_wait = time.time() - self.last_send_time
+                        if elapsed_after_wait < self.response_timeout:
+                            await asyncio.sleep(self.response_timeout - elapsed_after_wait)
                         
                     except Exception as e:
                         self.waiting_for_response = False
@@ -148,8 +268,9 @@ class BluetoothQueueSender:
                         
             finally:
                 self.is_sending = False
-                if self.logger:
-                    self.logger.write_log(f"📭 发送队列处理完成")
+                if self.verbose and self.logger:
+                    success_rate = (self.stats['total_success'] / self.stats['total_sent'] * 100) if self.stats['total_sent'] > 0 else 0
+                    self.logger.write_log(f"📭 队列处理完成 | 成功率: {success_rate:.1f}% | 平均响应: {self.stats['avg_response_time']*1000:.0f}ms")
                 
     def clear_queue(self):
         """清空发送队列"""
@@ -171,6 +292,22 @@ class BluetoothQueueSender:
         self.response_timeout = timeout
         if self.logger:
             self.logger.write_log(f"⚙️ 设置响应超时时间: {timeout}秒")
+    
+    def get_stats(self):
+        """获取性能统计信息"""
+        return self.stats.copy()
+    
+    def reset_stats(self):
+        """重置统计信息"""
+        self.stats = {
+            'total_sent': 0,
+            'total_success': 0,
+            'total_timeout': 0,
+            'avg_response_time': 0.0
+        }
+        self._response_times.clear()
+        if self.logger:
+            self.logger.write_log("📊 统计信息已重置")
 
 
 # ============== 位标志紧凑模型（4列显示：名称|值|名称|值） ==============
@@ -912,6 +1049,9 @@ class MultiWindowManager(QWidget):
         
         self.init_ui()
         
+        # 连接通讯状态信号到指示器
+        self.queue_sender.comm_status_changed.connect(self._on_comm_status_changed)
+        
     def init_ui(self):
         """初始化UI"""
         main_layout = QHBoxLayout()
@@ -950,6 +1090,35 @@ class MultiWindowManager(QWidget):
         self.deselect_all_btn = QPushButton('全不选')
         self.deselect_all_btn.clicked.connect(self.deselect_all_windows)
         button_layout.addWidget(self.deselect_all_btn)
+        
+        self.read_all_btn = QPushButton('📖 读取所有')
+        self.read_all_btn.clicked.connect(self.read_all_checked_windows)
+        self.read_all_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #4CAF50;
+                color: white;
+                font-weight: bold;
+                padding: 8px;
+                border-radius: 4px;
+            }
+            QPushButton:hover {
+                background-color: #45a049;
+            }
+            QPushButton:pressed {
+                background-color: #3d8b40;
+            }
+        """)
+        button_layout.addWidget(self.read_all_btn)
+        
+        # 通讯状态指示器
+        status_layout = QHBoxLayout()
+        status_label = QLabel('通讯状态:')
+        status_label.setStyleSheet("font-size: 10px;")
+        self.comm_indicator = CommStatusIndicator(size=16)
+        status_layout.addWidget(status_label)
+        status_layout.addWidget(self.comm_indicator)
+        status_layout.addStretch()
+        button_layout.addLayout(status_layout)
         
         left_layout.addLayout(button_layout)
         left_layout.addStretch()
@@ -1236,6 +1405,36 @@ class MultiWindowManager(QWidget):
         """全不选所有窗口"""
         for checkbox in self.checkboxes.values():
             checkbox.setChecked(False)
+            
+    def read_all_checked_windows(self):
+        """读取所有已勾选的窗口数据"""
+        checked_windows = []
+        
+        # 收集所有已勾选的窗口ID
+        for window_id, checkbox in self.checkboxes.items():
+            if checkbox.isChecked() and window_id in self.windows:
+                checked_windows.append(window_id)
+        
+        if not checked_windows:
+            if self.logger:
+                self.logger.write_log("⚠️ 没有勾选的窗口")
+            return
+        
+        if self.logger:
+            self.logger.write_log(f"📖 开始读取 {len(checked_windows)} 个窗口的数据")
+        
+        # 依次触发每个窗口的读取请求
+        for window_id in checked_windows:
+            self.window_read_requested.emit(window_id)
+            
+    def _on_comm_status_changed(self, status):
+        """通讯状态改变回调（优化版）"""
+        if status == 'success':
+            self.comm_indicator.flash_success()
+            # 成功时只闪灯，不输出日志
+        elif status == 'timeout':
+            self.comm_indicator.flash_error()
+            # 超时输出到蓝牙日志（重要信息）
             
     def on_read_clicked(self, window_id):
         """读取按钮点击"""

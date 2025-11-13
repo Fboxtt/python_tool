@@ -553,6 +553,11 @@ class EnhancedMainWindow(QMainWindow):
                         header = f"RX->,{self.bluetooth_tool.commu_type},{self.bluetooth_tool.device_name},{struct_name}"
                         csv_data = ",".join([item[2] for items in dict_data.values() for item in items if len(item) >= 3])
                         ComunManager.get_instance().write_csv(f"{header},{csv_data}")
+                        
+                        # 🔥 发射信号通知队列管理器：数据接收成功
+                        from struct_model import STRUCT_COMMANDS
+                        cmd_code = STRUCT_COMMANDS.get(struct_name, 0)
+                        self.bluetooth_tool.receive_ok_signal.emit(cmd_code, data_buffer)
                 else:
                     self.logger.write_log("错误：data_display_mgr未初始化")
             
