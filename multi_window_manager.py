@@ -228,6 +228,15 @@ class BitFlagsCompactModel(BatteryTableModel):
         elif role == Qt.ItemDataRole.TextAlignmentRole:
             return int(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
         
+        # 💡 工具提示（新增功能）- 鼠标悬停时显示完整内容
+        elif role == Qt.ItemDataRole.ToolTipRole:
+            # 所有列都显示工具提示
+            if row < len(self._organized_data) and col < self._columns:
+                cell_value = self._organized_data[row][col]
+                # 只有当单元格内容不为空时才返回工具提示
+                if cell_value and str(cell_value).strip():
+                    return str(cell_value)
+        
         return None
     
     def update_single_bit(self, name, value):
