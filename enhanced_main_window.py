@@ -361,16 +361,17 @@ class EnhancedMainWindow(QMainWindow):
             self.logger.write_log(f"监控循环错误: {str(e)}")
             traceback.print_exc()
             
-    async def queue_send_command(self, cmd_code, struct_name=None):
+    async def queue_send_command(self, cmd_code, struct_name=None, priority=False):
         """通过队列发送命令
         
         Args:
             cmd_code: 命令码
             struct_name: 结构体名称（用于记录）
+            priority: 是否优先发送（手动点击的指令设为True）
         """
         try:
             data = self.bluetooth_tool.text_decode.send_hex_fill(cmd_code)
-            await self.multi_window_manager.queue_send(data, priority=False)
+            await self.multi_window_manager.queue_send(data, priority=priority)
             
             if struct_name:
                 self.current_data_source = struct_name
@@ -397,15 +398,16 @@ class EnhancedMainWindow(QMainWindow):
         self.check_connection_status()
         
     def on_window_read(self, window_id):
-        """处理窗口读取请求"""
-        self.logger.write_log(f"收到读取请求: {window_id}")
+        """处理窗口读取请求（手动点击，优先发送）"""
+        self.logger.write_log(f"🖱️ 收到手动读取请求: {window_id}")
         
         # 根据window_id获取对应的命令码（直接从STRUCT_COMMANDS获取）
         from struct_model import STRUCT_COMMANDS
         cmd_code = STRUCT_COMMANDS.get(window_id)
         
         if cmd_code:
-            asyncio.create_task(self.queue_send_command(cmd_code, window_id))
+            # 手动点击的读取指令，使用优先发送
+            asyncio.create_task(self.queue_send_command(cmd_code, window_id, priority=True))
         else:
             self.logger.write_log(f"未找到窗口 {window_id} 对应的读取命令")
             

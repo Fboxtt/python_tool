@@ -17,9 +17,10 @@ from display_widgets import BatteryTableModel
 
 # ============== 蓝牙队列发送管理器 ==============
 class BluetoothQueueSender:
-    """蓝牙队列发送管理器
+    """蓝牙队列发送管理器（改进版）
     
     确保数据按顺序发送，避免数据冲突
+    支持响应等待机制，确保BMS端有足够时间处理每个指令
     """
     
     def __init__(self, bluetooth_tool, logger=None):
@@ -34,27 +35,62 @@ class BluetoothQueueSender:
         self.is_sending = False  # 是否正在发送
         self.send_lock = asyncio.Lock()  # 发送锁
         
+        # 响应等待机制
+        self.response_timeout = 0.5  # BMS响应超时时间（秒）
+        self.waiting_for_response = False  # 是否正在等待响应
+        self.response_received = asyncio.Event()  # 响应接收事件
+        self.last_send_time = 0  # 上次发送时间
+        
+        # 队列去重：记录队列中已有的命令码（set查找O(1)，性能高）
+        self.queued_commands = set()
+        
+        # 连接receive_ok_signal信号
+        if hasattr(bluetooth_tool, 'receive_ok_signal'):
+            bluetooth_tool.receive_ok_signal.connect(self._on_response_received)
+        
+    def _on_response_received(self, cmd_code, data):
+        """收到响应的回调"""
+        if self.waiting_for_response:
+            self.response_received.set()
+            if self.logger:
+                self.logger.write_log(f"✅ 收到BMS响应，命令码: 0x{cmd_code:02X}")
+        
     async def add_to_queue(self, data_bytes, priority=False):
-        """添加数据到发送队列
+        """添加数据到发送队列（带去重）
         
         Args:
             data_bytes: 要发送的字节数据
-            priority: 是否优先发送
+            priority: 是否优先发送（手动点击的读取指令设置为True）
         """
+        # 提取命令码（数据包格式：[0x00][长度H][长度L][单板类型][命令码][0x55][0xAA][数据][校验]）
+        cmd_code = data_bytes[4] if len(data_bytes) > 4 else None
+        
+        # 去重检查：如果队列中已有相同命令，跳过
+        if cmd_code is not None and cmd_code in self.queued_commands:
+            if self.logger:
+                self.logger.write_log(f"⚠️ 队列已有指令0x{cmd_code:02X}，跳过重复添加")
+            return
+        
+        # 添加到队列
         if priority:
             self.send_queue.appendleft(data_bytes)  # 优先级高的插入队首
+            if self.logger:
+                self.logger.write_log(f"🔴 优先添加到队列(0x{cmd_code:02X})，队列长度: {len(self.send_queue)}")
         else:
             self.send_queue.append(data_bytes)  # 普通的添加到队尾
-            
-        if self.logger:
-            self.logger.write_log(f"添加数据到发送队列，队列长度: {len(self.send_queue)}")
+            if self.logger:
+                self.logger.write_log(f"➕ 添加到队列(0x{cmd_code:02X})，队列长度: {len(self.send_queue)}")
+        
+        # 记录命令码到去重集合
+        if cmd_code is not None:
+            self.queued_commands.add(cmd_code)
             
         # 如果没有正在发送，启动发送任务
         if not self.is_sending:
             asyncio.create_task(self._process_queue())
             
     async def _process_queue(self):
-        """处理发送队列"""
+        """处理发送队列（改进版，支持响应等待）"""
         async with self.send_lock:
             self.is_sending = True
             
@@ -62,35 +98,79 @@ class BluetoothQueueSender:
                 while self.send_queue:
                     data_bytes = self.send_queue.popleft()
                     
+                    # 发送前从去重集合移除该命令（允许后续再次添加）
+                    cmd_code = data_bytes[4] if len(data_bytes) > 4 else None
+                    if cmd_code is not None:
+                        self.queued_commands.discard(cmd_code)
+                    
                     try:
+                        # 确保与上次发送间隔至少0.5秒
+                        current_time = time.time()
+                        elapsed = current_time - self.last_send_time
+                        if elapsed < self.response_timeout:
+                            wait_time = self.response_timeout - elapsed
+                            if self.logger:
+                                self.logger.write_log(f"⏳ 等待发送间隔: {wait_time:.3f}秒")
+                            await asyncio.sleep(wait_time)
+                        
+                        # 重置响应事件
+                        self.response_received.clear()
+                        self.waiting_for_response = True
+                        
                         # 发送数据
                         await self.bluetooth_tool.byte_send(data_bytes)
                         self.bluetooth_tool.display_send_data(data_bytes)
+                        self.last_send_time = time.time()
                         
                         if self.logger:
-                            self.logger.write_log(f"队列发送成功，剩余队列长度: {len(self.send_queue)}")
+                            self.logger.write_log(f"📤 队列发送成功，剩余队列: {len(self.send_queue)}")
                         
-                        # 发送间隔，避免设备处理不过来
-                        await asyncio.sleep(0.1)
+                        # 等待BMS响应或超时
+                        try:
+                            await asyncio.wait_for(
+                                self.response_received.wait(), 
+                                timeout=self.response_timeout
+                            )
+                            if self.logger:
+                                self.logger.write_log(f"✅ BMS已响应，继续下一个指令")
+                        except asyncio.TimeoutError:
+                            if self.logger:
+                                self.logger.write_log(f"⏰ BMS响应超时({self.response_timeout}秒)，继续下一个指令")
+                        
+                        self.waiting_for_response = False
                         
                     except Exception as e:
+                        self.waiting_for_response = False
                         if self.logger:
-                            self.logger.write_log(f"队列发送失败: {str(e)}")
-                        # 发送失败，可以选择重试或跳过
-                        break
+                            self.logger.write_log(f"❌ 队列发送失败: {str(e)}")
+                        # 发送失败，等待一段时间后继续
+                        await asyncio.sleep(0.5)
                         
             finally:
                 self.is_sending = False
+                if self.logger:
+                    self.logger.write_log(f"📭 发送队列处理完成")
                 
     def clear_queue(self):
         """清空发送队列"""
         self.send_queue.clear()
+        self.queued_commands.clear()  # 同时清空去重集合
         if self.logger:
-            self.logger.write_log("已清空发送队列")
+            self.logger.write_log("🗑️ 已清空发送队列")
             
     def get_queue_length(self):
         """获取队列长度"""
         return len(self.send_queue)
+    
+    def set_response_timeout(self, timeout):
+        """设置响应超时时间
+        
+        Args:
+            timeout: 超时时间（秒）
+        """
+        self.response_timeout = timeout
+        if self.logger:
+            self.logger.write_log(f"⚙️ 设置响应超时时间: {timeout}秒")
 
 
 # ============== 位标志紧凑模型（4列显示：名称|值|名称|值） ==============
