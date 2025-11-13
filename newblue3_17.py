@@ -110,8 +110,6 @@ class BluetoothTool(QWidget):
         self.text_decode = TextDecode()
         self.download_data = OtaController()
         self.hex_parser = HexParserApp()
-        # asyncio.create_task(self.scan_devices())
-        QTimer.singleShot(0, self.on_scan_devices_clicked)
         # 初始化定时器
         self.data_timer = QTimer()
         self.data_timer.setSingleShot(True) #单次定时器可能会影响实际数据接收数量上限
@@ -188,10 +186,6 @@ class BluetoothTool(QWidget):
         self.rssi_threshold_layout.addWidget(self.rssi_threshold_label)
         self.rssi_threshold_layout.addWidget(self.rssi_threshold_input)
         bluetooth_layout.addLayout(self.rssi_threshold_layout)
-
-        self.scan_button = QPushButton('扫描设备和刷新串口')
-        self.scan_button.clicked.connect(self.on_scan_all_clicked)
-        bluetooth_layout.addWidget(self.scan_button)
 
         # 设备连接和断开部分
         self.connect_layout = QHBoxLayout()
@@ -296,6 +290,27 @@ class BluetoothTool(QWidget):
 
         # 将连接区域添加到左侧布局
         left_layout.addLayout(connection_layout)
+        
+        # 添加共用的扫描按钮（在蓝牙和串口区域下方）
+        self.scan_button = QPushButton('🔍 扫描设备和刷新串口')
+        self.scan_button.clicked.connect(self.on_scan_all_clicked)
+        self.scan_button.setStyleSheet("""
+            QPushButton {
+                background-color: #27ae60;
+                color: white;
+                border: none;
+                padding: 8px;
+                border-radius: 4px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #229954;
+            }
+            QPushButton:pressed {
+                background-color: #1e8449;
+            }
+        """)
+        left_layout.addWidget(self.scan_button)
 
         # 共用的数据收发部分
         # 数据发送部分
@@ -522,13 +537,13 @@ class BluetoothTool(QWidget):
         main_layout.addLayout(left_layout, 2)  # 左侧占2/3
         main_layout.addLayout(right_layout, 1)  # 右侧占1/3
 
-        # 初始化时刷新串口列表
-        # self.refresh_serial_ports()
-
         self.setLayout(main_layout)
 
         # 设置窗口默认大小（移除最小大小限制）
         self.resize(600, 400)  # 设置更小的默认大小
+        
+        # 初始化时自动扫描蓝牙设备和刷新串口（延迟100ms等待UI加载完成）
+        QTimer.singleShot(100, self.on_scan_all_clicked)
 
     def blue_write_log(self,text):
         """写入日志"""
