@@ -409,24 +409,49 @@ class EnhancedMainWindow(QMainWindow):
             for row, param_name, current_value, write_value in modified_data:
                 modifications[row] = write_value
             
-            # 准备要写入的值列表（有写入值用写入值，否则用当前值）
+            # 准备要写入的值列表
             write_values = []
+            import re
+            fmt = STRUCT_FORMATS.get(window_id, '')
+            
+            # 检查格式中是否包含字符串类型
+            has_string_field = 's' in fmt
+            
             for row_idx, row_data in enumerate(original_data):
                 if row_idx in modifications:
                     value_str = modifications[row_idx]
                 else:
                     value_str = row_data[2] if len(row_data) > 2 else row_data[1]
                 
-                # 转换为整数
-                try:
-                    if isinstance(value_str, str) and value_str.startswith('0x'):
-                        value = int(value_str, 16)
+                # 如果格式包含字符串类型，且当前值是str或bytes，强制作为字符串处理
+                if has_string_field and isinstance(value_str, (str, bytes)):
+                    # 转换为bytes
+                    if isinstance(value_str, bytes):
+                        value_bytes = value_str
                     else:
-                        value = int(value_str)
-                    write_values.append(value)
-                except (ValueError, TypeError):
-                    self.logger.write_log(f"行{row_idx}值转换失败: {value_str}")
-                    write_values.append(0)
+                        # 对于字符串格式，即使是纯数字也当字符串处理
+                        value_bytes = value_str.encode('utf-8', errors='ignore')
+                    
+                    # 提取目标长度并补全/截断
+                    match = re.search(r'(\d+)s', fmt)
+                    if match:
+                        target_len = int(match.group(1))
+                        if len(value_bytes) < target_len:
+                            value_bytes += b'\xFF' * (target_len - len(value_bytes))
+                        elif len(value_bytes) > target_len:
+                            value_bytes = value_bytes[:target_len]
+                    write_values.append(value_bytes)
+                else:
+                    # 数值类型字段
+                    try:
+                        if isinstance(value_str, str) and value_str.startswith('0x'):
+                            value = int(value_str, 16)
+                        else:
+                            value = int(value_str)
+                        write_values.append(value)
+                    except (ValueError, TypeError):
+                        self.logger.write_log(f"行{row_idx}值转换失败: {value_str}")
+                        write_values.append(0)
             
             # 根据结构体格式打包
             if window_id not in STRUCT_FORMATS:
@@ -444,9 +469,9 @@ class EnhancedMainWindow(QMainWindow):
             # 构造完整命令
             try:
                 full_command = self.bluetooth_tool.text_decode.send_hex_fill(cmd_code, packed_data)
-                self.logger.write_log(f"写入命令已构造: {len(full_command)} 字节")
             except Exception as e:
                 self.logger.write_log(f"命令构造失败: {str(e)}")
+                traceback.print_exc()
                 return
             
             # 通过队列发送

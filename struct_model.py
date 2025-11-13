@@ -344,7 +344,9 @@ STRUCT_FORMATS = {
         "15s"     # icName (15 bytes)
         "B"       # writableArea (1 byte)
         "L"       # pcAddr (4 bytes)
-        "L"       # uniqueID (4 bytes)
+        "L",      # uniqueID (4 bytes)
+    "PC_GET_SERIALNUM": "<30s",  # 序列号：30字节字符串
+    "PC_SET_SERIALNUM": "<30s",  # 序列号：30字节字符串
 }
 
 STRUCT_ADDRESSES = {
@@ -428,6 +430,12 @@ STRUCT_VARIABLES = {
         "writableArea",
         "pcAddr",
         "uniqueID"
+    ],
+    "PC_GET_SERIALNUM": [
+        "cSerialNum"
+    ],
+    "PC_SET_SERIALNUM": [
+        "cSerialNum"
     ]
 }
 
@@ -530,6 +538,7 @@ WRITE_READ_COMMAND_MAPPING = {
     "PC_SET_CELL_CAP_PARA": "PC_GET_CELL_CAP_PARA",
     "PC_SET_LIFE_PARA": "PC_GET_LIFE_PARA",
     "PC_SET_MOSHTDATA": "PC_GET_MOSHTDATA",
+    "PC_SET_SERIALNUM": "PC_GET_SERIALNUM",
 }
 
 # 读取写入对应关系管理（反向映射）
@@ -541,6 +550,7 @@ READ_WRITE_COMMAND_MAPPING = {
     "PC_GET_CELL_CAP_PARA": "PC_SET_CELL_CAP_PARA",
     "PC_GET_LIFE_PARA": "PC_SET_LIFE_PARA",
     "PC_GET_MOSHTDATA": "PC_SET_MOSHTDATA",
+    "PC_GET_SERIALNUM": "PC_SET_SERIALNUM",
 }
 
 def get_write_command_from_read(read_command_name):
@@ -659,6 +669,7 @@ def get_all_display_windows():
             'LIFE_PARA': '📅 生命周期',
             'VER': '📋 版本信息',
             'INF': 'ℹ️ 系统信息',
+            'SERIALNUM': '🔢 序列号',
         }
         
         title = title_map.get(display_name, f'📄 {display_name}')
