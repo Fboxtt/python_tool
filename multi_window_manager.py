@@ -749,15 +749,17 @@ class ThreeColumnTableModel(BatteryTableModel):
         self._headers = ['参数名', '读取值', '写入值']
         
     def _organize_data(self):
-        """重新组织数据为3列"""
-        self._organized_data = []
+        """重新组织数据为3列（保留现有的写入值）"""
+        # 保存旧的写入值（通过参数名匹配）
+        old_write_values = {row[0]: row[2] for row in self._organized_data if len(row) >= 3 and row[2]}
         
+        self._organized_data = []
         for row_data in self._original_data:
             if len(row_data) >= 3:
                 self._organized_data.append([
                     row_data[0],  # 名称
-                    self._get_cached_display_value(self._original_data.index(row_data), row_data[2]),  # 读取值（当前值）
-                    ""  # 写入值（初始为空）
+                    self._get_cached_display_value(self._original_data.index(row_data), row_data[2]),  # 读取值
+                    old_write_values.get(row_data[0], "")  # 写入值（保留或为空）
                 ])
     
     def flags(self, index):
