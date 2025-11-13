@@ -18,6 +18,14 @@ from log_controller import LogManager, ComunManager
 from multi_window_manager import MultiWindowManager
 from struct_model import HexParserApp, STRUCT_COMMANDS
 
+# 尝试导入版本信息
+try:
+    import build_version_info
+    VERSION_INFO_AVAILABLE = True
+except ImportError:
+    VERSION_INFO_AVAILABLE = False
+    build_version_info = None
+
 
 class EnhancedMainWindow(QMainWindow):
     """增强版主窗口 - 使用MultiWindowManager替代原有的显示方案"""
@@ -65,7 +73,29 @@ class EnhancedMainWindow(QMainWindow):
         
     def init_ui(self):
         """初始化UI"""
-        self.setWindowTitle('增强版BMS调试工具 - 多窗口管理')
+        # 构建窗口标题，包含版本信息
+        base_title = '增强版BMS调试工具 - 多窗口管理'
+        if VERSION_INFO_AVAILABLE:
+            try:
+                version_str = build_version_info.get_version_string()
+                self.setWindowTitle(f'{base_title} | {version_str}')
+                
+                # 打印详细信息到日志
+                detailed_info = build_version_info.get_detailed_info()
+                self.logger.write_log("="*60)
+                self.logger.write_log("版本信息:")
+                self.logger.write_log(f"  打包日期: {detailed_info['build_date']}")
+                self.logger.write_log(f"  Git分支: {detailed_info['git_branch']}")
+                self.logger.write_log(f"  Commit: {detailed_info['git_commit_hash']}")
+                self.logger.write_log(f"  提交信息: {detailed_info['git_commit_message']}")
+                self.logger.write_log(f"  提交作者: {detailed_info['git_commit_author']}")
+                self.logger.write_log(f"  提交时间: {detailed_info['git_commit_date']}")
+                self.logger.write_log("="*60)
+            except Exception as e:
+                self.logger.write_log(f"读取版本信息出错: {e}")
+                self.setWindowTitle(base_title)
+        else:
+            self.setWindowTitle(base_title)
         
         # 获取屏幕大小，设置窗口为屏幕的2/3
         screen = QApplication.primaryScreen().geometry()
