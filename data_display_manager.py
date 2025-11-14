@@ -129,7 +129,10 @@ class BatteryWindowManager:
 
         # 创建标题
         title_label = QLabel('电池参数配置窗口')
-        title_label.setStyleSheet("QLabel { font-weight: bold; font-size: 12px; }")
+        font = title_label.font()
+        font.setBold(True)
+        font.setPointSize(12)
+        title_label.setFont(font)
         layout.addWidget(title_label)
 
         # 创建按钮
@@ -160,7 +163,9 @@ class BatteryWindowManager:
             layout.addWidget(self.table_view)
         else:
             error_label = QLabel('错误：无法加载BatteryTableModel')
-            error_label.setStyleSheet("QLabel { font-weight: bold; }")
+            font = error_label.font()
+            font.setBold(True)
+            error_label.setFont(font)
             layout.addWidget(error_label)
 
         self.widget.setLayout(layout)
@@ -212,7 +217,9 @@ class BitWindowManager:
             self.widget = QWidget(parent)
             layout = QVBoxLayout()
             error_label = QLabel('错误：无法加载BitFlagsWidget')
-            error_label.setStyleSheet("QLabel { font-weight: bold; }")
+            font = error_label.font()
+            font.setBold(True)
+            error_label.setFont(font)
             layout.addWidget(error_label)
             self.widget.setLayout(layout)
 
@@ -337,11 +344,17 @@ class DataDisplayManager(QMainWindow):
 
         # 标题
         title_label = QLabel('🎛️ 数据显示管理器控制面板')
-        title_label.setStyleSheet("QLabel { font-size: 14px; font-weight: bold; }")
+        font = title_label.font()
+        font.setBold(True)
+        font.setPointSize(14)
+        title_label.setFont(font)
         layout.addWidget(title_label)
         # 联系信息
         contact_label = QLabel('有疑问请联系郭学成')
-        contact_label.setStyleSheet("QLabel { font-size: 11px; margin-left: 15px; }")
+        font = contact_label.font()
+        font.setPointSize(11)
+        contact_label.setFont(font)
+        contact_label.setContentsMargins(15, 0, 0, 0)
         layout.addWidget(contact_label)
         # 32串/16串配置切换
         self.cell_32_checkbox = QCheckBox('32电芯配置')
@@ -365,46 +378,17 @@ class DataDisplayManager(QMainWindow):
         layout.addWidget(clear_all_btn)
 
         panel.setLayout(layout)
-        panel.setStyleSheet("""
-            QWidget {
-                border-radius: 5px;
-                padding: 10px;
-            }
-            QPushButton {
-                border: 1px solid palette(mid);
-                padding: 8px 16px;
-                border-radius: 4px;
-                font-weight: bold;
-                background-color: palette(button);
-            }
-            QPushButton:hover {
-                border: 2px solid palette(highlight);
-                background-color: palette(light);
-            }
-            QPushButton:pressed {
-                background-color: palette(mid);
-            }
-        """)
+        layout.setContentsMargins(10, 10, 10, 10)
 
         return panel
 
     def create_parse_panel(self):
         """创建数据解析面板"""
         group_box = QGroupBox("📡 数据解析调试工具")
-        group_box.setStyleSheet("""
-            QGroupBox {
-                font-size: 13px;
-                font-weight: bold;
-                border-radius: 5px;
-                margin-top: 10px;
-                padding-top: 10px;
-            }
-            QGroupBox::title {
-                subcontrol-origin: margin;
-                left: 10px;
-                padding: 0 5px;
-            }
-        """)
+        font = group_box.font()
+        font.setBold(True)
+        font.setPointSize(13)
+        group_box.setFont(font)
 
         layout = QVBoxLayout()
 
@@ -416,37 +400,18 @@ class DataDisplayManager(QMainWindow):
         self.hex_input = QTextEdit()
         self.hex_input.setMaximumHeight(80)
         self.hex_input.setPlaceholderText("输入十六进制字符串，例如：\n00 00 0C 01 93 55 AA 86 00 00 00 00 00 02 00 B4")
-        self.hex_input.setStyleSheet("""
-            QTextEdit {
-                font-family: 'Consolas', 'Courier New', monospace;
-                font-size: 11px;
-                border: 1px solid palette(mid);
-                border-radius: 3px;
-                padding: 5px;
-            }
-        """)
+        font = self.hex_input.font()
+        font.setFamily('Consolas, Courier New, monospace')
+        font.setPointSize(11)
+        self.hex_input.setFont(font)
         input_layout.addWidget(self.hex_input)
 
         # 解析按钮
         parse_btn = QPushButton('🔍 解析数据')
         parse_btn.setMinimumWidth(120)
-        parse_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #00cc66;
-                color: white;
-                border: 1px solid #009944;
-                font-weight: bold;
-                padding: 10px;
-                border-radius: 5px;
-            }
-            QPushButton:hover {
-                background-color: #00dd77;
-                border: 2px solid #00bb55;
-            }
-            QPushButton:pressed {
-                background-color: #009955;
-            }
-        """)
+        font = parse_btn.font()
+        font.setBold(True)
+        parse_btn.setFont(font)
         parse_btn.clicked.connect(self.parse_input_data)
         input_layout.addWidget(parse_btn)
 
@@ -477,15 +442,10 @@ class DataDisplayManager(QMainWindow):
         self.parse_output = QTextEdit()
         self.parse_output.setReadOnly(True)
         self.parse_output.setMaximumHeight(150)
-        self.parse_output.setStyleSheet("""
-            QTextEdit {
-                font-family: 'Consolas', 'Courier New', monospace;
-                font-size: 10px;
-                border: 1px solid palette(mid);
-                border-radius: 3px;
-                padding: 5px;
-            }
-        """)
+        font = self.parse_output.font()
+        font.setFamily('Consolas, Courier New, monospace')
+        font.setPointSize(10)
+        self.parse_output.setFont(font)
         layout.addWidget(self.parse_output)
 
         group_box.setLayout(layout)

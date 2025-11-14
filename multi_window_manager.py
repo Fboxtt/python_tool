@@ -540,14 +540,11 @@ class BitFlagsDisplayWindow(QWidget):
         
         # 标题
         title_label = QLabel(self.title)
-        title_label.setStyleSheet("""
-            QLabel { 
-                font-weight: bold; 
-                font-size: 10px;
-                padding: 2px;
-                border-radius: 3px;
-            }
-        """)
+        font = title_label.font()
+        font.setBold(True)
+        font.setPointSize(10)
+        title_label.setFont(font)
+        title_label.setContentsMargins(2, 2, 2, 2)
         layout.addWidget(title_label)
         
         # 创建表格视图（使用2列模型，但分4列显示）
@@ -594,22 +591,7 @@ class BitFlagsDisplayWindow(QWidget):
         
         self.setLayout(layout)
         
-        # 设置窗口边框和样式
-        self.setStyleSheet("""
-            BitFlagsDisplayWindow {
-                border-radius: 3px;
-                padding: 2px;
-            }
-            QTableView {
-                border: 1px solid palette(mid);
-            }
-            QTableView::item {
-                height: 12px;
-                padding: 0px;
-            }
-        """)
-        
-        # 样式表设置后再次强制设置行高（确保生效）
+        # 强制设置行高（确保生效）
         self.table_view.verticalHeader().setDefaultSectionSize(12)
         self.table_view.verticalHeader().setMinimumSectionSize(12)
         self.table_view.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Fixed)
@@ -701,14 +683,11 @@ class DataDisplayWindow(QWidget):
         
         # 标题（压缩字体以节省空间）
         title_label = QLabel(self.title)
-        title_label.setStyleSheet("""
-            QLabel { 
-                font-weight: bold; 
-                font-size: 10px;
-                padding: 2px;
-                border-radius: 3px;
-            }
-        """)
+        font = title_label.font()
+        font.setBold(True)
+        font.setPointSize(10)
+        title_label.setFont(font)
+        title_label.setContentsMargins(2, 2, 2, 2)
         layout.addWidget(title_label)
         
         # 创建表格视图
@@ -768,22 +747,10 @@ class DataDisplayWindow(QWidget):
         self.read_button.setMinimumWidth(60)
         self.read_button.setMaximumWidth(60)
         self.read_button.setMinimumHeight(24)
-        self.read_button.setStyleSheet("""
-            QPushButton {
-                border: 1px solid palette(mid);
-                border-radius: 4px;
-                font-weight: bold;
-                font-size: 9px;
-                background-color: palette(button);
-            }
-            QPushButton:hover {
-                border: 2px solid palette(highlight);
-                background-color: palette(light);
-            }
-            QPushButton:pressed {
-                background-color: palette(mid);
-            }
-        """)
+        font = self.read_button.font()
+        font.setBold(True)
+        font.setPointSize(9)
+        self.read_button.setFont(font)
         button_layout.addWidget(self.read_button)
         
         # 3列模式额外添加写入按钮
@@ -792,23 +759,10 @@ class DataDisplayWindow(QWidget):
             self.write_button.setMinimumWidth(60)
             self.write_button.setMaximumWidth(60)
             self.write_button.setMinimumHeight(24)
-            self.write_button.setStyleSheet("""
-                QPushButton {
-                    background-color: #00cc66;
-                    color: white;
-                    border: 1px solid #009944;
-                    border-radius: 4px;
-                    font-weight: bold;
-                    font-size: 9px;
-                }
-                QPushButton:hover {
-                    background-color: #00dd77;
-                    border: 2px solid #00bb55;
-                }
-                QPushButton:pressed {
-                    background-color: #009955;
-                }
-            """)
+            font = self.write_button.font()
+            font.setBold(True)
+            font.setPointSize(9)
+            self.write_button.setFont(font)
             button_layout.addWidget(self.write_button)
         
         button_layout.addStretch()
@@ -816,22 +770,7 @@ class DataDisplayWindow(QWidget):
         
         self.setLayout(layout)
         
-        # 设置窗口边框和样式（压缩边框）
-        self.setStyleSheet("""
-            DataDisplayWindow {
-                border-radius: 3px;
-                padding: 2px;
-            }
-            QTableView {
-                border: 1px solid palette(mid);
-            }
-            QTableView::item {
-                height: 12px;
-                padding: 0px;
-            }
-        """)
-        
-        # 样式表设置后再次强制设置行高（确保生效）
+        # 强制设置行高（确保生效）
         self.table_view.verticalHeader().setDefaultSectionSize(12)
         self.table_view.verticalHeader().setMinimumSectionSize(12)
         self.table_view.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Fixed)
@@ -1041,7 +980,10 @@ class MultiWindowManager(QWidget):
         
         # 标题
         title_label = QLabel('数据窗口控制')
-        title_label.setStyleSheet("QLabel { font-weight: bold; font-size: 12px; }")
+        font = title_label.font()
+        font.setBold(True)
+        font.setPointSize(12)
+        title_label.setFont(font)
         left_layout.addWidget(title_label)
         
         # checkbox滚动区域
@@ -1070,29 +1012,17 @@ class MultiWindowManager(QWidget):
         
         self.read_all_btn = QPushButton('📖 读取所有')
         self.read_all_btn.clicked.connect(self.read_all_checked_windows)
-        self.read_all_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #00cc66;
-                color: white;
-                border: 1px solid #009944;
-                font-weight: bold;
-                padding: 8px;
-                border-radius: 4px;
-            }
-            QPushButton:hover {
-                background-color: #00dd77;
-                border: 2px solid #00bb55;
-            }
-            QPushButton:pressed {
-                background-color: #009955;
-            }
-        """)
+        font = self.read_all_btn.font()
+        font.setBold(True)
+        self.read_all_btn.setFont(font)
         button_layout.addWidget(self.read_all_btn)
         
         # 通讯状态指示器
         status_layout = QHBoxLayout()
         status_label = QLabel('通讯状态:')
-        status_label.setStyleSheet("font-size: 10px;")
+        font = status_label.font()
+        font.setPointSize(10)
+        status_label.setFont(font)
         self.comm_indicator = CommStatusIndicator(size=16)
         status_layout.addWidget(status_label)
         status_layout.addWidget(self.comm_indicator)
@@ -1112,7 +1042,10 @@ class MultiWindowManager(QWidget):
         
         # 窗口显示区域标题
         display_title = QLabel('数据显示窗口')
-        display_title.setStyleSheet("QLabel { font-weight: bold; font-size: 12px; }")
+        font = display_title.font()
+        font.setBold(True)
+        font.setPointSize(12)
+        display_title.setFont(font)
         right_layout.addWidget(display_title)
         
         # 滚动区域

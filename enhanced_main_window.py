@@ -154,37 +154,16 @@ class EnhancedMainWindow(QMainWindow):
     def create_control_panel(self):
         """创建控制面板"""
         panel = QWidget()
-        panel.setStyleSheet("""
-            QWidget {
-                border-radius: 8px;
-                padding: 10px;
-            }
-            QPushButton {
-                border: 1px solid palette(mid);
-                padding: 8px 16px;
-                border-radius: 5px;
-                font-weight: bold;
-                min-width: 100px;
-                background-color: palette(button);
-            }
-            QPushButton:hover {
-                border: 2px solid palette(highlight);
-                background-color: palette(light);
-            }
-            QPushButton:pressed {
-                background-color: palette(mid);
-            }
-            QPushButton:disabled {
-                background-color: palette(window);
-                color: palette(mid);
-            }
-        """)
         
         layout = QHBoxLayout()
+        layout.setContentsMargins(10, 10, 10, 10)
         
         # 标题
         title_label = QLabel('🔧 BMS调试工具控制面板')
-        title_label.setStyleSheet("QLabel { font-size: 14px; font-weight: bold; }")
+        font = title_label.font()
+        font.setBold(True)
+        font.setPointSize(14)
+        title_label.setFont(font)
         layout.addWidget(title_label)
         
         layout.addStretch()
@@ -223,35 +202,36 @@ class EnhancedMainWindow(QMainWindow):
     def create_status_panel(self):
         """创建状态面板"""
         panel = QWidget()
-        panel.setStyleSheet("""
-            QWidget {
-                border-radius: 5px;
-                padding: 5px;
-            }
-            QLabel {
-                font-size: 11px;
-                padding: 3px 10px;
-            }
-        """)
         
         layout = QHBoxLayout()
+        layout.setContentsMargins(5, 5, 5, 5)
         
         # 连接状态
         self.conn_status_label = QLabel('📡 连接状态: 未连接')
+        font = self.conn_status_label.font()
+        font.setPointSize(11)
+        self.conn_status_label.setFont(font)
+        self.conn_status_label.setContentsMargins(3, 0, 10, 0)
         layout.addWidget(self.conn_status_label)
         
         layout.addStretch()
         
         # 发送队列状态
         self.queue_status_label = QLabel('📤 发送队列: 0')
+        self.queue_status_label.setFont(font)
+        self.queue_status_label.setContentsMargins(3, 0, 10, 0)
         layout.addWidget(self.queue_status_label)
         
         # 数据接收计数
         self.rx_count_label = QLabel('📥 接收: 0')
+        self.rx_count_label.setFont(font)
+        self.rx_count_label.setContentsMargins(3, 0, 10, 0)
         layout.addWidget(self.rx_count_label)
         
         # 数据发送计数
         self.tx_count_label = QLabel('📤 发送: 0')
+        self.tx_count_label.setFont(font)
+        self.tx_count_label.setContentsMargins(3, 0, 10, 0)
         layout.addWidget(self.tx_count_label)
         
         panel.setLayout(layout)
@@ -326,26 +306,10 @@ class EnhancedMainWindow(QMainWindow):
         """切换监控状态"""
         if self.monitor_btn.text() == '▶️ 开始监控':
             self.monitor_btn.setText('⏸️ 停止监控')
-            self.monitor_btn.setStyleSheet("""
-                QPushButton { 
-                    background-color: #ff5555; 
-                    color: white; 
-                    border: 1px solid #dd3333;
-                    font-weight: bold; 
-                }
-                QPushButton:hover {
-                    background-color: #ff6666;
-                    border: 2px solid #dd4444;
-                }
-                QPushButton:pressed {
-                    background-color: #ee4444;
-                }
-            """)
             self.scan_task = asyncio.create_task(self.monitoring_loop())
             self.logger.write_log("开始监控")
         else:
             self.monitor_btn.setText('▶️ 开始监控')
-            self.monitor_btn.setStyleSheet("")
             if self.scan_task:
                 self.scan_task.cancel()
                 self.scan_task = None
