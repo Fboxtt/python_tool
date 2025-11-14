@@ -7,6 +7,7 @@ from log_controller import LogManager
 from PyQt6.QtCore import pyqtSignal
 import json
 import os
+import re
 
 import traceback
 # Define constants at the top of your file
@@ -510,13 +511,13 @@ STRUCT_COMMANDS = {
 # 定义需要显示十六进制的变量
 HEX_DISPLAY_VARIABLES = {
     "PC_GET_SBS": [
-        "ulOtherInfo", "ulAlarmStatus", "ulProtectStatus", "ulFaultStatus", "ulBalanceStatus"
+        "其他信息", "告警状态", "保护状态", "失效状态", "均衡状态"
     ],
     "PC_GET_BMS": [
         # 可以根据需要添加其他命令的十六进制显示变量
     ],
     "PC_GET_MOSHTDATA": [
-        "sAlarm", "sAlarmRe", "sProtect", "sProtectRe"
+        "MOS温度告警", "MOS温度告警恢复", "MOS温度保护", "MOS温度保护恢复"
     ]
 }
 
@@ -1047,12 +1048,25 @@ class HexParserApp(QMainWindow):
 
             # 解析为元组
             values = struct.unpack(fmt, data_bytes)
+            
+            # 解析格式字符串，获取每个字段的格式字符
+            fmt_chars = re.findall(r'(\d*)([a-zA-Z])', fmt[1:])  # 跳过字节序标记
+            field_formats = []
+            for count_str, char in fmt_chars:
+                count = int(count_str) if count_str else 1
+                if char == 's':
+                    field_formats.append(char)
+                else:
+                    field_formats.extend([char] * count)
 
             # 处理有符号值
             dec_values = []
             hex_byte_array = []
 
             for i, (var_name, value) in enumerate(zip(STRUCT_VARIABLES[struct_name], values)):
+                # 获取对应的格式字符
+                fmt_char = field_formats[i] if i < len(field_formats) else 'L'
+                
                 # 处理字符串字段（bytes类型）
                 if isinstance(value, bytes):
                     # 字节串类型，解码为字符串
@@ -1081,10 +1095,10 @@ class HexParserApp(QMainWindow):
                             hex_str = f"0x{value:08X}"
                         dec_values.append(hex_str)  # 只显示十六进制
                     else:
-                        # 根据约定确定符号
-                        if var_name.startswith('s') or var_name.startswith('l'):
+                        # 根据格式字符判断是否有符号（小写=有符号，大写=无符号）
+                        if fmt_char in ('b', 'h', 'l', 'q'):  # 有符号格式
                             dec_values.append(str(value))  # 保留符号
-                        else:
+                        else:  # 无符号格式 ('B', 'H', 'L', 'Q')
                             dec_values.append(str(value & 0xFFFF_FFFF))  # 无符号显示
                 else:
                     # 其他类型的值
