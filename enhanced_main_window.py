@@ -156,27 +156,27 @@ class EnhancedMainWindow(QMainWindow):
         panel = QWidget()
         panel.setStyleSheet("""
             QWidget {
-                background-color: #ecf0f1;
                 border-radius: 8px;
                 padding: 10px;
             }
             QPushButton {
-                background-color: #3498db;
-                color: white;
-                border: none;
+                border: 1px solid palette(mid);
                 padding: 8px 16px;
                 border-radius: 5px;
                 font-weight: bold;
                 min-width: 100px;
+                background-color: palette(button);
             }
             QPushButton:hover {
-                background-color: #2980b9;
+                border: 2px solid palette(highlight);
+                background-color: palette(light);
             }
             QPushButton:pressed {
-                background-color: #21618c;
+                background-color: palette(mid);
             }
             QPushButton:disabled {
-                background-color: #95a5a6;
+                background-color: palette(window);
+                color: palette(mid);
             }
         """)
         
@@ -184,7 +184,7 @@ class EnhancedMainWindow(QMainWindow):
         
         # 标题
         title_label = QLabel('🔧 BMS调试工具控制面板')
-        title_label.setStyleSheet("QLabel { font-size: 14px; font-weight: bold; color: #2c3e50; background: none; }")
+        title_label.setStyleSheet("QLabel { font-size: 14px; font-weight: bold; }")
         layout.addWidget(title_label)
         
         layout.addStretch()
@@ -225,14 +225,11 @@ class EnhancedMainWindow(QMainWindow):
         panel = QWidget()
         panel.setStyleSheet("""
             QWidget {
-                background-color: #34495e;
                 border-radius: 5px;
                 padding: 5px;
             }
             QLabel {
-                color: #ecf0f1;
                 font-size: 11px;
-                background: none;
                 padding: 3px 10px;
             }
         """)
@@ -329,7 +326,21 @@ class EnhancedMainWindow(QMainWindow):
         """切换监控状态"""
         if self.monitor_btn.text() == '▶️ 开始监控':
             self.monitor_btn.setText('⏸️ 停止监控')
-            self.monitor_btn.setStyleSheet("QPushButton { background-color: #e74c3c; }")
+            self.monitor_btn.setStyleSheet("""
+                QPushButton { 
+                    background-color: #ff5555; 
+                    color: white; 
+                    border: 1px solid #dd3333;
+                    font-weight: bold; 
+                }
+                QPushButton:hover {
+                    background-color: #ff6666;
+                    border: 2px solid #dd4444;
+                }
+                QPushButton:pressed {
+                    background-color: #ee4444;
+                }
+            """)
             self.scan_task = asyncio.create_task(self.monitoring_loop())
             self.logger.write_log("开始监控")
         else:

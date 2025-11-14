@@ -542,11 +542,9 @@ class BitFlagsDisplayWindow(QWidget):
         title_label = QLabel(self.title)
         title_label.setStyleSheet("""
             QLabel { 
-                color: #2c3e50; 
                 font-weight: bold; 
                 font-size: 10px;
                 padding: 2px;
-                background-color: #ecf0f1;
                 border-radius: 3px;
             }
         """)
@@ -599,25 +597,15 @@ class BitFlagsDisplayWindow(QWidget):
         # 设置窗口边框和样式
         self.setStyleSheet("""
             BitFlagsDisplayWindow {
-                border: 1px solid #bdc3c7;
                 border-radius: 3px;
-                background-color: white;
                 padding: 2px;
             }
             QTableView {
-                border: 1px solid #dce0e3;
-                gridline-color: #ecf0f1;
+                border: 1px solid palette(mid);
             }
             QTableView::item {
                 height: 12px;
                 padding: 0px;
-            }
-            QTableView::item:selected {
-                background-color: #3498db;
-                color: white;
-            }
-            QTableView::item:hover {
-                background-color: #ecf0f1;
             }
         """)
         
@@ -715,11 +703,9 @@ class DataDisplayWindow(QWidget):
         title_label = QLabel(self.title)
         title_label.setStyleSheet("""
             QLabel { 
-                color: #2c3e50; 
                 font-weight: bold; 
                 font-size: 10px;
                 padding: 2px;
-                background-color: #ecf0f1;
                 border-radius: 3px;
             }
         """)
@@ -784,18 +770,18 @@ class DataDisplayWindow(QWidget):
         self.read_button.setMinimumHeight(24)
         self.read_button.setStyleSheet("""
             QPushButton {
-                background-color: #3498db;
-                color: white;
-                border: none;
+                border: 1px solid palette(mid);
                 border-radius: 4px;
                 font-weight: bold;
                 font-size: 9px;
+                background-color: palette(button);
             }
             QPushButton:hover {
-                background-color: #2980b9;
+                border: 2px solid palette(highlight);
+                background-color: palette(light);
             }
             QPushButton:pressed {
-                background-color: #21618c;
+                background-color: palette(mid);
             }
         """)
         button_layout.addWidget(self.read_button)
@@ -808,18 +794,19 @@ class DataDisplayWindow(QWidget):
             self.write_button.setMinimumHeight(24)
             self.write_button.setStyleSheet("""
                 QPushButton {
-                    background-color: #27ae60;
+                    background-color: #00cc66;
                     color: white;
-                    border: none;
+                    border: 1px solid #009944;
                     border-radius: 4px;
                     font-weight: bold;
                     font-size: 9px;
                 }
                 QPushButton:hover {
-                    background-color: #229954;
+                    background-color: #00dd77;
+                    border: 2px solid #00bb55;
                 }
                 QPushButton:pressed {
-                    background-color: #1e8449;
+                    background-color: #009955;
                 }
             """)
             button_layout.addWidget(self.write_button)
@@ -832,25 +819,15 @@ class DataDisplayWindow(QWidget):
         # 设置窗口边框和样式（压缩边框）
         self.setStyleSheet("""
             DataDisplayWindow {
-                border: 1px solid #bdc3c7;
                 border-radius: 3px;
-                background-color: white;
                 padding: 2px;
             }
             QTableView {
-                border: 1px solid #dce0e3;
-                gridline-color: #ecf0f1;
+                border: 1px solid palette(mid);
             }
             QTableView::item {
                 height: 12px;
                 padding: 0px;
-            }
-            QTableView::item:selected {
-                background-color: #3498db;
-                color: white;
-            }
-            QTableView::item:hover {
-                background-color: #ecf0f1;
             }
         """)
         
@@ -1095,17 +1072,19 @@ class MultiWindowManager(QWidget):
         self.read_all_btn.clicked.connect(self.read_all_checked_windows)
         self.read_all_btn.setStyleSheet("""
             QPushButton {
-                background-color: #4CAF50;
+                background-color: #00cc66;
                 color: white;
+                border: 1px solid #009944;
                 font-weight: bold;
                 padding: 8px;
                 border-radius: 4px;
             }
             QPushButton:hover {
-                background-color: #45a049;
+                background-color: #00dd77;
+                border: 2px solid #00bb55;
             }
             QPushButton:pressed {
-                background-color: #3d8b40;
+                background-color: #009955;
             }
         """)
         button_layout.addWidget(self.read_all_btn)

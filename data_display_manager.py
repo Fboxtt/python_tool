@@ -129,7 +129,7 @@ class BatteryWindowManager:
 
         # 创建标题
         title_label = QLabel('电池参数配置窗口')
-        title_label.setStyleSheet("QLabel { color: blue; font-weight: bold; font-size: 12px; }")
+        title_label.setStyleSheet("QLabel { font-weight: bold; font-size: 12px; }")
         layout.addWidget(title_label)
 
         # 创建按钮
@@ -160,7 +160,7 @@ class BatteryWindowManager:
             layout.addWidget(self.table_view)
         else:
             error_label = QLabel('错误：无法加载BatteryTableModel')
-            error_label.setStyleSheet("QLabel { color: red; }")
+            error_label.setStyleSheet("QLabel { font-weight: bold; }")
             layout.addWidget(error_label)
 
         self.widget.setLayout(layout)
@@ -212,7 +212,7 @@ class BitWindowManager:
             self.widget = QWidget(parent)
             layout = QVBoxLayout()
             error_label = QLabel('错误：无法加载BitFlagsWidget')
-            error_label.setStyleSheet("QLabel { color: red; }")
+            error_label.setStyleSheet("QLabel { font-weight: bold; }")
             layout.addWidget(error_label)
             self.widget.setLayout(layout)
 
@@ -337,11 +337,11 @@ class DataDisplayManager(QMainWindow):
 
         # 标题
         title_label = QLabel('🎛️ 数据显示管理器控制面板')
-        title_label.setStyleSheet("QLabel { font-size: 14px; font-weight: bold; color: #2c3e50; }")
+        title_label.setStyleSheet("QLabel { font-size: 14px; font-weight: bold; }")
         layout.addWidget(title_label)
         # 联系信息
         contact_label = QLabel('有疑问请联系郭学成')
-        contact_label.setStyleSheet("QLabel { font-size: 11px; color: #7f8c8d; margin-left: 15px; }")
+        contact_label.setStyleSheet("QLabel { font-size: 11px; margin-left: 15px; }")
         layout.addWidget(contact_label)
         # 32串/16串配置切换
         self.cell_32_checkbox = QCheckBox('32电芯配置')
@@ -367,23 +367,22 @@ class DataDisplayManager(QMainWindow):
         panel.setLayout(layout)
         panel.setStyleSheet("""
             QWidget {
-                background-color: #ecf0f1;
                 border-radius: 5px;
                 padding: 10px;
             }
             QPushButton {
-                background-color: #3498db;
-                color: white;
-                border: none;
+                border: 1px solid palette(mid);
                 padding: 8px 16px;
                 border-radius: 4px;
                 font-weight: bold;
+                background-color: palette(button);
             }
             QPushButton:hover {
-                background-color: #2980b9;
+                border: 2px solid palette(highlight);
+                background-color: palette(light);
             }
             QPushButton:pressed {
-                background-color: #21618c;
+                background-color: palette(mid);
             }
         """)
 
@@ -396,7 +395,6 @@ class DataDisplayManager(QMainWindow):
             QGroupBox {
                 font-size: 13px;
                 font-weight: bold;
-                border: 2px solid #3498db;
                 border-radius: 5px;
                 margin-top: 10px;
                 padding-top: 10px;
@@ -422,7 +420,7 @@ class DataDisplayManager(QMainWindow):
             QTextEdit {
                 font-family: 'Consolas', 'Courier New', monospace;
                 font-size: 11px;
-                border: 1px solid #bdc3c7;
+                border: 1px solid palette(mid);
                 border-radius: 3px;
                 padding: 5px;
             }
@@ -434,17 +432,19 @@ class DataDisplayManager(QMainWindow):
         parse_btn.setMinimumWidth(120)
         parse_btn.setStyleSheet("""
             QPushButton {
-                background-color: #27ae60;
+                background-color: #00cc66;
                 color: white;
+                border: 1px solid #009944;
                 font-weight: bold;
                 padding: 10px;
                 border-radius: 5px;
             }
             QPushButton:hover {
-                background-color: #229954;
+                background-color: #00dd77;
+                border: 2px solid #00bb55;
             }
             QPushButton:pressed {
-                background-color: #1e8449;
+                background-color: #009955;
             }
         """)
         parse_btn.clicked.connect(self.parse_input_data)
@@ -481,9 +481,7 @@ class DataDisplayManager(QMainWindow):
             QTextEdit {
                 font-family: 'Consolas', 'Courier New', monospace;
                 font-size: 10px;
-                background-color: #2c3e50;
-                color: #ecf0f1;
-                border: 1px solid #34495e;
+                border: 1px solid palette(mid);
                 border-radius: 3px;
                 padding: 5px;
             }
