@@ -117,7 +117,8 @@ class BluetoothTool(QWidget):
 
         # 用于存储接收到的数据
         self.received_data_buffer = bytearray()
-
+        # 注册响应标志（用于 send_register_cmd 检测）
+        self.register_response = None  # None=未收到, True=成功, False=失败
         # 烧录计数
         self.ota_start_count = 0
         self.ota_ok_count = 0
@@ -1159,7 +1160,16 @@ class BluetoothTool(QWidget):
         """回调函数，处理接收到的数据"""
         # 将数据添加到缓冲区
         self.received_data_buffer.extend(data)
-        # print("2第一次收到数据J")
+        # 🔥 立即检测注册响应（不等定时器，提高响应速度）
+        try:
+            if len(self.received_data_buffer) >= 8 and self.received_data_buffer[4] == 0x81:
+                cmd_ack = self.received_data_buffer[7]
+                if cmd_ack in [0x00, 0x04]:
+                    self.register_response = True
+                else:
+                    self.register_response = False
+        except (IndexError, Exception):
+            pass  # 数据不完整或异常，忽略
         # 重启定时器
         self.data_timer.start(100)  # 100ms
 
@@ -1554,29 +1564,32 @@ class BluetoothTool(QWidget):
 
     def on_register_clicked(self):
         asyncio.create_task(self.send_register_cmd())
-        pass
 
     async def send_register_cmd(self):
         """注册按钮点击处理"""
         try:
             self.update_registration_status(False)
-            # 这里添加实际的注册逻辑
+            # 清空注册响应标志
+            self.register_response = None
+            # 发送注册命令
             data = bytearray([0x00,0x00,0x04,0x01,0x01,0x55,0xaa,0x05])
             self.display_send_data(data)
             await self.byte_send(data)
-            await asyncio.sleep(0.4)
-            if self.text_decode.legality == ReceveDataStatus.ERR_NOTHING:
-                await asyncio.sleep(0.7)
-            if self.text_decode.legality != ReceveDataStatus.ERR_NOTHING:
-                if self.text_decode.cmd_ack in [0x00, 0x04]:
-                    self.update_registration_status(True)
-                    self.blue_write_log("注册成功")
-                else:
-                    self.update_registration_status(False)
-                    self.blue_write_log("注册失败")
-            else:
+            # 等待接收响应（总共等待1.5秒）
+            for _ in range(15):
+                await asyncio.sleep(0.1)
+                if self.register_response is not None:
+                    break
+            # 检查注册响应标志
+            if self.register_response is True:
+                self.update_registration_status(True)
+                self.blue_write_log("注册成功")
+            elif self.register_response is False:
                 self.update_registration_status(False)
                 self.blue_write_log("注册失败")
+            else:
+                self.update_registration_status(False)
+                self.blue_write_log("注册失败：未收到响应")
 
         except Exception as e:
             self.blue_write_log(f"注册异常: {str(e)}")
