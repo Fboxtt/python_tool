@@ -668,7 +668,7 @@ def main():
     """主函数"""
     try:
         app = QApplication(sys.argv)
-        
+        app.setStyle('Fusion')  # 使用Fusion样式，跟随系统颜色
         # 设置事件循环
         from qasync import QEventLoop
         loop = QEventLoop(app)
