@@ -4,14 +4,91 @@
 """
 import time
 import random
+import sys
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QPushButton, QLabel, QTableView, QAbstractItemView, QHBoxLayout
+    QWidget, QVBoxLayout, QPushButton, QLabel, QTableView, QAbstractItemView, QHBoxLayout, QApplication
 )
 from PyQt6.QtCore import Qt, QAbstractTableModel, QModelIndex, QTimer
 from PyQt6.QtGui import QFont, QColor
 from PyQt6.QtWidgets import QStyledItemDelegate
 from PyQt6.QtGui import QPainter
 from PyQt6.QtWidgets import QStyle
+
+# Windows 注册表检测（优先方案）
+if sys.platform == 'win32':
+    try:
+        import winreg as reg
+        WINDOWS_REGISTRY_AVAILABLE = True
+    except ImportError:
+        WINDOWS_REGISTRY_AVAILABLE = False
+else:
+    WINDOWS_REGISTRY_AVAILABLE = False
+
+
+def is_dark_theme():
+    """检测当前是否为深色主题（优先使用 Windows 注册表）"""
+    # 方案1：Windows 注册表（最准确）
+    if WINDOWS_REGISTRY_AVAILABLE:
+        try:
+            reg_key = reg.OpenKey(reg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize")
+            value, _ = reg.QueryValueEx(reg_key, "AppsUseLightTheme")
+            reg.CloseKey(reg_key)
+            return value == 0  # 0=深色模式，1=浅色模式
+        except (FileNotFoundError, OSError):
+            pass  # 注册表读取失败，使用备用方案
+    
+    # 方案2：QPalette 检测（跨平台兼容）
+    app = QApplication.instance()
+    if app:
+        palette = app.palette()
+        window_color = palette.color(palette.ColorRole.Window)
+        # 计算亮度 (0-255)
+        brightness = (window_color.red() * 0.299 + 
+                     window_color.green() * 0.587 + 
+                     window_color.blue() * 0.114)
+        return brightness < 128
+    
+    return False  # 默认浅色主题
+
+
+def get_adaptive_colors():
+    """根据系统主题返回自适应颜色"""
+    if is_dark_theme():
+        # 深色主题 - 使用深色背景色，确保文字清晰可见
+        return {
+            # BatteryTableModel 颜色
+            'fresh': QColor(120, 80, 40),       # 深橙色
+            'stale': QColor(60, 60, 60),        # 深灰色
+            'modified': QColor(100, 100, 50),   # 深黄色
+            # BitFlags 颜色
+            'green': QColor(50, 100, 50),       # 深绿色
+            'red': QColor(120, 50, 50),         # 深红色
+            'gray': QColor(70, 70, 70),         # 深灰色
+            'text': QColor(255, 255, 255),      # 白色文字
+            # BitFlags 渐变色
+            'green_fresh': QColor(60, 120, 60),  # 深鲜绿
+            'green_stale': QColor(40, 80, 40),   # 深淡绿
+            'red_fresh': QColor(140, 60, 60),    # 深鲜红
+            'red_stale': QColor(100, 50, 50),    # 深淡红
+        }
+    else:
+        # 浅色主题 - 使用浅色背景色（原有颜色）
+        return {
+            # BatteryTableModel 颜色
+            'fresh': QColor(255, 200, 150),      # 橙色
+            'stale': QColor(220, 220, 220),      # 灰色
+            'modified': QColor(255, 255, 200),   # 浅黄色
+            # BitFlags 颜色
+            'green': QColor(144, 238, 144),      # 浅绿色
+            'red': QColor(255, 160, 160),        # 浅红色
+            'gray': QColor(180, 180, 180),       # 灰色
+            'text': QColor(0, 0, 0),             # 黑色文字
+            # BitFlags 渐变色
+            'green_fresh': QColor(144, 238, 144),
+            'green_stale': QColor(200, 220, 200),
+            'red_fresh': QColor(255, 160, 160),
+            'red_stale': QColor(230, 200, 200),
+        }
 
 
 # ==================== 🔄 全局定时器管理器（单例模式）====================
@@ -129,10 +206,11 @@ class BatteryTableModel(QAbstractTableModel):
         self._gradient_duration = 5.0  # 渐变持续时间（秒）
         self._update_timestamps = {}   # 记录每个参数的最后更新时间 {original_row_index: timestamp}
         
-        # 颜色配置
-        self._color_fresh = QColor(255, 200, 150)      # 橙色 - 新鲜数据（刚更新）
-        self._color_stale = QColor(220, 220, 220)      # 灰色 - 陈旧数据（5秒未更新）
-        self._color_modified = QColor(255, 255, 200)   # 浅黄色 - 有待发送的修改
+        # 颜色配置（自适应系统主题）
+        colors = get_adaptive_colors()
+        self._color_fresh = colors['fresh']      # 新鲜数据（刚更新）
+        self._color_stale = colors['stale']      # 陈旧数据（5秒未更新）
+        self._color_modified = colors['modified']   # 有待发送的修改
         
         # 🔄 使用全局定时器管理器（多窗口同步刷新，节省性能）
         self._gradient_timer_manager = _global_refresh_timer_manager
@@ -674,12 +752,13 @@ class BitFlagsTableModel(QAbstractTableModel):
         self._headers = ['参数名', '状态值']  # 两列显示
         self._timeout_seconds = 5.0  # 超时时间（秒）
 
-        # 性能优化：缓存QColor对象，避免重复创建
+        # 性能优化：缓存QColor对象，避免重复创建（自适应系统主题）
+        colors = get_adaptive_colors()
         self._color_cache = {
-            'green': QColor(144, 238, 144),   # 浅绿色
-            'red': QColor(255, 160, 160),     # 浅红色
-            'gray': QColor(180, 180, 180),    # 灰色
-            'black': QColor(0, 0, 0)          # 黑色文字
+            'green': colors['green'],    # 绿色（0值）
+            'red': colors['red'],        # 红色（1值）
+            'gray': colors['gray'],      # 灰色（超时）
+            'black': colors['text']      # 文字颜色
         }
 
         # 性能优化：缓存当前时间，避免每个单元格都调用time.time()

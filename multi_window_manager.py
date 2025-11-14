@@ -12,7 +12,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QObject
 from PyQt6.QtGui import QFont, QColor, QPainter
-from display_widgets import BatteryTableModel
+from display_widgets import BatteryTableModel, get_adaptive_colors
 
 
 # ============== 圆形通讯状态指示器（优化版）==============
@@ -324,11 +324,12 @@ class BitFlagsCompactModel(BatteryTableModel):
         self._gradient_enabled = True
         # 渐变持续时间（与其他窗口保持统一：5秒）
         self._gradient_duration = 5.0
-        # 位标志的新鲜色和陈旧色
-        self._color_green_fresh = QColor(144, 238, 144)  # 鲜艳绿色（0值，刚更新）
-        self._color_green_stale = QColor(200, 220, 200)  # 淡绿色（0值，陈旧）
-        self._color_red_fresh = QColor(255, 160, 160)    # 鲜艳红色（1值，刚更新）
-        self._color_red_stale = QColor(230, 200, 200)    # 淡红色（1值，陈旧）
+        # 位标志的新鲜色和陈旧色（自适应系统主题）
+        colors = get_adaptive_colors()
+        self._color_green_fresh = colors['green_fresh']  # 鲜艳绿色（0值，刚更新）
+        self._color_green_stale = colors['green_stale']  # 淡绿色（0值，陈旧）
+        self._color_red_fresh = colors['red_fresh']      # 鲜艳红色（1值，刚更新）
+        self._color_red_stale = colors['red_stale']      # 淡红色（1值，陈旧）
         
     def _get_gradient_color_for_bit(self, original_idx, value):
         """计算位标志的渐变颜色（与其他窗口保持统一的渐变算法）
