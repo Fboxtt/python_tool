@@ -229,7 +229,7 @@ def parse_all_status_from_sbs(sbs_data_dict):
     从 PC_GET_SBS 数据字典中解析所有状态位
 
     Args:
-        sbs_data_dict: PC_GET_SBS 解析后的字典，包含 ulAlarmStatus, ulProtectStatus 等
+        sbs_data_dict: PC_GET_SBS 解析后的字典，包含 告警状态, 保护状态 等
 
     Returns:
         dict: 包含所有状态位的字典
@@ -244,24 +244,24 @@ def parse_all_status_from_sbs(sbs_data_dict):
     result = {}
 
     # 解析告警状态
-    if 'ulAlarmStatus' in sbs_data_dict:
-        result['alarm'] = parse_status_bits(sbs_data_dict['ulAlarmStatus'], 'ALARM')
+    if '告警状态' in sbs_data_dict:
+        result['alarm'] = parse_status_bits(sbs_data_dict['告警状态'], 'ALARM')
 
     # 解析保护状态
-    if 'ulProtectStatus' in sbs_data_dict:
-        result['protect'] = parse_status_bits(sbs_data_dict['ulProtectStatus'], 'PROTECT')
+    if '保护状态' in sbs_data_dict:
+        result['protect'] = parse_status_bits(sbs_data_dict['保护状态'], 'PROTECT')
 
     # 解析失效状态
-    if 'ulFaultStatus' in sbs_data_dict:
-        result['fault'] = parse_status_bits(sbs_data_dict['ulFaultStatus'], 'FAULT')
+    if '失效状态' in sbs_data_dict:
+        result['fault'] = parse_status_bits(sbs_data_dict['失效状态'], 'FAULT')
 
     # 解析其他信息
-    if 'ulOtherInfo' in sbs_data_dict:
-        result['info'] = parse_status_bits(sbs_data_dict['ulOtherInfo'], 'INFO')
+    if '其他信息' in sbs_data_dict:
+        result['info'] = parse_status_bits(sbs_data_dict['其他信息'], 'INFO')
 
     # 解析电池状态
-    if 'usBattStatus' in sbs_data_dict:
-        batt_status = sbs_data_dict['usBattStatus']
+    if '电池状态' in sbs_data_dict:
+        batt_status = sbs_data_dict['电池状态']
         result['battery_status'] = BATTERY_STATUS_NAMES.get(batt_status, f'未知({batt_status})')
 
     return result
@@ -324,19 +324,19 @@ STRUCT_FORMATS = {
     "PC_GET_CELL_CAP_PARA": "<LL",
     "PC_GET_MOSHTDATA": "<HHHH",
     "PC_GET_LIFE_PARA": "<HHLLL",
-    "PC_GET_SBS": "<LL"  # ulPackV, ulBattV
-        "HHHHHHHHHHHHHHHH"  # usCellV[CELL_COUNT]
-        "l"  # lCurrent
-        "hhhhh"  # sTemp[TEMP_COUNT]
-        "HHH"  # usRemainAH, usFccAH, usBiaAH
-        "LLLLL"  # ulOtherInfo, ulAlarmStatus, ulProtectStatus, ulFaultStatus, ulBalanceStatus
-        "HH"  # usBattStatus, usSOC_Percent
-        "LLL",  # ulSOH_Percent, ulDisTimes, ulTotalDisAH
+    "PC_GET_SBS": "<LL"  # PACK电压, BATT电压
+        "HHHHHHHHHHHHHHHH"  # 第1-16节电压
+        "l"  # 电流
+        "hhhhh"  # 环境温度1-5
+        "HHH"  # 剩余容量, 满充容量, 设计容量
+        "LLLLL"  # 其他信息, 告警状态, 保护状态, 失效状态, 均衡状态
+        "HH"  # 电池状态, SOC
+        "LLL",  # 容量保持率, 放电次数, 总放电容量
     "PC_GET_VER": "<"
-        "HHHH"    # usMajorVer, usMinorVer, usRevision, usCompileYear
-        "BB"      # ucCompileMonth, ucCompileDay
-        "30s"     # cHWversion (30 bytes)
-        "40s",    # cFuncVersion (40 bytes)
+        "HHHH"    # 主版本号, 次版本号, 修订版本号, 编译年份
+        "BB"      # 编译月份, 编译日期
+        "30s"     # 硬件版本 (30 bytes)
+        "40s",    # 功能版本 (40 bytes)
     "PC_GET_INF": "<"
         "HHHHBBBB"  # TVER: bootVer
         "HHHHBBBB"  # TVER: app_Ver
