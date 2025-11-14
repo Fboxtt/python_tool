@@ -623,11 +623,11 @@ class BitFlagsDisplayWindow(QWidget):
         
         extra_height = 40  # 标题 + 边距
         
-        # 计算总高度
-        total_height = header_height + row_count * row_height + extra_height
+        # 计算总高度（预留两行位置用于滚动条等）
+        total_height = header_height + row_count * row_height + extra_height + 2 * row_height
         
         # 设置最小高度（至少显示3行）
-        min_height = header_height + 3 * row_height + extra_height
+        min_height = header_height + 3 * row_height + extra_height + 2 * row_height
         total_height = max(total_height, min_height)
         
         # 限制最大高度（99%，除了读取写入按钮）
@@ -635,8 +635,8 @@ class BitFlagsDisplayWindow(QWidget):
             max_window_height = int(max_container_height * 0.99)
             total_height = min(total_height, max_window_height)
         
-        # 计算所需宽度（4列：54+30+54+30+边距 = 178）
-        total_width = 54 + 30 + 54 + 30 + 10
+        # 计算所需宽度（4列：54+30+54+30+边距+15px用于滚动条 = 193）
+        total_width = 54 + 30 + 54 + 30 + 25
         
         # 设置固定大小
         self.setMinimumHeight(total_height)
@@ -828,11 +828,11 @@ class DataDisplayWindow(QWidget):
         # 标题和按钮的高度（现在所有窗口都有按钮）
         extra_height = 50  # 标题(18) + 按钮(24) + 边距(8)
         
-        # 计算总高度
-        total_height = header_height + row_count * row_height + extra_height
+        # 计算总高度（预留两行位置用于滚动条等）
+        total_height = header_height + row_count * row_height + extra_height + 2 * row_height
         
         # 设置最小高度（至少显示3行）
-        min_height = header_height + 3 * row_height + extra_height
+        min_height = header_height + 3 * row_height + extra_height + 2 * row_height
         total_height = max(total_height, min_height)
         
         # 限制最大高度为容器高度的99%（如果有容器高度限制）
@@ -841,11 +841,11 @@ class DataDisplayWindow(QWidget):
             max_window_height = int(max_container_height * 0.99)
             total_height = min(total_height, max_window_height)
         
-        # 计算所需宽度（列宽总和 + 10px，避免横向滚动条）
+        # 计算所需宽度（列宽总和 + 25px，预留15px用于滚动条）
         if self.column_mode == 2:
-            total_width = 97 + 60 + 10  # 2列：名称97 + 当前值60 + 10 = 167
+            total_width = 97 + 60 + 25  # 2列：名称97 + 当前值60 + 25 = 182
         else:
-            total_width = 103 + 60 + 60 + 10  # 3列：名称103 + 读取60 + 写入60 + 10 = 233
+            total_width = 103 + 60 + 60 + 25  # 3列：名称103 + 读取60 + 写入60 + 25 = 248
             
         # 设置固定大小
         self.setMinimumHeight(total_height)
