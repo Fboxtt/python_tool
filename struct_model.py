@@ -7,6 +7,7 @@ from log_controller import LogManager
 from PyQt6.QtCore import pyqtSignal
 import json
 import os
+import re
 
 import traceback
 # Define constants at the top of your file
@@ -100,83 +101,83 @@ STATUS_FULL = 0x04
 STATUS_BIT_NAMES = {
     # 告警状态 (ALARM)
     'ALARM': {
-        ALARM_PACK_OV: '告_组过压',
-        ALARM_BATT_OV: '告_池过压',
-        ALARM_CELL_OV: '告_芯过压',
-        ALARM_BATT_UV: '告_池欠压',
-        ALARM_CELL_UV: '告_芯欠压',
-        ALARM_CHG_OC: '告_充过流',
-        ALARM_DIS_OC: '告_放过流',
-        ALARM_CHG_OT: '告_充过温',
-        ALARM_DIS_OT: '告_放过温',
-        ALARM_CHG_UT: '告_充低温',
-        ALARM_DIS_UT: '告_放低温',
-        ALARM_SOC_L: '告_SOC低',
-        ALARM_END_LIFE: '告_寿终止',
-        ALARM_MOS_HT: '告_MOS热',
+        ALARM_PACK_OV: 'A_组过压',
+        ALARM_BATT_OV: 'A_池过压',
+        ALARM_CELL_OV: 'A_芯过压',
+        ALARM_BATT_UV: 'A_池欠压',
+        ALARM_CELL_UV: 'A_芯欠压',
+        ALARM_CHG_OC: 'A_充过流',
+        ALARM_DIS_OC: 'A_放过流',
+        ALARM_CHG_OT: 'A_充过温',
+        ALARM_DIS_OT: 'A_放过温',
+        ALARM_CHG_UT: 'A_充低温',
+        ALARM_DIS_UT: 'A_放低温',
+        ALARM_SOC_L: 'A_SOC低',
+        ALARM_END_LIFE: 'A_寿终止',
+        ALARM_MOS_HT: 'A_MOS热',
     },
     # 保护状态 (PROTECT)
     'PROTECT': {
-        PROTECT_PACK_OV: '护_组过压',
-        PROTECT_BATT_OV: '护_池过压',
-        PROTECT_CELL_OV: '护_芯过压',
-        PROTECT_BATT_UV: '护_池欠压',
-        PROTECT_CELL_UV: '护_芯欠压',
-        PROTECT_CHG_OC: '护_充过流',
-        PROTECT_DIS_OC: '护_放过流',
-        PROTECT_CHG_OT: '护_充过温',
-        PROTECT_DIS_OT: '护_放过温',
-        PROTECT_CHG_UT: '护_充低温',
-        PROTECT_DIS_UT: '护_放低温',
-        PROTECT_SHORT: '护_短路',
-        PROTECT_REV: '护_反接',
-        PROTECT_CHG_UTOC: '护_充温流',
-        PROTECT_CHG_UTOV: '护_充温压',
-        PROTECT_CHG_SHORT: '护_充短路',
-        PROTECT_PSP: '护_PSP',
-        PROTECT_BQ_SCD: '护_BQ短路',
-        PROTECT_BQ_OCD: '护_BQ过流',
-        PROTECT_MOS_HT: '护_MOS热',
-        PROTECT_CHG_UT_LIMIT: '护_充温限',
+        PROTECT_PACK_OV: 'P_组过压',
+        PROTECT_BATT_OV: 'P_池过压',
+        PROTECT_CELL_OV: 'P_芯过压',
+        PROTECT_BATT_UV: 'P_池欠压',
+        PROTECT_CELL_UV: 'P_芯欠压',
+        PROTECT_CHG_OC: 'P_充过流',
+        PROTECT_DIS_OC: 'P_放过流',
+        PROTECT_CHG_OT: 'P_充过温',
+        PROTECT_DIS_OT: 'P_放过温',
+        PROTECT_CHG_UT: 'P_充低温',
+        PROTECT_DIS_UT: 'P_放低温',
+        PROTECT_SHORT: 'P_短路',
+        PROTECT_REV: 'P_反接',
+        PROTECT_CHG_UTOC: 'P_充温流',
+        PROTECT_CHG_UTOV: 'P_充温压',
+        PROTECT_CHG_SHORT: 'P_充短路',
+        PROTECT_PSP: 'P_PSP',
+        PROTECT_BQ_SCD: 'P_BQ短路',
+        PROTECT_BQ_OCD: 'P_BQ过流',
+        PROTECT_MOS_HT: 'P_MOS热',
+        PROTECT_CHG_UT_LIMIT: 'P_充温限',
     },
     # 失效状态 (FAULT)
     'FAULT': {
-        FAULT_V_SENSOR: '错_电压器',
-        FAULT_T_SENSOR: '错_温度器',
-        FAULT_CHG: '错_充电',
-        FAULT_DIS: '错_放电',
-        FAULT_CELL_BAD: '错_电芯',
-        FAULT_SWITCH_OFF: '错_开关',
-        FAULT_LIFE_END: '错_寿终',
-        FAULT_BQ_UV: '错_BQ欠压',
-        FAULT_BQ_OV: '错_BQ过压',
-        FAULT_BQ_DEVIECE: '错_BQ芯片',
-        FAULT_BQ_OVERWR: '错_BQ覆写',
-        FAULT_FUSE_BREAK: '错_保险丝',
+        FAULT_V_SENSOR: 'F_电压器',
+        FAULT_T_SENSOR: 'F_温度器',
+        FAULT_CHG: 'F_充电',
+        FAULT_DIS: 'F_放电',
+        FAULT_CELL_BAD: 'F_电芯',
+        FAULT_SWITCH_OFF: 'F_开关',
+        FAULT_LIFE_END: 'F_寿终',
+        FAULT_BQ_UV: 'F_BQ欠压',
+        FAULT_BQ_OV: 'F_BQ过压',
+        FAULT_BQ_DEVIECE: 'F_BQ芯片',
+        FAULT_BQ_OVERWR: 'F_BQ覆写',
+        FAULT_FUSE_BREAK: 'F_保险丝',
     },
     # 其他信息 (INFO)
     'INFO': {
-        INFO_HEAETER_CONFIG: '另_加热配',
-        INFO_HEATER_ON: '另_加热开',
-        INFO_CHG_FULL_T: '另_充满温',
-        INFO_BATT_FULL: '另_电池满',
-        INFO_CHG_LIMITED_ON: '另_充限流',
-        INFO_DIS_LIMITED_ON: '另_放限流',
-        INFO_CHG_MOS_OFF: '另_充MOS',
-        INFO_DIS_MOS_OFF: '另_放MOS',
-        INFO_LOWVOL_LIMIT: '另_低压限',
-        INFO_LOWTEMP_FORCECHG: '另_温强充',
-        INFO_MULT_BATT: '另_多电池',
-        INFO_CAN_MASTER: '另_CAN主',
-        INFO_CAN_SLAVE: '另_CAN从',
-        INFO_CALENDAR_REACH: '另_日历到',
-        INFO_TEST_KB: '另_测试KB',
-        INFO_CALIBRATED_V: '另_电压准',
-        INFO_CALIBRATED_C: '另_电流准',
-        INFO_LOST_CANBOX: '另_CAN丢',
-        INFO_NO_INV_TIMEOUTE: '另_无逆变',
-        INFO_FUSEEN_OPEN: '另_保险开',
-        INFO_CELL_CTO: '另_芯CTO',
+        INFO_HEAETER_CONFIG: 'I_加热配',
+        INFO_HEATER_ON: 'I_加热开',
+        INFO_CHG_FULL_T: 'I_充满温',
+        INFO_BATT_FULL: 'I_电池满',
+        INFO_CHG_LIMITED_ON: 'I_充限流',
+        INFO_DIS_LIMITED_ON: 'I_放限流',
+        INFO_CHG_MOS_OFF: 'I_充MOS',
+        INFO_DIS_MOS_OFF: 'I_放MOS',
+        INFO_LOWVOL_LIMIT: 'I_低压限',
+        INFO_LOWTEMP_FORCECHG: 'I_温强充',
+        INFO_MULT_BATT: 'I_多电池',
+        INFO_CAN_MASTER: 'I_CAN主',
+        INFO_CAN_SLAVE: 'I_CAN从',
+        INFO_CALENDAR_REACH: 'I_日历到',
+        INFO_TEST_KB: 'I_测试KB',
+        INFO_CALIBRATED_V: 'I_电压准',
+        INFO_CALIBRATED_C: 'I_电流准',
+        INFO_LOST_CANBOX: 'I_CAN丢',
+        INFO_NO_INV_TIMEOUTE: 'I_无逆变',
+        INFO_FUSEEN_OPEN: 'I_保险开',
+        INFO_CELL_CTO: 'I_芯CTO',
     }
 }
 
@@ -360,82 +361,82 @@ STRUCT_ADDRESSES = {
 
 STRUCT_VARIABLES = {
     "PC_GET_BMS": [
-        "ulCHG_SwitchV", "ulSwitch_PB_DiffV",
-        "ulCHG_Bls_StartV", "ulCHG_Bls_StopV",
-        "ulPack_OVA_Threshold", "ulPack_OVA_Resume",
-        "ulPack_OVP_Threshold", "ulPack_OVP_Resume",
-        "ulBatt_OVA_Threshold", "ulBatt_OVA_Resume",
-        "ulBatt_OVP_Threshold", "ulBatt_OVP_Resume",
-        "usCell_OVA_Threshold", "usCell_OVA_Resume",
-        "usCell_OVP_Threshold", "usCell_OVP_Resume",
-        "ulBatt_UVA_Threshold", "ulBatt_UVA_Resume",
-        "ulBatt_UVP_Threshold", "ulBatt_UVP_Resume",
-        "usCell_UVA_Threshold", "usCell_UVA_Resume",
-        "usCell_UVP_Threshold", "usCell_UVP_Resume",
-        "lCHG_OCA_Threshold", "lCHG_OCA_Resume", "lCHG_OCP_Threshold",
-        "lDIS_OCA_Threshold", "lDIS_OCA_Resume", "lDIS_OCP_Threshold",
-        "sCHG_OTA_Threshold", "sCHG_OTA_Resume", "sCHG_OTP_Threshold", "sCHG_OTP_Resume",
-        "sDIS_OTA_Threshold", "sDIS_OTA_Resume", "sDIS_OTP_Threshold", "sDIS_OTP_Resume",
-        "sCHG_UTA_Threshold", "sCHG_UTA_Resume", "sCHG_UTP_Threshold", "sCHG_UTP_Resume",
-        "sDIS_UTA_Threshold", "sDIS_UTA_Resume", "sDIS_UTP_Threshold", "sDIS_UTP_Resume",
-        "sHEATER_START_T", "sHEATER_STOP_T",
+        "充电功耗电压值", "充电功耗Pack与Batt压差",
+        "充电功满开启电压值", "充电功满停止电压值",
+        "Pack过充-警限值", "Pack过充-警恢复值",
+        "Pack过充-保限值", "Pack过充-保恢复值",
+        "Batt过充-警限值", "Batt过充-警恢复值",
+        "Batt过充-保限值", "Batt过充-保恢复值",
+        "Cell过充-警限值", "Cell过充-警恢复值",
+        "Cell过充-保限值", "Cell过充-保恢复值",
+        "Batt欠压-警限值", "Batt欠压-警恢复值",
+        "Batt欠压-保限值", "Batt欠压-保恢复值",
+        "Cell欠压-警限值", "Cell欠压-警恢复值",
+        "Cell欠压-保限值", "Cell欠压-保恢复值",
+        "充-过流-警限值", "充-过流-警恢复值", "充-过流-保护限值",
+        "放-过流-警限值", "放-过流-警恢复值", "放-过流-保护限值",
+        "充-过温-警限值", "充-过温-警恢复值", "充-过温-保护限值", "充-过温-保护恢复值",
+        "放-过温-警限值", "放-过温-警恢复值", "放-过温-保护限值", "放-过温-保护恢复值",
+        "充-低温-警限值", "充-低温-警恢复值", "充-低温-保护限值", "充-低温-保护恢复值",
+        "放-低温-警限值", "放-低温-警恢复值", "放-低温-保护限值", "放-低温-保护恢复值",
+        "加热器启动温度", "加热器关闭温度",
     ],
     "PC_GET_KB": [
-        "usPackVK", "usBattVK",
-        *[f"usCellVK[{i}]" for i in range(16)],
-        "usChgCurrK", "sChgCurrB",
-        "usDisCurrK", "sDisCurrB",
-        "usChgCurrSK", "sChgCurrSB",
-        "usDisCurrSK", "sDisCurrSB",
-        "usChgCurrSSK", "sChgCurrSSB",
-        "usDisCurrSSK", "sDisCurrSSB",
-        *[f"usTempK[{i}]" for i in range(8)]
+        "Pack电压K", "Batt电压K",
+        *[f"第【{i+1}】节电压K" for i in range(16)],
+        "50-500安K",    "50-500安B",
+        "-(50-500)安K", "-(50-500)安B",
+        "10-50安SK",    "10-50安SB",
+        "-10-50安SK",   "-10-50安SB",
+        "0-10安SSK",    "0-10安SSB",
+        "-(0-10)安SSK", "-(0-10)安SSB",
+        *[f"温度{i+1}K" for i in range(8)]
     ],
     "PC_GET_OCP_DELAYTIME": [
-        "ChgDelayCount_1C", "ChgDelayCount_2C",
-        "DisDelayCount_1C", "DisDelayCount_2C"
+        "1C充电过流保护延时", "2C充电过流保护延时",
+        "1C放电过流保护延时", "2C放电过流保护延时"
     ],
     "PC_GET_CELL_CAP_PARA": [
-        "ulModuleDesignCap", "ulModuleFactoryCap"
+        "额定容量", "出厂容量"
     ],
     "PC_GET_MOSHTDATA": [
-        "sAlarm", "sAlarmRe", "sProtect", "sProtectRe"
+        "MOS温度告警", "MOS温度告警恢复", "MOS温度保护", "MOS温度保护恢复"
     ],
     "PC_GET_LIFE_PARA": [
-        "usSOC_Percent", "reserved", "ulSOH_Percent",
-        "ulRemainPointmAs", "lSingleDis_Ah"
+        "SOC", "保留", "容量保持率",
+        "循环时间累计", "单次充电结合容量"
     ],
     "PC_GET_SBS": [
-        "ulPackV", "ulBattV",
-        *[f"usCellV[{i}]" for i in range(16)],
-        "lCurrent",
-        *[f"sTemp[{i}]" for i in range(5)],
-        "usRemainAH", "usFccAH", "usBiaAH",
-        "ulOtherInfo", "ulAlarmStatus", "ulProtectStatus", "ulFaultStatus", "ulBalanceStatus",
-        "usBattStatus", "usSOC_Percent",
-        "ulSOH_Percent", "ulDisTimes", "ulTotalDisAH"
+        "PACK电压", "BATT电压",
+        *[f"第【{i+1}】节电压" for i in range(16)],
+        "电流",
+        *[f"环境温度{i+1}" for i in range(5)],
+        "剩余容量", "满充容量", "设计容量",
+        "其他信息", "告警状态", "保护状态", "失效状态", "均衡状态",
+        "电池状态", "SOC",
+        "容量保持率", "放电次数", "总放电容量"
     ],
     "PC_GET_VER": [
-        "usMajorVer", "usMinorVer", "usRevision", "usCompileYear",
-        "ucCompileMonth", "ucCompileDay",
-        "cHWversion",
-        "cFuncVersion"
+        "主版本号", "次版本号", "修订版本号", "编译年份",
+        "编译月份", "编译日期",
+        "硬件版本",
+        "功能版本"
     ],
     "PC_GET_INF": [
-        "bootVer.usMajorVer", "bootVer.usMinorVer", "bootVer.usRevision", "bootVer.usYear", "bootVer.ucMonth", "bootVer.ucDay","bootVer.reserved","bootVer.reserved",
-        "app_Ver.usMajorVer", "app_Ver.usMinorVer", "app_Ver.usRevision", "app_Ver.usYear", "app_Ver.ucMonth", "app_Ver.ucDay","app_Ver.reserved","app_Ver.reserved",
-        "buffVer.usMajorVer", "buffVer.usMinorVer", "buffVer.usRevision", "buffVer.usYear", "buffVer.ucMonth", "buffVer.ucDay","buffVer.reserved","buffVer.reserved",
-        "backVer.usMajorVer", "backVer.usMinorVer", "backVer.usRevision", "backVer.usYear", "backVer.ucMonth", "backVer.ucDay","backVer.reserved","backVer.reserved",
-        "icName",
-        "writableArea",
-        "pcAddr",
-        "uniqueID"
+        "boot主版本号", "boot次版本号", "boot修订版本号", "boot年份", "boot月份", "boot日期","boot保留1","boot保留2",
+        "app主版本号",  "app次版本号",  "app修订版本号",   "app年份",  "app月份",  "app日期", "app保留1", "app保留2",
+        "buff主版本号", "buff次版本号", "buff修订版本号", "buff年份", "buff月份", "buff日期","buff保留1","buff保留2",
+        "back主版本号", "back次版本号", "back修订版本号", "back年份", "back月份", "back日期","back保留1","back保留2",
+        "芯片名称",
+        "可写区域",
+        "PC地址",
+        "唯一ID"
     ],
     "PC_GET_SERIALNUM": [
-        "cSerialNum"
+        "序列号"
     ],
     "PC_SET_SERIALNUM": [
-        "cSerialNum"
+        "序列号"
     ]
 }
 
@@ -510,13 +511,13 @@ STRUCT_COMMANDS = {
 # 定义需要显示十六进制的变量
 HEX_DISPLAY_VARIABLES = {
     "PC_GET_SBS": [
-        "ulOtherInfo", "ulAlarmStatus", "ulProtectStatus", "ulFaultStatus", "ulBalanceStatus"
+        "其他信息", "告警状态", "保护状态", "失效状态", "均衡状态"
     ],
     "PC_GET_BMS": [
         # 可以根据需要添加其他命令的十六进制显示变量
     ],
     "PC_GET_MOSHTDATA": [
-        "sAlarm", "sAlarmRe", "sProtect", "sProtectRe"
+        "MOS温度告警", "MOS温度告警恢复", "MOS温度保护", "MOS温度保护恢复"
     ]
 }
 
@@ -825,29 +826,29 @@ class HexParserApp(QMainWindow):
         "LLLLL" +\
         "HH" +\
         "LLL"
-        STRUCT_VARIABLES["PC_GET_SBS"] = ["ulPackV", "ulBattV",
-        *[f"usCellV[{i}]" for i in range(16)],
-        "lCurrent",
-        *[f"sTemp[{i}]" for i in range(5)],
-        "usRemainAH", "usFccAH", "usBiaAH",
-        "ulOtherInfo", "ulAlarmStatus", "ulProtectStatus", "ulFaultStatus", "ulBalanceStatus",
-        "usBattStatus", "usSOC_Percent",
-        "ulSOH_Percent", "ulDisTimes", "ulTotalDisAH"]
+        STRUCT_VARIABLES["PC_GET_SBS"] = ["PACK电压", "BATT电压",
+        *[f"第【{i+1}】节电压" for i in range(16)],
+        "电流",
+        *[f"环境温度{i+1}" for i in range(5)],
+        "剩余容量", "满充容量", "设计容量",
+        "其他信息", "告警状态", "保护状态", "失效状态", "均衡状态",
+        "电池状态", "SOC",
+        "容量保持率", "放电次数", "总放电容量"]
 
         # PC_GET_KB: 8个温度传感器
         STRUCT_FORMATS["PC_GET_KB"] = "<HH" + \
         "HHHHHHHHHHHHHHHH" +\
         "HhHhHhHhHhHh" +\
         "HHHHHHHH"
-        STRUCT_VARIABLES["PC_GET_KB"] = ["usPackVK", "usBattVK",
-        *[f"usCellVK[{i}]" for i in range(16)],
-        "usChgCurrK", "sChgCurrB",
-        "usDisCurrK", "sDisCurrB",
-        "usChgCurrSK", "sChgCurrSB",
-        "usDisCurrSK", "sDisCurrSB",
-        "usChgCurrSSK", "sChgCurrSSB",
-        "usDisCurrSSK", "sDisCurrSSB",
-        *[f"usTempK[{i}]" for i in range(8)]]
+        STRUCT_VARIABLES["PC_GET_KB"] = ["Pack电压K", "Batt电压K",
+        *[f"第【{i+1}】节电压K" for i in range(16)],
+        "50-500安K",    "50-500安B",
+        "-(50-500)安K", "-(50-500)安B",
+        "10-50安SK",    "10-50安SB",
+        "-10-50安SK",   "-10-50安SB",
+        "0-10安SSK",    "0-10安SSB",
+        "-(0-10)安SSK", "-(0-10)安SSB",
+        *[f"温度{i+1}K" for i in range(8)]]
 
         # 修改完成后，更新 config_data 字典
         config_data["STRUCT_FORMATS"] = STRUCT_FORMATS
@@ -872,29 +873,29 @@ class HexParserApp(QMainWindow):
         "LLLLL" +\
         "HH" +\
         "LLL"
-        STRUCT_VARIABLES["PC_GET_SBS"] =  ["ulPackV", "ulBattV",
-        *[f"usCellV[{i}]" for i in range(32)],
-        "lCurrent",
-        *[f"sTemp[{i}]" for i in range(15)],
-        "usRemainAH", "usFccAH", "usBiaAH",
-        "ulOtherInfo", "ulAlarmStatus", "ulProtectStatus", "ulFaultStatus", "ulBalanceStatus",
-        "usBattStatus", "usSOC_Percent",
-        "ulSOH_Percent", "ulDisTimes", "ulTotalDisAH"]
+        STRUCT_VARIABLES["PC_GET_SBS"] =  ["PACK电压", "BATT电压",
+        *[f"第【{i+1}】节电压" for i in range(32)],
+        "电流",
+        *[f"环境温度{i+1}" for i in range(15)],
+        "剩余容量", "满充容量", "设计容量",
+        "其他信息", "告警状态", "保护状态", "失效状态", "均衡状态",
+        "电池状态", "SOC",
+        "容量保持率", "放电次数", "总放电容量"]
 
         # PC_GET_KB: 15个温度传感器
         STRUCT_FORMATS["PC_GET_KB"] = "<HH" + \
         "HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH" +\
         "HhHhHhHhHhHh" +\
         "HHHHHHHHHHHHHHH"
-        STRUCT_VARIABLES["PC_GET_KB"] = ["usPackVK", "usBattVK",
-        *[f"usCellVK[{i}]" for i in range(32)],
-        "usChgCurrK", "sChgCurrB",
-        "usDisCurrK", "sDisCurrB",
-        "usChgCurrSK", "sChgCurrSB",
-        "usDisCurrSK", "sDisCurrSB",
-        "usChgCurrSSK", "sChgCurrSSB",
-        "usDisCurrSSK", "sDisCurrSSB",
-        *[f"usTempK[{i}]" for i in range(15)]]
+        STRUCT_VARIABLES["PC_GET_KB"] = ["Pack电压K", "Batt电压K",
+        *[f"第【{i+1}】节电压K" for i in range(32)],
+        "50-500安K",     "50-500安B",
+        "-(50-500)安K",  "-(50-500)安B",
+        "10-50安SK",   "10-50安SB",
+        "-10-50安SK",  "-10-50安SB",
+        "0-10安SSK",     "0-10安SSB",
+        "-(0-10)安SSK", "-(0-10)安SSB",
+        *[f"温度{i+1}K" for i in range(15)]]
 
         # 修改完成后，更新 config_data 字典
         config_data["STRUCT_FORMATS"] = STRUCT_FORMATS
@@ -1047,12 +1048,25 @@ class HexParserApp(QMainWindow):
 
             # 解析为元组
             values = struct.unpack(fmt, data_bytes)
+            
+            # 解析格式字符串，获取每个字段的格式字符
+            fmt_chars = re.findall(r'(\d*)([a-zA-Z])', fmt[1:])  # 跳过字节序标记
+            field_formats = []
+            for count_str, char in fmt_chars:
+                count = int(count_str) if count_str else 1
+                if char == 's':
+                    field_formats.append(char)
+                else:
+                    field_formats.extend([char] * count)
 
             # 处理有符号值
             dec_values = []
             hex_byte_array = []
 
             for i, (var_name, value) in enumerate(zip(STRUCT_VARIABLES[struct_name], values)):
+                # 获取对应的格式字符
+                fmt_char = field_formats[i] if i < len(field_formats) else 'L'
+                
                 # 处理字符串字段（bytes类型）
                 if isinstance(value, bytes):
                     # 字节串类型，解码为字符串
@@ -1081,10 +1095,10 @@ class HexParserApp(QMainWindow):
                             hex_str = f"0x{value:08X}"
                         dec_values.append(hex_str)  # 只显示十六进制
                     else:
-                        # 根据约定确定符号
-                        if var_name.startswith('s') or var_name.startswith('l'):
+                        # 根据格式字符判断是否有符号（小写=有符号，大写=无符号）
+                        if fmt_char in ('b', 'h', 'l', 'q'):  # 有符号格式
                             dec_values.append(str(value))  # 保留符号
-                        else:
+                        else:  # 无符号格式 ('B', 'H', 'L', 'Q')
                             dec_values.append(str(value & 0xFFFF_FFFF))  # 无符号显示
                 else:
                     # 其他类型的值
