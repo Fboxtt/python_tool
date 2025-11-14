@@ -508,6 +508,11 @@ class EnhancedMainWindow(QMainWindow):
             if self.bluetooth_tool.check_new_password_response(data_buffer):
                 self.bluetooth_tool.handle_new_password_response(data_buffer)
             else:
+                # 提取响应命令码（用于发射信号）
+                response_cmd_code = None
+                if len(data_buffer) >= 5:
+                    response_cmd_code = data_buffer[4] & 0x7F  # 去掉0x80标志，获取原始命令码
+                
                 # 使用data_display_mgr解析数据
                 if hasattr(self.bluetooth_tool, 'data_display_mgr') and self.bluetooth_tool.data_display_mgr:
                     success, result = self.bluetooth_tool.data_display_mgr.parse_and_update_displays(data_buffer)
@@ -533,7 +538,14 @@ class EnhancedMainWindow(QMainWindow):
                         from struct_model import STRUCT_COMMANDS
                         cmd_code = STRUCT_COMMANDS.get(struct_name, 0)
                         self.bluetooth_tool.receive_ok_signal.emit(cmd_code, data_buffer)
+                    else:
+                        # 解析失败，但仍然发射信号（用于写入命令的简单确认响应）
+                        if response_cmd_code is not None:
+                            self.bluetooth_tool.receive_ok_signal.emit(response_cmd_code, data_buffer)
                 else:
+                    # data_display_mgr未初始化，仍然发射信号
+                    if response_cmd_code is not None:
+                        self.bluetooth_tool.receive_ok_signal.emit(response_cmd_code, data_buffer)
                     self.logger.write_log("错误：data_display_mgr未初始化")
             
             # 显示接收到的数据（原始逻辑）

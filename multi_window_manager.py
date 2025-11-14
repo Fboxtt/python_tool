@@ -150,13 +150,33 @@ class BluetoothQueueSender(QObject):
         # 无论是否在等待，都设置事件（避免时序问题）
         self.response_received.set()
         # 只在verbose模式输出详细日志（减少日志噪音）
-        if self.verbose and self.logger:
-            self.logger.write_log(f"✅ 收到BMS响应，命令码: 0x{cmd_code:02X}")
+        if self.verbose and hasattr(self.bluetooth_tool, 'blue_write_log'):
+            self.bluetooth_tool.blue_write_log(f"✅ 收到BMS响应，命令码: 0x{cmd_code:02X}")
         
     @staticmethod
     def _extract_cmd_code(data_bytes):
         """快速提取命令码（内联优化）"""
         return data_bytes[4] if len(data_bytes) > 4 else None
+    
+    @staticmethod
+    def _is_write_command(cmd_code):
+        """判断命令码是否为写入命令
+        
+        写入命令需要更长的超时时间（0.7秒），因为响应时间比读取命令长
+        """
+        if cmd_code is None:
+            return False
+        # 写入命令列表（根据WRITE_READ_COMMAND_MAPPING定义）
+        write_commands = {
+            0x08,  # PC_SET_KB
+            0x09,  # PC_SET_BMS
+            0x11,  # PC_SET_SERIALNUM
+            0x26,  # PC_SET_OCP_DELAYTIME
+            0x40,  # PC_SET_LIFE_PARA
+            0x42,  # PC_SET_CELL_CAP_PARA
+            0x66,  # PC_SET_MOSHTDATA
+        }
+        return cmd_code in write_commands
     
     async def add_to_queue(self, data_bytes, priority=False):
         """添加数据到发送队列（优化版，带去重）
@@ -170,8 +190,8 @@ class BluetoothQueueSender(QObject):
         
         # 去重检查：如果队列中已有相同命令，跳过
         if cmd_code is not None and cmd_code in self.queued_commands:
-            if self.verbose and self.logger:
-                self.logger.write_log(f"⚠️ 队列已有指令0x{cmd_code:02X}，跳过重复添加")
+            if self.verbose and hasattr(self.bluetooth_tool, 'blue_write_log'):
+                self.bluetooth_tool.blue_write_log(f"⚠️ 队列已有指令0x{cmd_code:02X}，跳过重复添加")
             return
         
         # 添加到队列
@@ -185,9 +205,9 @@ class BluetoothQueueSender(QObject):
             self.queued_commands.add(cmd_code)
         
         # 只在verbose模式或重要操作时输出日志
-        if self.verbose and self.logger:
+        if self.verbose and hasattr(self.bluetooth_tool, 'blue_write_log'):
             priority_flag = "🔴 优先" if priority else "➕"
-            self.logger.write_log(f"{priority_flag} 添加到队列(0x{cmd_code:02X if cmd_code else 0:02X})，队列长度: {len(self.send_queue)}")
+            self.bluetooth_tool.blue_write_log(f"{priority_flag} 添加到队列(0x{cmd_code:02X if cmd_code else 0:02X})，队列长度: {len(self.send_queue)}")
             
         # 如果没有正在发送，启动发送任务
         if not self.is_sending:
@@ -214,13 +234,17 @@ class BluetoothQueueSender(QObject):
                         elapsed = current_time - self.last_send_time
                         if elapsed < self.response_timeout:
                             wait_time = self.response_timeout - elapsed
-                            if self.verbose and self.logger:
-                                self.logger.write_log(f"⏳ 等待发送间隔: {wait_time:.3f}秒")
+                            if self.verbose and hasattr(self.bluetooth_tool, 'blue_write_log'):
+                                self.bluetooth_tool.blue_write_log(f"⏳ 等待发送间隔: {wait_time:.3f}秒")
                             await asyncio.sleep(wait_time)
                         
                         # 重置响应事件
                         self.response_received.clear()
                         self.waiting_for_response = True
+                        
+                        # 判断是否为写入命令（写入命令需要更长的超时时间）
+                        is_write_command = self._is_write_command(cmd_code)
+                        timeout_duration = 0.7 if is_write_command else 0.5
                         
                         # 发送数据
                         await self.bluetooth_tool.byte_send(data_bytes)
@@ -228,11 +252,11 @@ class BluetoothQueueSender(QObject):
                         self.last_send_time = time.time()
                         self.stats['total_sent'] += 1
                         
-                        # 等待BMS响应或超时（简短等待0.3秒）
+                        # 等待BMS响应或超时
                         try:
                             await asyncio.wait_for(
                                 self.response_received.wait(), 
-                                timeout=0.3
+                                timeout=timeout_duration
                             )
                             # 成功：记录响应时间
                             response_time = time.time() - send_start_time
@@ -240,15 +264,15 @@ class BluetoothQueueSender(QObject):
                             self.stats['total_success'] += 1
                             self.stats['avg_response_time'] = sum(self._response_times) / len(self._response_times)
                             
-                            if self.verbose and self.logger:
-                                self.logger.write_log(f"✅ BMS已响应({response_time*1000:.0f}ms)")
+                            if self.verbose and hasattr(self.bluetooth_tool, 'blue_write_log'):
+                                self.bluetooth_tool.blue_write_log(f"✅ BMS已响应({response_time*1000:.0f}ms)")
                             # 发送成功信号（绿色闪烁）
                             self.comm_status_changed.emit('success')
                         except asyncio.TimeoutError:
                             # 超时
                             self.stats['total_timeout'] += 1
-                            if self.logger:  # 超时总是记录日志
-                                self.logger.write_log(f"⏰ BMS响应超时(0.3秒)")
+                            if hasattr(self.bluetooth_tool, 'blue_write_log'):  # 超时总是记录日志
+                                self.bluetooth_tool.blue_write_log(f"⏰ BMS响应超时({timeout_duration}秒)")
                             # 发送超时信号（红色闪烁）
                             self.comm_status_changed.emit('timeout')
                         
@@ -261,23 +285,23 @@ class BluetoothQueueSender(QObject):
                         
                     except Exception as e:
                         self.waiting_for_response = False
-                        if self.logger:
-                            self.logger.write_log(f"❌ 队列发送失败: {str(e)}")
+                        if hasattr(self.bluetooth_tool, 'blue_write_log'):
+                            self.bluetooth_tool.blue_write_log(f"❌ 队列发送失败: {str(e)}")
                         # 发送失败，等待一段时间后继续
                         await asyncio.sleep(0.5)
                         
             finally:
                 self.is_sending = False
-                if self.verbose and self.logger:
+                if self.verbose and hasattr(self.bluetooth_tool, 'blue_write_log'):
                     success_rate = (self.stats['total_success'] / self.stats['total_sent'] * 100) if self.stats['total_sent'] > 0 else 0
-                    self.logger.write_log(f"📭 队列处理完成 | 成功率: {success_rate:.1f}% | 平均响应: {self.stats['avg_response_time']*1000:.0f}ms")
+                    self.bluetooth_tool.blue_write_log(f"📭 队列处理完成 | 成功率: {success_rate:.1f}% | 平均响应: {self.stats['avg_response_time']*1000:.0f}ms")
                 
     def clear_queue(self):
         """清空发送队列"""
         self.send_queue.clear()
         self.queued_commands.clear()  # 同时清空去重集合
-        if self.logger:
-            self.logger.write_log("🗑️ 已清空发送队列")
+        if hasattr(self.bluetooth_tool, 'blue_write_log'):
+            self.bluetooth_tool.blue_write_log("🗑️ 已清空发送队列")
             
     def get_queue_length(self):
         """获取队列长度"""
@@ -290,8 +314,8 @@ class BluetoothQueueSender(QObject):
             timeout: 超时时间（秒）
         """
         self.response_timeout = timeout
-        if self.logger:
-            self.logger.write_log(f"⚙️ 设置响应超时时间: {timeout}秒")
+        if hasattr(self.bluetooth_tool, 'blue_write_log'):
+            self.bluetooth_tool.blue_write_log(f"⚙️ 设置响应超时时间: {timeout}秒")
     
     def get_stats(self):
         """获取性能统计信息"""
@@ -306,8 +330,8 @@ class BluetoothQueueSender(QObject):
             'avg_response_time': 0.0
         }
         self._response_times.clear()
-        if self.logger:
-            self.logger.write_log("📊 统计信息已重置")
+        if hasattr(self.bluetooth_tool, 'blue_write_log'):
+            self.bluetooth_tool.blue_write_log("📊 统计信息已重置")
 
 
 # ============== 位标志紧凑模型（4列显示：名称|值|名称|值） ==============
