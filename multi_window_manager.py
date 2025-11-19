@@ -698,7 +698,21 @@ class DataDisplayWindow(QWidget):
         self.title = title
         self.column_mode = column_mode
         self.expected_row_count = expected_row_count
+        self._determine_column_widths()
         self.init_ui()
+    
+    def _determine_column_widths(self):
+        """根据窗口ID确定列宽"""
+        if self.window_id in ['PC_GET_VER', 'PC_GET_SERIALNUM']:
+            if self.column_mode == 2:
+                self.col_widths = [48, 210]
+            else:
+                self.col_widths = [48, 210, 210]
+        else:
+            if self.column_mode == 2:
+                self.col_widths = [97, 60]
+            else:
+                self.col_widths = [103, 60, 60]
         
     def init_ui(self):
         """初始化UI"""
@@ -722,14 +736,14 @@ class DataDisplayWindow(QWidget):
         if self.column_mode == 2:
             self.table_model = TwoColumnTableModel()
             self.table_view.setModel(self.table_model)
-            self.table_view.setColumnWidth(0, 97)   # 名称列
-            self.table_view.setColumnWidth(1, 60)   # 当前值列
+            self.table_view.setColumnWidth(0, self.col_widths[0])   # 名称列
+            self.table_view.setColumnWidth(1, self.col_widths[1])   # 当前值列
         else:  # 3列模式
             self.table_model = ThreeColumnTableModel()
             self.table_view.setModel(self.table_model)
-            self.table_view.setColumnWidth(0, 103)  # 名称列
-            self.table_view.setColumnWidth(1, 60)   # 读取值列
-            self.table_view.setColumnWidth(2, 60)   # 写入值列
+            self.table_view.setColumnWidth(0, self.col_widths[0])  # 名称列
+            self.table_view.setColumnWidth(1, self.col_widths[1])  # 读取值列
+            self.table_view.setColumnWidth(2, self.col_widths[2])  # 写入值列
         
         # 设置表格属性
         self.table_view.setAlternatingRowColors(True)
@@ -866,10 +880,7 @@ class DataDisplayWindow(QWidget):
             total_height = min(total_height, max_window_height)
         
         # 计算所需宽度（列宽总和 + 25px，预留15px用于滚动条）
-        if self.column_mode == 2:
-            total_width = 97 + 60 + 25  # 2列：名称97 + 当前值60 + 25 = 182
-        else:
-            total_width = 103 + 60 + 60 + 25  # 3列：名称103 + 读取60 + 写入60 + 25 = 248
+        total_width = sum(self.col_widths) + 25
             
         # 设置固定大小
         self.setMinimumHeight(total_height)
