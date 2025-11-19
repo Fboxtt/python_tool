@@ -47,3 +47,6 @@ Scripts
 *.doc
 *.xls
 *.hex
+
+# Build version tracking
+build_version_info.py
