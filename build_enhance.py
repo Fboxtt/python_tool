@@ -75,7 +75,7 @@ GIT_COMMIT_DATE = "{git_info['commit_date']}"
 
 def get_version_string():
     """获取完整的版本信息字符串"""
-    return f"打包: {{BUILD_DATE}} | Commit: {{GIT_COMMIT_HASH}} ({{GIT_BRANCH}}) | {{GIT_COMMIT_AUTHOR}}"
+    return f"打包: {{BUILD_DATE}} | Commit: {{GIT_COMMIT_HASH}} ({{GIT_BRANCH}}) | {{GIT_COMMIT_AUTHOR}} | {{GIT_COMMIT_MESSAGE}}"
 
 def get_detailed_info():
     """获取详细信息"""
