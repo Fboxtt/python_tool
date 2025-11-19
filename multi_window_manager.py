@@ -599,9 +599,9 @@ class BitFlagsDisplayWindow(QWidget):
         table_font.setPointSize(8)
         self.table_view.setFont(table_font)
         
-        # 设置行高（12像素）
-        self.table_view.verticalHeader().setDefaultSectionSize(12)
-        self.table_view.verticalHeader().setMinimumSectionSize(12)
+        # 设置行高（15像素，确保下划线字符能正确显示）
+        self.table_view.verticalHeader().setDefaultSectionSize(15)
+        self.table_view.verticalHeader().setMinimumSectionSize(15)
         # 强制固定行高
         self.table_view.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Fixed)
         
@@ -617,8 +617,8 @@ class BitFlagsDisplayWindow(QWidget):
         self.setLayout(layout)
         
         # 强制设置行高（确保生效）
-        self.table_view.verticalHeader().setDefaultSectionSize(12)
-        self.table_view.verticalHeader().setMinimumSectionSize(12)
+        self.table_view.verticalHeader().setDefaultSectionSize(15)
+        self.table_view.verticalHeader().setMinimumSectionSize(15)
         self.table_view.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Fixed)
         
     def update_data(self, status_list):
@@ -629,8 +629,8 @@ class BitFlagsDisplayWindow(QWidget):
     def adjust_size_to_content(self, max_container_height=None):
         """根据内容自适应调整大小"""
         # 在计算前再次强制设置行高（防止被重置）
-        self.table_view.verticalHeader().setDefaultSectionSize(12)
-        self.table_view.verticalHeader().setMinimumSectionSize(12)
+        self.table_view.verticalHeader().setDefaultSectionSize(15)
+        self.table_view.verticalHeader().setMinimumSectionSize(15)
         self.table_view.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Fixed)
         
         # 获取实际行数（4列显示，行数为数据总数/2向上取整）
@@ -760,9 +760,9 @@ class DataDisplayWindow(QWidget):
         table_font.setPointSize(8)
         self.table_view.setFont(table_font)
         
-        # 设置行高（压缩以节省空间，12像素）
-        self.table_view.verticalHeader().setDefaultSectionSize(12)
-        self.table_view.verticalHeader().setMinimumSectionSize(12)
+        # 设置行高（15像素，确保下划线字符能正确显示）
+        self.table_view.verticalHeader().setDefaultSectionSize(15)
+        self.table_view.verticalHeader().setMinimumSectionSize(15)
         # 强制固定行高
         self.table_view.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Fixed)
         
@@ -810,8 +810,8 @@ class DataDisplayWindow(QWidget):
         self.setLayout(layout)
         
         # 强制设置行高（确保生效）
-        self.table_view.verticalHeader().setDefaultSectionSize(12)
-        self.table_view.verticalHeader().setMinimumSectionSize(12)
+        self.table_view.verticalHeader().setDefaultSectionSize(15)
+        self.table_view.verticalHeader().setMinimumSectionSize(15)
         self.table_view.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Fixed)
         
     def update_data(self, data):
@@ -847,8 +847,8 @@ class DataDisplayWindow(QWidget):
             max_container_height: 容器的最大高度限制
         """
         # 在计算前再次强制设置行高（防止被重置）
-        self.table_view.verticalHeader().setDefaultSectionSize(12)
-        self.table_view.verticalHeader().setMinimumSectionSize(12)
+        self.table_view.verticalHeader().setDefaultSectionSize(15)
+        self.table_view.verticalHeader().setMinimumSectionSize(15)
         self.table_view.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Fixed)
         
         # 获取实际行数，如果没有数据则使用预期行数
