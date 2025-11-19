@@ -384,7 +384,7 @@ STRUCT_VARIABLES = {
     "PC_GET_KB": [
         "Pack电压K", "Batt电压K",
         *[f"第【{i+1}】节电压K" for i in range(16)],
-        "50-500安K",    "50-500安B",
+        "50-500安K(注，不同电池，电流范围不同，谨慎参考)",    "50-500安B",
         "-(50-500)安K", "-(50-500)安B",
         "10-50安SK",    "10-50安SB",
         "-10-50安SK",   "-10-50安SB",
@@ -842,7 +842,7 @@ class HexParserApp(QMainWindow):
         "HHHHHHHH"
         STRUCT_VARIABLES["PC_GET_KB"] = ["Pack电压K", "Batt电压K",
         *[f"第【{i+1}】节电压K" for i in range(16)],
-        "50-500安K",    "50-500安B",
+        "50-500安K(注，不同电池，电流范围不同，谨慎参考)",    "50-500安B",
         "-(50-500)安K", "-(50-500)安B",
         "10-50安SK",    "10-50安SB",
         "-10-50安SK",   "-10-50安SB",
@@ -889,7 +889,7 @@ class HexParserApp(QMainWindow):
         "HHHHHHHHHHHHHHH"
         STRUCT_VARIABLES["PC_GET_KB"] = ["Pack电压K", "Batt电压K",
         *[f"第【{i+1}】节电压K" for i in range(32)],
-        "50-500安K",     "50-500安B",
+        "50-500安K(注，不同电池，电流范围不同，谨慎参考)",     "50-500安B",
         "-(50-500)安K",  "-(50-500)安B",
         "10-50安SK",   "10-50安SB",
         "-10-50安SK",  "-10-50安SB",
