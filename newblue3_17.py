@@ -23,7 +23,6 @@ from log_controller import LogManager
 from log_controller import ComunManager
 from PyQt6.QtCore import pyqtSignal
 from bleak.exc import BleakError
-
 from hex_model import HexFileModel
 from OTA_controller import OtaController
 from OTA_controller import TextDecode
@@ -836,12 +835,59 @@ class BluetoothTool(QWidget):
         self.no_ack_count = 0
         self.task_flag = True
         self.task = asyncio.create_task(self.test_send_data())
-
+    async def ensure_bluetooth_radio_enabled(self):
+        """确保Windows蓝牙Radio被启用和初始化"""
+        try:
+            import winrt.windows.devices.radios as radios
+            import winrt.windows.devices.bluetooth as windows_bluetooth
+        except ImportError:
+            self.blue_write_log("⚠️ winrt模块不可用，跳过蓝牙Radio检查（需要安装 winrt-Windows.Devices.Radios）")
+            return True
+        try:
+            self.blue_write_log("正在检查并初始化蓝牙适配器...")
+            radio_access = await radios.Radio.request_access_async()
+            if radio_access != radios.RadioAccessStatus.ALLOWED:
+                self.blue_write_log(f"⚠️ 蓝牙访问权限被拒绝: {radio_access}")
+                return False
+            all_radios = await radios.Radio.get_radios_async()
+            bluetooth_radio = None
+            for radio in all_radios:
+                if radio.kind == radios.RadioKind.BLUETOOTH:
+                    bluetooth_radio = radio
+                    break
+            if bluetooth_radio is None:
+                self.blue_write_log("⚠️ 未找到蓝牙适配器")
+                return False
+            current_state = bluetooth_radio.state
+            self.blue_write_log(f"蓝牙适配器当前状态: {current_state}")
+            if current_state == radios.RadioState.OFF:
+                self.blue_write_log("蓝牙适配器已关闭，正在尝试开启...")
+                result = await bluetooth_radio.set_state_async(radios.RadioState.ON)
+                if result == radios.RadioAccessStatus.ALLOWED:
+                    self.blue_write_log("✅ 蓝牙适配器已成功开启")
+                    await asyncio.sleep(1)
+                    return True
+                else:
+                    self.blue_write_log(f"⚠️ 无法开启蓝牙适配器: {result}")
+                    return False
+            elif current_state == radios.RadioState.ON:
+                self.blue_write_log("✅ 蓝牙适配器已开启")
+                return True
+            else:
+                self.blue_write_log(f"⚠️ 蓝牙适配器状态异常: {current_state}")
+                return False
+        except Exception as e:
+            self.blue_write_log(f"⚠️ 初始化蓝牙适配器时出错: {str(e)}")
+            traceback.print_exc()
+            return False
     async def scan_devices(self):
         """异步方法，扫描蓝牙设备"""
         self.device_list.clear()
         self.label.setText('正在扫描设备...')
-
+        radio_ok = await self.ensure_bluetooth_radio_enabled()
+        if not radio_ok:
+            self.label.setText('蓝牙适配器未就绪，请检查系统蓝牙设置')
+            self.blue_write_log("⚠️ 蓝牙适配器检查失败，继续尝试扫描...")
         # 获取用户输入的信号强度阈值
         try:
             rssi_threshold = int(self.rssi_threshold_input.text())
