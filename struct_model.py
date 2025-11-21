@@ -909,7 +909,7 @@ class HexParserApp(QMainWindow):
     def __init__(self):
         super().__init__()
         self.initUI()
-        self.set_config_file()
+        # self.set_config_file()  # 已禁用配置文件读写
         self.struct_name_list = []
     def update_dict(self, target, source):
         """递归更新字典"""
@@ -920,49 +920,53 @@ class HexParserApp(QMainWindow):
                 target[key] = value
     def set_config_file(self, force_write=False):
         """
-        设置配置文件
+        设置配置文件（已禁用，保留代码供将来使用）
 
         Args:
             force_write (bool): 如果为 True，强制写入当前 config_data，不从文件读取
         """
-        # 配置文件路径
-        config_file_path = os.path.join(os.getcwd(), "default_config.json")
+        # 已禁用配置文件读写功能，直接返回
+        return
+        
+        # ====== 以下代码已禁用，保留供将来使用 ======
+        # # 配置文件路径
+        # config_file_path = os.path.join(os.getcwd(), "default_config.json")
 
-        # 如果不是强制写入，则先读取现有配置并合并
-        if not force_write:
-            # 检查配置文件是否存在
-            if os.path.exists(config_file_path):
-                try:
-                    # 读取现有配置文件
-                    with open(config_file_path, 'r', encoding='utf-8') as config_file:
-                        existing_config = json.load(config_file)
+        # # 如果不是强制写入，则先读取现有配置并合并
+        # if not force_write:
+        #     # 检查配置文件是否存在
+        #     if os.path.exists(config_file_path):
+        #         try:
+        #             # 读取现有配置文件
+        #             with open(config_file_path, 'r', encoding='utf-8') as config_file:
+        #                 existing_config = json.load(config_file)
 
-                    # 检查现有配置文件格式是否正确
-                    if isinstance(existing_config, dict):
-                        # 比较现有配置文件与当前配置数据
-                        if existing_config != config_data:
-                            # 更新 config_data 为现有配置文件内容
-                            self.update_dict(config_data, existing_config)
-                            print("已从现有配置文件加载配置")
-                        else:
-                            print("配置文件已存在且内容相同，无需更新")
-                            return  # 内容相同，不需要写入
-                    else:
-                        print("配置文件格式不正确，使用当前配置数据")
-                except Exception as e:
-                    traceback.print_exc()
-                    print(f"读取配置文件失败: {e}")
-            else:
-                print("配置文件不存在，将创建新文件")
+        #             # 检查现有配置文件格式是否正确
+        #             if isinstance(existing_config, dict):
+        #                 # 比较现有配置文件与当前配置数据
+        #                 if existing_config != config_data:
+        #                     # 更新 config_data 为现有配置文件内容
+        #                     self.update_dict(config_data, existing_config)
+        #                     print("已从现有配置文件加载配置")
+        #                 else:
+        #                     print("配置文件已存在且内容相同，无需更新")
+        #                     return  # 内容相同，不需要写入
+        #             else:
+        #                 print("配置文件格式不正确，使用当前配置数据")
+        #         except Exception as e:
+        #             traceback.print_exc()
+        #             print(f"读取配置文件失败: {e}")
+        #     else:
+        #         print("配置文件不存在，将创建新文件")
 
-        # 将字典写入 JSON 文件
-        try:
-            with open(config_file_path, 'w', encoding='utf-8') as config_file:
-                json.dump(config_data, config_file, ensure_ascii=False, indent=4)
-            print(f"配置文件已生成或更新: {config_file_path}")
-        except Exception as e:
-            traceback.print_exc()
-            print(f"写入配置文件失败: {e}")
+        # # 将字典写入 JSON 文件
+        # try:
+        #     with open(config_file_path, 'w', encoding='utf-8') as config_file:
+        #         json.dump(config_data, config_file, ensure_ascii=False, indent=4)
+        #     print(f"配置文件已生成或更新: {config_file_path}")
+        # except Exception as e:
+        #     traceback.print_exc()
+        #     print(f"写入配置文件失败: {e}")
     def initUI(self):
         self.setWindowTitle("HEX 文件解析器")
         self.setGeometry(100, 100, 800, 600)
@@ -1029,9 +1033,9 @@ class HexParserApp(QMainWindow):
         config_data["STRUCT_FORMATS"] = STRUCT_FORMATS
         config_data["STRUCT_VARIABLES"] = STRUCT_VARIABLES
 
-        # 强制写入配置文件
-        print("16串配置已更新（SBS:5个温度, KB:8个温度），正在写入配置文件...")
-        self.set_config_file(force_write=True)
+        # 强制写入配置文件（已禁用）
+        print("16串配置已更新（SBS:5个温度, KB:8个温度）")
+        # self.set_config_file(force_write=True)  # 已禁用配置文件写入
 
     def set_struct_to_cell_32(self):
         """
@@ -1076,9 +1080,9 @@ class HexParserApp(QMainWindow):
         config_data["STRUCT_FORMATS"] = STRUCT_FORMATS
         config_data["STRUCT_VARIABLES"] = STRUCT_VARIABLES
 
-        # 强制写入配置文件
-        print("32串配置已更新，正在写入配置文件...")
-        self.set_config_file(force_write=True)
+        # 强制写入配置文件（已禁用）
+        print("32串配置已更新")
+        # self.set_config_file(force_write=True)  # 已禁用配置文件写入
     def get_struct_name_list(self):
         for key, value in STRUCT_VARIABLES.items():
             struct_str = key
