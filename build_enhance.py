@@ -247,7 +247,7 @@ if __name__ == "__main__":
     # 步骤5: 编译版本
     print("\n步骤5: 编译可执行文件...")
     built_files = []
-    for mode in ["factoryApp", "developerApp", "firstuse"]:
+    for mode in ["factoryApp", "firstuse"]:
         print(f"\n{'='*50}")
         output_dir, exe_name = build_exe(mode, version)
         built_files.append((output_dir, exe_name))

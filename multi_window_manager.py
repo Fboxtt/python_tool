@@ -713,10 +713,10 @@ class DataDisplayWindow(QWidget):
                 self.col_widths = [48, 210, 210]
         elif self.window_type == 'alarm_protect':
             # 告警-保护窗口：4列（告警名称, 告警值, 保护名称, 保护值）
-            self.col_widths = [60, 15, 60, 15]  # 值列宽度从30减半到15
+            self.col_widths = [59, 15, 75, 15]  # 值列宽度从30减半到15
         elif self.window_type == 'other_status':
             # 其他状态信息窗口：6列（错误名称, 错误值, 信息名称, 信息值, 均衡名称, 均衡值）
-            self.col_widths = [60, 15, 60, 15, 50, 15]  # 值列宽度从30减半到15
+            self.col_widths = [75, 15, 63, 15, 44, 15]  # 值列宽度从30减半到15
         else:
             if self.column_mode == 2:
                 self.col_widths = [97, 60]
