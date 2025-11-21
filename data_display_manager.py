@@ -151,7 +151,6 @@ class BatteryWindowManager:
             self.table_view.setModel(self.table_model)
 
             # 设置表格属性
-            self.table_view.setAlternatingRowColors(True)
             self.table_view.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
             self.table_view.horizontalHeader().setStretchLastSection(False)
 

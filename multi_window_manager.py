@@ -589,7 +589,6 @@ class BitFlagsDisplayWindow(QWidget):
             self.table_view.horizontalHeader().setSectionResizeMode(col, QHeaderView.ResizeMode.Fixed)
         
         # 设置表格属性
-        self.table_view.setAlternatingRowColors(True)
         self.table_view.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.table_view.horizontalHeader().setStretchLastSection(False)
         self.table_view.verticalHeader().setVisible(False)
@@ -746,7 +745,6 @@ class DataDisplayWindow(QWidget):
             self.table_view.setColumnWidth(2, self.col_widths[2])  # 写入值列
         
         # 设置表格属性
-        self.table_view.setAlternatingRowColors(True)
         self.table_view.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.table_view.horizontalHeader().setStretchLastSection(False)
         self.table_view.verticalHeader().setVisible(False)
