@@ -178,6 +178,25 @@ STATUS_BIT_NAMES = {
         INFO_NO_INV_TIMEOUTE: 'I_无逆变',
         INFO_FUSEEN_OPEN: 'I_保险开',
         INFO_CELL_CTO: 'I_芯CTO',
+    },
+    # 均衡状态 (BALANCE) - 每一位代表一个电芯的均衡状态
+    'BALANCE': {
+        0x00000001: 'B_芯01',
+        0x00000002: 'B_芯02',
+        0x00000004: 'B_芯03',
+        0x00000008: 'B_芯04',
+        0x00000010: 'B_芯05',
+        0x00000020: 'B_芯06',
+        0x00000040: 'B_芯07',
+        0x00000080: 'B_芯08',
+        0x00000100: 'B_芯09',
+        0x00000200: 'B_芯10',
+        0x00000400: 'B_芯11',
+        0x00000800: 'B_芯12',
+        0x00001000: 'B_芯13',
+        0x00002000: 'B_芯14',
+        0x00004000: 'B_芯15',
+        0x00008000: 'B_芯16',
     }
 }
 
@@ -238,6 +257,7 @@ def parse_all_status_from_sbs(sbs_data_dict):
                 'protect': [...],
                 'fault': [...],
                 'info': [...],
+                'balance': [...],
                 'battery_status': str
             }
     """
@@ -258,6 +278,10 @@ def parse_all_status_from_sbs(sbs_data_dict):
     # 解析其他信息
     if '其他信息' in sbs_data_dict:
         result['info'] = parse_status_bits(sbs_data_dict['其他信息'], 'INFO')
+
+    # 解析均衡状态
+    if '均衡状态' in sbs_data_dict:
+        result['balance'] = parse_status_bits(sbs_data_dict['均衡状态'], 'BALANCE')
 
     # 解析电池状态
     if '电池状态' in sbs_data_dict:
@@ -302,6 +326,137 @@ def get_all_status_bits_for_display(sbs_data_dict):
             display_list.append({'name': bit['name'], 'value': bit['value']})
 
     return display_list
+
+
+def get_alarm_protect_display_data(sbs_data_dict):
+    """
+    获取告警-保护信息窗口的显示数据
+    告警和保护按照状态位的位置对应起来，没有的用"-"替代
+    
+    Args:
+        sbs_data_dict: PC_GET_SBS 解析后的字典
+        
+    Returns:
+        list: 数据列表，每项格式 (告警名称, 告警值, 保护名称, 保护值)
+    """
+    all_status = parse_all_status_from_sbs(sbs_data_dict)
+    
+    # 创建告警和保护的位索引映射
+    alarm_by_bit = {}
+    protect_by_bit = {}
+    
+    if 'alarm' in all_status:
+        for bit_info in all_status['alarm']:
+            alarm_by_bit[bit_info['bit']] = {
+                'name': bit_info['name'],
+                'value': bit_info['value']
+            }
+    
+    if 'protect' in all_status:
+        for bit_info in all_status['protect']:
+            protect_by_bit[bit_info['bit']] = {
+                'name': bit_info['name'],
+                'value': bit_info['value']
+            }
+    
+    # 获取所有位索引的并集
+    all_bits = sorted(set(alarm_by_bit.keys()) | set(protect_by_bit.keys()))
+    
+    # 构建显示数据
+    result = []
+    for bit_idx in all_bits:
+        alarm_data = alarm_by_bit.get(bit_idx, {'name': '-', 'value': 0})
+        protect_data = protect_by_bit.get(bit_idx, {'name': '-', 'value': 0})
+        
+        result.append((
+            alarm_data['name'],
+            str(alarm_data['value']),
+            protect_data['name'],
+            str(protect_data['value'])
+        ))
+    
+    return result
+
+
+def get_other_status_display_data(sbs_data_dict):
+    """
+    获取其他状态信息窗口的显示数据
+    错误、信息、均衡每个单独一列
+    
+    Args:
+        sbs_data_dict: PC_GET_SBS 解析后的字典
+        
+    Returns:
+        list: 数据列表，每项格式 (错误名称, 错误值, 信息名称, 信息值, 均衡名称, 均衡值)
+    """
+    all_status = parse_all_status_from_sbs(sbs_data_dict)
+    
+    fault_list = []
+    info_list = []
+    balance_list = []
+    
+    if 'fault' in all_status:
+        for bit_info in all_status['fault']:
+            fault_list.append({
+                'name': bit_info['name'],
+                'value': bit_info['value']
+            })
+    
+    if 'info' in all_status:
+        for bit_info in all_status['info']:
+            info_list.append({
+                'name': bit_info['name'],
+                'value': bit_info['value']
+            })
+    
+    if 'balance' in all_status:
+        for bit_info in all_status['balance']:
+            balance_list.append({
+                'name': bit_info['name'],
+                'value': bit_info['value']
+            })
+    
+    # 找到最大行数
+    max_len = max(len(fault_list), len(info_list), len(balance_list))
+    
+    # 构建显示数据
+    result = []
+    for i in range(max_len):
+        fault_data = fault_list[i] if i < len(fault_list) else {'name': '-', 'value': 0}
+        info_data = info_list[i] if i < len(info_list) else {'name': '-', 'value': 0}
+        balance_data = balance_list[i] if i < len(balance_list) else {'name': '-', 'value': 0}
+        
+        result.append((
+            fault_data['name'],
+            str(fault_data['value']),
+            info_data['name'],
+            str(info_data['value']),
+            balance_data['name'],
+            str(balance_data['value'])
+        ))
+    
+    return result
+
+
+def get_battery_status_display_data(sbs_data_dict):
+    """
+    获取电池状态窗口的显示数据
+    
+    Args:
+        sbs_data_dict: PC_GET_SBS 解析后的字典
+        
+    Returns:
+        list: 数据列表，每项格式 [name, value]（2列数据）
+    """
+    all_status = parse_all_status_from_sbs(sbs_data_dict)
+    
+    result = []
+    
+    # 添加电池状态（使用2列格式）
+    if 'battery_status' in all_status:
+        result.append(['电池状态', all_status['battery_status']])
+    
+    return result
 
 
 # ---------------------------- 结构体定义 ----------------------------
@@ -693,19 +848,39 @@ def get_all_display_windows():
             'expected_row_count': expected_row_count
         })
     
-    # 添加位标志窗口
-    # 计算位标志总数（告警32 + 保护32 + 失效32 + 其他32 = 128位）
-    # 4列显示，每行2个状态位，所以总行数为 128 / 2 = 64
-    total_status_bits = 128
-    bit_flags_row_count = (total_status_bits + 1) // 2  # 向上取整
+    # 添加告警-保护信息窗口
+    # 告警和保护最多各32位，按位对应，所以最多32行
     windows.append({
-        'window_id': 'BIT_FLAGS',
-        'title': '🚦 位标志监控',
-        'column_mode': 2,  # 位标志窗口不需要列模式
-        'default_visible': True,  # 默认显示
-        'cmd_code': 0,  # 位标志窗口没有特定命令码
-        'expected_row_count': bit_flags_row_count,  # 4列显示，每行2个位
-        'window_type': 'bitflags'  # 标记为位标志窗口
+        'window_id': 'ALARM_PROTECT',
+        'title': '⚠️ 告警-保护信息',
+        'column_mode': 2,
+        'default_visible': True,
+        'cmd_code': 0,
+        'expected_row_count': 32,
+        'window_type': 'alarm_protect'
+    })
+    
+    # 添加其他状态信息窗口
+    # 错误、信息、均衡各一列，找最大行数
+    windows.append({
+        'window_id': 'OTHER_STATUS',
+        'title': 'ℹ️ 其他状态信息',
+        'column_mode': 2,
+        'default_visible': True,
+        'cmd_code': 0,
+        'expected_row_count': 21,  # info有21个状态位，是最多的
+        'window_type': 'other_status'
+    })
+    
+    # 添加电池状态窗口
+    windows.append({
+        'window_id': 'BATTERY_STATUS',
+        'title': '🔋 电池状态',
+        'column_mode': 2,
+        'default_visible': True,
+        'cmd_code': 0,
+        'expected_row_count': 1,
+        'window_type': 'battery_status'
     })
     
     return windows

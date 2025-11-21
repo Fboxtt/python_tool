@@ -583,13 +583,17 @@ class EnhancedMainWindow(QMainWindow):
             traceback.print_exc()
     
     def update_bit_flags_window(self, dict_data):
-        """增量更新位标志窗口（只更新变化的位，提高效率）
+        """更新状态位窗口（告警-保护、其他状态信息、电池状态）
         
         Args:
             dict_data: SBS解析后的字典数据
         """
         try:
-            from struct_model import get_all_status_bits_for_display
+            from struct_model import (
+                get_alarm_protect_display_data,
+                get_other_status_display_data,
+                get_battery_status_display_data
+            )
             
             # 将dict_data转换为flat_dict（需要转换为整数）
             flat_dict = {}
@@ -608,18 +612,23 @@ class EnhancedMainWindow(QMainWindow):
                             # 如果转换失败，保持原值
                             flat_dict[name] = value_str
             
-            # 提取位标志数据
-            status_bits = get_all_status_bits_for_display(flat_dict)
+            # 更新告警-保护信息窗口
+            alarm_protect_data = get_alarm_protect_display_data(flat_dict)
+            if alarm_protect_data and 'ALARM_PROTECT' in self.multi_window_manager.windows:
+                self.multi_window_manager.update_window_data('ALARM_PROTECT', alarm_protect_data)
             
-            # 使用增量更新位标志窗口（只更新变化的位）
-            if status_bits and 'BIT_FLAGS' in self.multi_window_manager.windows:
-                self.multi_window_manager.update_bit_flags_incremental('BIT_FLAGS', status_bits)
-            # 如果窗口不存在但有数据，使用全量更新（初始化）
-            elif status_bits and 'BIT_FLAGS' in self.multi_window_manager.window_configs:
-                self.multi_window_manager.update_window_data('BIT_FLAGS', status_bits)
+            # 更新其他状态信息窗口
+            other_status_data = get_other_status_display_data(flat_dict)
+            if other_status_data and 'OTHER_STATUS' in self.multi_window_manager.windows:
+                self.multi_window_manager.update_window_data('OTHER_STATUS', other_status_data)
+            
+            # 更新电池状态窗口
+            battery_status_data = get_battery_status_display_data(flat_dict)
+            if battery_status_data and 'BATTERY_STATUS' in self.multi_window_manager.windows:
+                self.multi_window_manager.update_window_data('BATTERY_STATUS', battery_status_data)
                 
         except Exception as e:
-            self.logger.write_log(f"更新位标志窗口失败: {str(e)}")
+            self.logger.write_log(f"更新状态位窗口失败: {str(e)}")
             traceback.print_exc()
             
     def closeEvent(self, event):

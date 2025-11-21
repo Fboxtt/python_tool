@@ -10,9 +10,9 @@ from PyQt6.QtWidgets import (
     QCheckBox, QLabel, QPushButton, QScrollArea,
     QGroupBox, QTableView, QAbstractItemView, QSizePolicy, QHeaderView
 )
-from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QObject
+from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QObject, QAbstractTableModel
 from PyQt6.QtGui import QFont, QColor, QPainter
-from display_widgets import BatteryTableModel, get_adaptive_colors
+from display_widgets import BatteryTableModel, get_adaptive_colors, BitFlagsTableModel, _global_refresh_timer_manager
 
 
 # ============== 圆形通讯状态指示器（优化版）==============
@@ -678,18 +678,21 @@ class BitFlagsDisplayWindow(QWidget):
 class DataDisplayWindow(QWidget):
     """单个数据显示窗口
     
-    支持2列和3列两种模式：
+    支持2列、3列、4列和6列模式：
     - 2列模式：名称 | 当前值
     - 3列模式：名称 | 读取值 | 写入值（可编辑）
+    - 4列模式：告警名称 | 告警值 | 保护名称 | 保护值
+    - 6列模式：错误名称 | 错误值 | 信息名称 | 信息值 | 均衡名称 | 均衡值
     """
     
-    def __init__(self, window_id, title, column_mode=2, expected_row_count=10, parent=None):
+    def __init__(self, window_id, title, column_mode=2, expected_row_count=10, window_type='data', parent=None):
         """
         Args:
             window_id: 窗口ID
             title: 窗口标题
-            column_mode: 列数模式（2或3）
+            column_mode: 列数模式（2、3、4或6）
             expected_row_count: 预期的数据行数
+            window_type: 窗口类型
             parent: 父窗口
         """
         super().__init__(parent)
@@ -697,16 +700,23 @@ class DataDisplayWindow(QWidget):
         self.title = title
         self.column_mode = column_mode
         self.expected_row_count = expected_row_count
+        self.window_type = window_type
         self._determine_column_widths()
         self.init_ui()
     
     def _determine_column_widths(self):
-        """根据窗口ID确定列宽"""
+        """根据窗口ID和类型确定列宽"""
         if self.window_id in ['PC_GET_VER', 'PC_GET_SERIALNUM']:
             if self.column_mode == 2:
                 self.col_widths = [48, 210]
             else:
                 self.col_widths = [48, 210, 210]
+        elif self.window_type == 'alarm_protect':
+            # 告警-保护窗口：4列（告警名称, 告警值, 保护名称, 保护值）
+            self.col_widths = [60, 15, 60, 15]  # 值列宽度从30减半到15
+        elif self.window_type == 'other_status':
+            # 其他状态信息窗口：6列（错误名称, 错误值, 信息名称, 信息值, 均衡名称, 均衡值）
+            self.col_widths = [60, 15, 60, 15, 50, 15]  # 值列宽度从30减半到15
         else:
             if self.column_mode == 2:
                 self.col_widths = [97, 60]
@@ -731,8 +741,23 @@ class DataDisplayWindow(QWidget):
         # 创建表格视图
         self.table_view = QTableView()
         
-        # 根据列模式创建不同的数据模型
-        if self.column_mode == 2:
+        # 根据列模式和窗口类型创建不同的数据模型
+        if self.window_type == 'alarm_protect':
+            self.table_model = BitFlagsTableModel(num_columns=4, headers=['告警', '值', '保护', '值'], value_columns=[1, 3])
+            self.table_view.setModel(self.table_model)
+            for col, width in enumerate(self.col_widths):
+                self.table_view.setColumnWidth(col, width)
+        elif self.window_type == 'other_status':
+            self.table_model = BitFlagsTableModel(num_columns=6, headers=['错误', '值', '信息', '值', '均衡', '值'], value_columns=[1, 3, 5])
+            self.table_view.setModel(self.table_model)
+            for col, width in enumerate(self.col_widths):
+                self.table_view.setColumnWidth(col, width)
+        elif self.window_type == 'battery_status':
+            self.table_model = BitFlagsTableModel(num_columns=2, headers=['参数名', '状态值'], value_columns=[])
+            self.table_view.setModel(self.table_model)
+            for col, width in enumerate(self.col_widths):
+                self.table_view.setColumnWidth(col, width)
+        elif self.column_mode == 2:
             self.table_model = TwoColumnTableModel()
             self.table_view.setModel(self.table_model)
             self.table_view.setColumnWidth(0, self.col_widths[0])   # 名称列
@@ -775,35 +800,37 @@ class DataDisplayWindow(QWidget):
         
         layout.addWidget(self.table_view)
         
-        # 添加按钮（所有窗口都有读取按钮）
-        button_layout = QHBoxLayout()
-        button_layout.setSpacing(3)
-        button_layout.setContentsMargins(0, 0, 0, 0)
-        
-        self.read_button = QPushButton('🔄 读取')
-        self.read_button.setMinimumWidth(60)
-        self.read_button.setMaximumWidth(60)
-        self.read_button.setMinimumHeight(24)
-        font = self.read_button.font()
-        font.setBold(True)
-        font.setPointSize(9)
-        self.read_button.setFont(font)
-        button_layout.addWidget(self.read_button)
-        
-        # 3列模式额外添加写入按钮
-        if self.column_mode == 3:
-            self.write_button = QPushButton('✏️ 写入')
-            self.write_button.setMinimumWidth(60)
-            self.write_button.setMaximumWidth(60)
-            self.write_button.setMinimumHeight(24)
-            font = self.write_button.font()
+        # 只有需要读取按钮的窗口才添加按钮
+        if self.window_type not in ['alarm_protect', 'other_status', 'battery_status']:
+            # 添加按钮（所有数据窗口都有读取按钮）
+            button_layout = QHBoxLayout()
+            button_layout.setSpacing(3)
+            button_layout.setContentsMargins(0, 0, 0, 0)
+            
+            self.read_button = QPushButton('🔄 读取')
+            self.read_button.setMinimumWidth(60)
+            self.read_button.setMaximumWidth(60)
+            self.read_button.setMinimumHeight(24)
+            font = self.read_button.font()
             font.setBold(True)
             font.setPointSize(9)
-            self.write_button.setFont(font)
-            button_layout.addWidget(self.write_button)
-        
-        button_layout.addStretch()
-        layout.addLayout(button_layout)
+            self.read_button.setFont(font)
+            button_layout.addWidget(self.read_button)
+            
+            # 3列模式额外添加写入按钮
+            if self.column_mode == 3:
+                self.write_button = QPushButton('✏️ 写入')
+                self.write_button.setMinimumWidth(60)
+                self.write_button.setMaximumWidth(60)
+                self.write_button.setMinimumHeight(24)
+                font = self.write_button.font()
+                font.setBold(True)
+                font.setPointSize(9)
+                self.write_button.setFont(font)
+                button_layout.addWidget(self.write_button)
+            
+            button_layout.addStretch()
+            layout.addLayout(button_layout)
         
         self.setLayout(layout)
         
@@ -1155,13 +1182,14 @@ class MultiWindowManager(QWidget):
         if window_type == 'bitflags':
             window = BitFlagsDisplayWindow(window_id, title, expected_row_count, parent=self.window_container)
         else:
-            window = DataDisplayWindow(window_id, title, column_mode, expected_row_count, parent=self.window_container)
+            window = DataDisplayWindow(window_id, title, column_mode, expected_row_count, window_type, parent=self.window_container)
             
-            # 连接读取按钮信号（数据窗口都有）
-            window.read_button.clicked.connect(lambda checked=False, wid=window_id: self.on_read_clicked(wid))
+            # 只有普通数据窗口才连接读取/写入按钮
+            if hasattr(window, 'read_button'):
+                window.read_button.clicked.connect(lambda checked=False, wid=window_id: self.on_read_clicked(wid))
             
             # 3列模式额外连接写入按钮
-            if column_mode == 3:
+            if column_mode == 3 and hasattr(window, 'write_button'):
                 window.write_button.clicked.connect(lambda checked=False, wid=window_id: self.on_write_clicked(wid))
             
         self.windows[window_id] = window
@@ -1170,7 +1198,12 @@ class MultiWindowManager(QWidget):
         self.rearrange_windows()
         
         if self.logger:
-            window_type_name = "位标志窗口" if window_type == 'bitflags' else f"数据窗口({column_mode}列)"
+            if window_type == 'bitflags':
+                window_type_name = "位标志窗口"
+            elif window_type in ['alarm_protect', 'other_status', 'battery_status']:
+                window_type_name = f"{window_type}窗口"
+            else:
+                window_type_name = f"数据窗口({column_mode}列)"
             self.logger.write_log(f"创建{window_type_name}: {title}")
             
     def remove_window(self, window_id):

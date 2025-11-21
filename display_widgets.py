@@ -744,12 +744,17 @@ class StatusBitsDelegate(QStyledItemDelegate):
 
 # ============== 位标志显示模型（三色状态：置起绿色、置0红色、5秒未刷新灰色）==============
 class BitFlagsTableModel(QAbstractTableModel):
-    """位标志表格模型，支持三色状态显示，2列模式（名称 | 状态值）"""
-    def __init__(self, parent=None):
+    """位标志表格模型，支持三色状态显示，支持2列、4列、6列模式"""
+    def __init__(self, parent=None, num_columns=2, headers=None, value_columns=None):
         super().__init__(parent)
+        # 多列支持
+        self._num_columns = num_columns
+        self._headers = headers or ['参数名', '状态值']
+        self._value_columns = value_columns or [1]  # 值列的索引
+        
         # 所有状态位存储在一个列表中（不分类）
         self._status_bits = []  # 列表形式：[{'name': str, 'value': int, 'last_update': float}, ...]
-        self._headers = ['参数名', '状态值']  # 两列显示
+        self._row_data = []  # 多列数据（仅用于多列模式）
         self._timeout_seconds = 5.0  # 超时时间（秒）
 
         # 性能优化：缓存QColor对象，避免重复创建（自适应系统主题）
@@ -760,6 +765,14 @@ class BitFlagsTableModel(QAbstractTableModel):
             'gray': colors['gray'],      # 灰色（超时）
             'black': colors['text']      # 文字颜色
         }
+        
+        # 添加渐变颜色配置（与BatteryTableModel统一）
+        self._gradient_enabled = True
+        self._gradient_duration = 5.0
+        self._color_green_fresh = colors['green_fresh']
+        self._color_green_stale = colors['green_stale']
+        self._color_red_fresh = colors['red_fresh']
+        self._color_red_stale = colors['red_stale']
 
         # 性能优化：缓存当前时间，避免每个单元格都调用time.time()
         self._cached_time = time.time()
@@ -783,11 +796,11 @@ class BitFlagsTableModel(QAbstractTableModel):
             self.check_timeout()
 
     def rowCount(self, parent=QModelIndex()):
-        # 返回状态位的总数
-        return len(self._status_bits)
+        # 多列模式使用_row_data，2列模式使用_status_bits
+        return len(self._row_data) if self._num_columns > 2 else len(self._status_bits)
 
     def columnCount(self, parent=QModelIndex()):
-        return 2  # 两列：名称 | 状态值
+        return self._num_columns
 
     def headerData(self, section, orientation, role):
         if role == Qt.ItemDataRole.DisplayRole:
@@ -803,6 +816,27 @@ class BitFlagsTableModel(QAbstractTableModel):
         if current_time - self._cached_time > self._cache_update_threshold:
             self._cached_time = current_time
 
+    def _get_gradient_color_for_bit(self, row_idx, value):
+        """计算位标志的渐变颜色（从鲜艳到陈旧）"""
+        if row_idx >= len(self._status_bits) or 'last_update' not in self._status_bits[row_idx]:
+            return self._color_green_stale if value == 0 else self._color_red_stale
+        
+        elapsed = time.time() - self._status_bits[row_idx]['last_update']
+        progress = min(elapsed / self._gradient_duration, 1.0)
+        
+        if value == 0:
+            color_fresh = self._color_green_fresh
+            color_stale = self._color_green_stale
+        else:
+            color_fresh = self._color_red_fresh
+            color_stale = self._color_red_stale
+        
+        r = int(color_fresh.red() + (color_stale.red() - color_fresh.red()) * progress)
+        g = int(color_fresh.green() + (color_stale.green() - color_fresh.green()) * progress)
+        b = int(color_fresh.blue() + (color_stale.blue() - color_fresh.blue()) * progress)
+        
+        return QColor(r, g, b)
+
     def data(self, index, role):
         if not index.isValid():
             return None
@@ -810,27 +844,48 @@ class BitFlagsTableModel(QAbstractTableModel):
         row = index.row()
         col = index.column()
 
-        # 检查行索引是否有效
+        # 多列模式
+        if self._num_columns > 2:
+            if row >= len(self._row_data):
+                return None
+            
+            if role == Qt.ItemDataRole.DisplayRole:
+                return str(self._row_data[row][col])
+            
+            elif role == Qt.ItemDataRole.BackgroundRole:
+                if col in self._value_columns:
+                    try:
+                        value = int(self._row_data[row][col])
+                        return self._get_gradient_color_for_bit(row, value)
+                    except (ValueError, TypeError):
+                        return None
+            
+            elif role == Qt.ItemDataRole.ForegroundRole:
+                return self._color_cache['black']
+            
+            elif role == Qt.ItemDataRole.TextAlignmentRole:
+                return Qt.AlignmentFlag.AlignCenter
+            
+            return None
+        
+        # 原来的2列模式
         if row >= len(self._status_bits):
             return None
 
         bit_info = self._status_bits[row]
 
-        # 性能优化：使用缓存的时间，只在必要时更新
         self._update_cached_time()
         time_diff = self._cached_time - bit_info['last_update']
         is_timeout = time_diff > self._timeout_seconds
 
-        # 显示数据
         if role == Qt.ItemDataRole.DisplayRole:
-            if col == 0:  # 名称列
+            if col == 0:
                 return bit_info['name']
-            elif col == 1:  # 状态值列
+            elif col == 1:
                 return str(bit_info['value'])
 
-        # 背景颜色（仅在状态值列显示）
         elif role == Qt.ItemDataRole.BackgroundRole:
-            if col == 1:  # 只在状态值列显示颜色
+            if col == 1 and 1 in self._value_columns:
                 if is_timeout:
                     return self._color_cache['gray']
                 elif bit_info['value'] == 1:
@@ -838,32 +893,29 @@ class BitFlagsTableModel(QAbstractTableModel):
                 else:
                     return self._color_cache['green']
 
-        # 前景色（文字颜色）- 使用缓存的QColor对象
         elif role == Qt.ItemDataRole.ForegroundRole:
             return self._color_cache['black']
 
-        # 文字对齐
         elif role == Qt.ItemDataRole.TextAlignmentRole:
             return int(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
 
-        # 💡 工具提示（新增功能）- 鼠标悬停时显示完整内容
         elif role == Qt.ItemDataRole.ToolTipRole:
-            # 所有列都显示工具提示
-            if col == 0:  # 名称列
+            if col == 0:
                 return bit_info['name']
-            elif col == 1:  # 状态值列
+            elif col == 1:
                 return str(bit_info['value'])
 
         return None
 
-    def batch_update_status_bits(self, status_list):
-        """批量更新状态位（2列模式，不分组）
+    def update_data(self, data):
+        """批量更新数据（支持多列模式）
         Args:
-            status_list: 列表，每项格式为 {'name': str, 'value': int} 或 (name, value) 元组
+            data: 多列模式: 列表，每项是包含多列数据的元组/列表
+                  2列模式: 列表，每项格式为 {'name': str, 'value': int} 或 (name, value) 元组
         """
-        # 检查数据有效性
-        if not status_list:
+        if not data:
             old_row_count = self.rowCount()
+            self._row_data = []
             self._status_bits = []
             if old_row_count > 0:
                 self.beginResetModel()
@@ -871,76 +923,55 @@ class BitFlagsTableModel(QAbstractTableModel):
             return
         
         current_time = time.time()
-
-        # 性能优化：记录旧的行数
         old_row_count = self.rowCount()
-
-        # 清空列表
-        self._status_bits = []
-
-        # 添加所有状态位
-        for item in status_list:
-            if isinstance(item, dict):
-                name = item.get('name', '')
-                value = item.get('value', 0)
-            else:  # 假设是元组
-                name, value = item
-
-            bit_data = {
-                'name': name,
-                'value': value,
-                'last_update': current_time
-            }
-            self._status_bits.append(bit_data)
-
-        # 性能优化：只在行数变化时使用resetModel，否则使用dataChanged
+        
+        # 多列模式
+        if self._num_columns > 2:
+            self._row_data = []
+            self._status_bits = []
+            for idx, row_data in enumerate(data):
+                if len(row_data) >= self._num_columns:
+                    self._row_data.append([str(row_data[i]) for i in range(self._num_columns)])
+                    self._status_bits.append({'last_update': current_time})
+        else:
+            # 2列模式（保持原逻辑）
+            self._status_bits = []
+            for item in data:
+                if isinstance(item, dict):
+                    name = item.get('name', '')
+                    value = item.get('value', 0)
+                else:
+                    name, value = item
+                self._status_bits.append({
+                    'name': name,
+                    'value': value,
+                    'last_update': current_time
+                })
+        
         new_row_count = self.rowCount()
         if new_row_count != old_row_count:
-            # 行数变化，需要重置模型
             self.beginResetModel()
             self.endResetModel()
         else:
-            # 行数未变，只通知数据变化（更高效）
             if new_row_count > 0:
-                top_left = self.index(0, 0)
-                bottom_right = self.index(new_row_count - 1, self.columnCount() - 1)
-                self.dataChanged.emit(top_left, bottom_right)
-
-        # 更新时间缓存
+                self.dataChanged.emit(self.index(0, 0), self.index(new_row_count - 1, self.columnCount() - 1))
+        
         self._cached_time = current_time
+    
+    def batch_update_status_bits(self, status_list):
+        """批量更新状态位（兼容旧接口）"""
+        self.update_data(status_list)
 
     def check_timeout(self):
-        """检查所有状态位是否超时，返回是否有变化（性能优化版）"""
-        current_time = time.time()
-        self._cached_time = current_time  # 更新时间缓存
-
-        # 性能优化：记录需要更新的行
-        changed_rows = []
-
-        # 检查所有状态位
-        for row_idx, bit_info in enumerate(self._status_bits):
-            time_diff = current_time - bit_info['last_update']
-            # 检查是否刚好跨越超时阈值（前后1秒的窗口）
-            if self._timeout_seconds - 1 < time_diff < self._timeout_seconds + 1:
-                changed_rows.append(row_idx)
-
-        # 性能优化：只更新变化的行
-        if changed_rows:
-            # 如果变化的行少于10个，逐个发送信号（更精确）
-            if len(changed_rows) <= 10:
-                for row in changed_rows:
-                    # 只更新状态值列（第1列）
-                    idx = self.index(row, 1)
-                    self.dataChanged.emit(idx, idx, [Qt.ItemDataRole.BackgroundRole])
-            else:
-                # 变化较多时，刷新整个视图（避免信号风暴）
-                if self._status_bits:
-                    top_left = self.index(0, 0)
-                    bottom_right = self.index(self.rowCount() - 1, self.columnCount() - 1)
-                    self.dataChanged.emit(top_left, bottom_right, [Qt.ItemDataRole.BackgroundRole])
-            return True
-
-        return False
+        """定时刷新渐变颜色（全局定时器回调）"""
+        if not self._gradient_enabled or self.rowCount() == 0:
+            return False
+        
+        row_count = self.rowCount()
+        # 批量刷新所有值列的背景颜色（实现渐变效果）
+        for col in self._value_columns:
+            self.dataChanged.emit(self.index(0, col), self.index(row_count - 1, col), [Qt.ItemDataRole.BackgroundRole])
+        return True
 
     def set_timeout_seconds(self, seconds):
         """设置超时时间"""
