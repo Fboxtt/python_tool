@@ -133,8 +133,8 @@ def build_exe(mode: str, version: str):
     """编译指定版本的EXE"""
     # 模式名称映射
     mode_names = {
-        'userApp': '用户版',
-        'debugApp': '调试版',
+        'factoryApp': '工厂版',
+        'developerApp': '开发者版本',
         'firstuse': '首次使用版'
     }
     mode_name = mode_names.get(mode, mode)
@@ -183,7 +183,7 @@ def build_exe(mode: str, version: str):
     ]
     
     # 调试版额外配置
-    if mode in ["debugApp"]:
+    if mode in ["developerApp"]:
         args += [
             "--debug=all",
             "--console"  # 调试版显示控制台
@@ -247,7 +247,7 @@ if __name__ == "__main__":
     # 步骤5: 编译版本
     print("\n步骤5: 编译可执行文件...")
     built_files = []
-    for mode in ["userApp", "debugApp", "firstuse"]:
+    for mode in ["factoryApp", "developerApp", "firstuse"]:
         print(f"\n{'='*50}")
         output_dir, exe_name = build_exe(mode, version)
         built_files.append((output_dir, exe_name))

@@ -38,7 +38,7 @@ def build_exe(mode: str):
     ]
     
     # 调试版额外配置
-    if mode in ["debugApp"]:
+    if mode in ["developerApp"]:
         args += [
             "--debug=all",
             "--console"  # 调试版显示控制台
@@ -82,7 +82,7 @@ if __name__ == "__main__":
     convert_ui_to_py('monitor_interface.ui', 'ui_monitor.py')
     # 编译两个版本
 
-    for mode in ["userApp", "debugApp","firstuse"]:
+    for mode in ["factoryApp", "developerApp","firstuse"]:
         build_exe(mode)
     
     print("编译完成！")
