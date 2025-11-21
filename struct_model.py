@@ -833,8 +833,8 @@ def get_all_display_windows():
         # 获取命令码
         cmd_code = STRUCT_COMMANDS.get(struct_name, 0)
         
-        # 默认显示规则：SBS、BMS、KB（校准参数）、VER（版本信息）默认显示
-        default_visible = struct_name in ['PC_GET_SBS', 'PC_GET_BMS', 'PC_GET_KB', 'PC_GET_VER']
+        # 默认显示规则：电芯容量、SBS数据、版本信息默认显示
+        default_visible = struct_name in ['PC_GET_KB', 'PC_GET_SBS', 'PC_GET_VER']
         
         # 获取预期的数据行数（从 STRUCT_VARIABLES 中获取变量数量）
         expected_row_count = len(STRUCT_VARIABLES.get(struct_name, []))
