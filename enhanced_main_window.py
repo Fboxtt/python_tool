@@ -3,17 +3,18 @@
 替代原有的battery_window和bit_window
 """
 import sys
+import os
 import asyncio
 import traceback
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-    QPushButton, QLabel, QMessageBox
+    QPushButton, QLabel, QMessageBox, QCheckBox
 )
 from PyQt6.QtCore import Qt, QTimer
-from PyQt6.QtGui import QFont
+from PyQt6.QtGui import QFont, QCursor
 
 # 导入必要的模块
-from newblue3_17 import BluetoothTool, load_ui_dynamically
+from newblue3_17 import BluetoothTool, SimplifiedBluetoothTool, load_ui_dynamically
 from log_controller import LogManager, ComunManager
 from multi_window_manager import MultiWindowManager
 from struct_model import HexParserApp, STRUCT_COMMANDS
@@ -168,6 +169,19 @@ class EnhancedMainWindow(QMainWindow):
         
         layout.addStretch()
         
+        # 窗口模式切换checkbox
+        self.use_simplified_window = QCheckBox('使用简化连接窗口')
+        layout.addWidget(self.use_simplified_window)
+        
+        # 根据APP_MODE设置checkbox状态
+        app_mode = os.environ.get('APP_MODE', 'factoryApp')
+        if app_mode == 'firstuse':
+            self.use_simplified_window.setChecked(True)
+            self.use_simplified_window.setEnabled(False)
+        else:
+            self.use_simplified_window.setChecked(False)
+            self.use_simplified_window.setEnabled(True)
+        
         # 连接控制
         self.connect_btn = QPushButton('📱 打开连接窗口')
         self.connect_btn.clicked.connect(self.show_bluetooth_tool)
@@ -267,17 +281,56 @@ class EnhancedMainWindow(QMainWindow):
         self.queue_timer.timeout.connect(self.update_status_display)
         self.queue_timer.start(500)  # 每0.5秒更新
         
+    def _activate_simplified_window(self):
+        """延迟激活简化窗口，确保获得焦点"""
+        if hasattr(self, 'simplified_bluetooth_tool') and self.simplified_bluetooth_tool.isVisible():
+            print(f"[主窗口] 强制激活简化窗口")
+            self.simplified_bluetooth_tool.activateWindow()
+            self.simplified_bluetooth_tool.setFocus()
+    
     def show_bluetooth_tool(self):
-        """显示蓝牙工具窗口"""
-        self.bluetooth_tool.show()
-        self.bluetooth_tool.raise_()
-        self.bluetooth_tool.activateWindow()
+        """显示/隐藏蓝牙工具窗口（切换功能）"""
+        cursor_pos = QCursor.pos()
+        
+        if self.use_simplified_window.isChecked():
+            # 简化窗口：切换显示/隐藏
+            if not hasattr(self, 'simplified_bluetooth_tool'):
+                print(f"[主窗口] 创建简化窗口")
+                self.simplified_bluetooth_tool = SimplifiedBluetoothTool(self.bluetooth_tool)
+            
+            is_visible = self.simplified_bluetooth_tool.isVisible()
+            print(f"[主窗口] show_bluetooth_tool: 简化窗口可见性={is_visible}")
+            
+            if is_visible:
+                print(f"[主窗口] 隐藏简化窗口")
+                self.simplified_bluetooth_tool.hide()
+            else:
+                print(f"[主窗口] 显示简化窗口在: {cursor_pos}")
+                self.simplified_bluetooth_tool.move(cursor_pos)
+                self.simplified_bluetooth_tool.show()
+                self.simplified_bluetooth_tool.raise_()
+                # 强制设置焦点
+                QTimer.singleShot(10, self._activate_simplified_window)
+        else:
+            # 原窗口：切换显示/隐藏
+            is_visible = self.bluetooth_tool.isVisible()
+            print(f"[主窗口] show_bluetooth_tool: 原窗口可见性={is_visible}")
+            
+            if is_visible:
+                print(f"[主窗口] 隐藏原窗口")
+                self.bluetooth_tool.hide()
+            else:
+                print(f"[主窗口] 显示原窗口在: {cursor_pos}")
+                self.bluetooth_tool.move(cursor_pos)
+                self.bluetooth_tool.show()
+                self.bluetooth_tool.raise_()
+                self.bluetooth_tool.activateWindow()
         
         # 检查连接状态
         QTimer.singleShot(100, self.check_connection_status)
         
     def check_connection_status(self):
-        """检查连接状态"""
+        """检查连接状态（两个窗口共享同一个bluetooth_tool）"""
         is_connected = False
         try:
             if self.bluetooth_tool.client and self.bluetooth_tool.client.is_connected:
@@ -294,10 +347,9 @@ class EnhancedMainWindow(QMainWindow):
         self.monitor_btn.setEnabled(is_connected)
         
     def disconnect_device(self):
-        """断开设备连接"""
+        """断开设备连接（两个窗口共享同一个bluetooth_tool）"""
         if self.scan_task:
             self.toggle_monitoring()
-        # 判断连接类型并断开
         try:
             if self.bluetooth_tool.client and self.bluetooth_tool.client.is_connected:
                 asyncio.create_task(self.bluetooth_tool.disconnect_device())
@@ -636,6 +688,17 @@ class EnhancedMainWindow(QMainWindow):
             self.logger.write_log(f"更新状态位窗口失败: {str(e)}")
             traceback.print_exc()
             
+    def focusInEvent(self, event):
+        """主窗口获得焦点时，隐藏简化窗口"""
+        print(f"[主窗口] focusInEvent - 主窗口获得焦点")
+        if hasattr(self, 'simplified_bluetooth_tool'):
+            is_visible = self.simplified_bluetooth_tool.isVisible()
+            print(f"[主窗口]   简化窗口可见性: {is_visible}")
+            if is_visible:
+                print(f"[主窗口]   隐藏简化窗口")
+                self.simplified_bluetooth_tool.hide()
+        super().focusInEvent(event)
+    
     def closeEvent(self, event):
         """重写关闭事件"""
         # 停止监控

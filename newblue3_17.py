@@ -2384,6 +2384,285 @@ class load_ui_dynamically(QMainWindow):
             self.logger.write_log(f"设置写入值失败: {e}")
             return False
 
+
+# ============== 简化版蓝牙连接窗口 ==============
+class SimplifiedBluetoothTool(QWidget):
+    """简化版蓝牙连接窗口 - 复用原窗口的核心功能"""
+    
+    def __init__(self, bluetooth_tool):
+        super().__init__()
+        
+        # 复用原窗口的核心功能（共享连接状态）
+        self.bluetooth_tool = bluetooth_tool
+        
+        # 直接引用原窗口的属性（而不是创建新的）
+        self.client = bluetooth_tool.client
+        self.serial_port = bluetooth_tool.serial_port
+        self.device_name_to_address = bluetooth_tool.device_name_to_address
+        
+        # 初始化简化UI
+        self.initSimplifiedUI()
+        
+        # 设置窗口属性：无边框、置顶、Window类型（能接收焦点）
+        self.setWindowFlags(
+            Qt.WindowType.FramelessWindowHint |
+            Qt.WindowType.WindowStaysOnTopHint |
+            Qt.WindowType.Window  # 使用Window类型，能够接收焦点事件
+        )
+        
+        # 设置焦点策略，确保窗口能获得焦点
+        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating, False)  # 显示时激活窗口
+        
+        # 安装事件过滤器，监听全局鼠标点击
+        from PyQt6.QtWidgets import QApplication
+        QApplication.instance().installEventFilter(self)
+        
+    def initSimplifiedUI(self):
+        """初始化简化UI"""
+        self.setWindowTitle('蓝牙/串口连接')
+        
+        main_layout = QVBoxLayout()
+        main_layout.setContentsMargins(10, 10, 10, 10)
+        main_layout.setSpacing(5)
+        
+        # 蓝牙和串口水平布局
+        connection_layout = QHBoxLayout()
+        
+        # ========== 左侧：蓝牙 ==========
+        bluetooth_layout = QVBoxLayout()
+        bluetooth_title = QLabel('蓝牙连接')
+        bluetooth_title.setFont(QFont('Arial', 11, QFont.Weight.Bold))
+        bluetooth_layout.addWidget(bluetooth_title)
+        
+        # 使用原窗口的设备列表（直接引用）
+        self.device_list = self.bluetooth_tool.device_list
+        self.device_list.setMinimumHeight(175)
+        bluetooth_layout.addWidget(self.device_list)
+        
+        # 使用原窗口的RSSI筛选输入
+        rssi_layout = QHBoxLayout()
+        rssi_layout.addWidget(QLabel('RSSI >:'))
+        self.rssi_threshold_input = self.bluetooth_tool.rssi_threshold_input
+        self.rssi_threshold_input.setMaximumWidth(60)
+        rssi_layout.addWidget(self.rssi_threshold_input)
+        rssi_layout.addStretch()
+        bluetooth_layout.addLayout(rssi_layout)
+        
+        # 使用原窗口的连接/断开按钮
+        bt_btn_layout = QHBoxLayout()
+        self.connect_button = self.bluetooth_tool.connect_button
+        self.disconnect_button = self.bluetooth_tool.disconnect_button
+        bt_btn_layout.addWidget(self.connect_button)
+        bt_btn_layout.addWidget(self.disconnect_button)
+        bluetooth_layout.addLayout(bt_btn_layout)
+        
+        # 使用原窗口的蓝牙状态标签
+        self.bluetooth_status_label = self.bluetooth_tool.bluetooth_status_label
+        bluetooth_layout.addWidget(self.bluetooth_status_label)
+        
+        # ========== 右侧：串口 ==========
+        serial_layout = QVBoxLayout()
+        serial_title = QLabel('串口连接')
+        serial_title.setFont(QFont('Arial', 11, QFont.Weight.Bold))
+        serial_layout.addWidget(serial_title)
+        
+        # 使用原窗口的串口参数控件
+        param_grid = QGridLayout()
+        param_grid.setSpacing(3)
+        
+        self.port_combo = self.bluetooth_tool.port_combo
+        self.baud_combo = self.bluetooth_tool.baud_combo
+        self.data_bits_combo = self.bluetooth_tool.data_bits_combo
+        self.stop_bits_combo = self.bluetooth_tool.stop_bits_combo
+        self.parity_combo = self.bluetooth_tool.parity_combo
+        
+        param_grid.addWidget(QLabel('串口:'), 0, 0)
+        param_grid.addWidget(self.port_combo, 0, 1)
+        param_grid.addWidget(QLabel('波特率:'), 1, 0)
+        param_grid.addWidget(self.baud_combo, 1, 1)
+        param_grid.addWidget(QLabel('数据位:'), 2, 0)
+        param_grid.addWidget(self.data_bits_combo, 2, 1)
+        param_grid.addWidget(QLabel('停止位:'), 3, 0)
+        param_grid.addWidget(self.stop_bits_combo, 3, 1)
+        param_grid.addWidget(QLabel('校验位:'), 4, 0)
+        param_grid.addWidget(self.parity_combo, 4, 1)
+        
+        serial_layout.addLayout(param_grid)
+        
+        # 使用原窗口的串口连接按钮
+        self.serial_connect_button = self.bluetooth_tool.serial_connect_button
+        serial_layout.addWidget(self.serial_connect_button)
+        
+        serial_layout.addStretch()
+        
+        connection_layout.addLayout(bluetooth_layout, 1)
+        connection_layout.addLayout(serial_layout, 1)
+        main_layout.addLayout(connection_layout)
+        
+        # ========== 扫描按钮 ==========
+        self.scan_button = self.bluetooth_tool.scan_button
+        self.scan_button.setStyleSheet("""
+            QPushButton {
+                background-color: #27ae60;
+                color: white;
+                border: none;
+                padding: 8px;
+                border-radius: 4px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #229954;
+            }
+        """)
+        main_layout.addWidget(self.scan_button)
+        
+        # ========== 连接测试按钮和状态指示灯 ==========
+        test_layout = QHBoxLayout()
+        test_layout.setSpacing(5)
+        
+        # 使用原窗口的注册按钮，改名为"连接测试"
+        self.register_button = self.bluetooth_tool.register_button
+        self.register_button.setText('连接测试')
+        test_layout.addWidget(self.register_button)
+        
+        # 使用原窗口的状态指示灯
+        self.status_indicator = self.bluetooth_tool.status_indicator
+        test_layout.addWidget(self.status_indicator)
+        
+        test_layout.addStretch()
+        main_layout.addLayout(test_layout)
+        
+        # ========== 充放电控制（横排紧凑）==========
+        charge_discharge_layout = QHBoxLayout()
+        charge_discharge_layout.setSpacing(3)
+        
+        # 使用原窗口的充放电按钮
+        self.open_charge_button = self.bluetooth_tool.open_charge_button
+        self.close_charge_button = self.bluetooth_tool.close_charge_button
+        self.open_discharge_button = self.bluetooth_tool.open_discharge_button
+        self.close_discharge_button = self.bluetooth_tool.close_discharge_button
+        
+        for btn in [self.open_charge_button, self.close_charge_button, 
+                    self.open_discharge_button, self.close_discharge_button]:
+            btn.setMaximumWidth(90)
+        
+        charge_discharge_layout.addWidget(self.open_charge_button)
+        charge_discharge_layout.addWidget(self.close_charge_button)
+        charge_discharge_layout.addWidget(self.open_discharge_button)
+        charge_discharge_layout.addWidget(self.close_discharge_button)
+        
+        main_layout.addLayout(charge_discharge_layout)
+        
+        self.setLayout(main_layout)
+        self.setFixedSize(520, 460)
+    
+    def focusOutEvent(self, event):
+        """失去焦点时隐藏（点击窗口外部）"""
+        print(f"[简化窗口] focusOutEvent 被触发")
+        # 延迟检查，给下拉框时间展开（可能点击的就是下拉框）
+        print(f"[简化窗口]   延迟150ms检查是否隐藏")
+        QTimer.singleShot(150, self._check_and_hide)
+        super().focusOutEvent(event)
+    
+    def _check_and_hide(self):
+        """延迟检查并隐藏（用于下拉框情况）"""
+        print(f"[简化窗口] _check_and_hide 被调用")
+        from PyQt6.QtWidgets import QComboBox
+        from PyQt6.QtGui import QCursor
+        
+        # 检查鼠标是否回到窗口内
+        cursor_pos = self.mapFromGlobal(QCursor.pos())
+        if self.rect().contains(cursor_pos):
+            print(f"[简化窗口]   鼠标在窗口内，取消隐藏")
+            return
+        
+        # 检查下拉框是否展开
+        for combo in self.findChildren(QComboBox):
+            if combo.view().isVisible():
+                print(f"[简化窗口]   下拉框展开中，取消隐藏")
+                return
+        
+        # 下拉框已关闭且鼠标不在窗口内，隐藏窗口
+        print(f"[简化窗口]   可以隐藏，执行隐藏")
+        self.hide()
+    
+    def showEvent(self, event):
+        """窗口显示事件"""
+        print(f"[简化窗口] showEvent - 窗口被显示")
+        super().showEvent(event)
+    
+    def hideEvent(self, event):
+        """窗口隐藏事件"""
+        print(f"[简化窗口] hideEvent - 窗口被隐藏")
+        super().hideEvent(event)
+    
+    def focusInEvent(self, event):
+        """简化窗口获得焦点"""
+        print(f"[简化窗口] focusInEvent - 获得焦点")
+        super().focusInEvent(event)
+    
+    def enterEvent(self, event):
+        """鼠标进入窗口"""
+        print(f"[简化窗口] enterEvent - 鼠标进入")
+        super().enterEvent(event)
+    
+    def leaveEvent(self, event):
+        """鼠标离开窗口"""
+        print(f"[简化窗口] leaveEvent - 鼠标离开")
+        super().leaveEvent(event)
+    
+    def eventFilter(self, obj, event):
+        """全局事件过滤器：监听鼠标点击"""
+        from PyQt6.QtCore import QEvent
+        from PyQt6.QtGui import QMouseEvent
+        from PyQt6.QtWidgets import QComboBox
+        
+        # 只在窗口可见时处理
+        if not self.isVisible():
+            return super().eventFilter(obj, event)
+        
+        # 监听鼠标按下事件
+        if event.type() == QEvent.Type.MouseButtonPress:
+            mouse_event = event
+            # 获取全局坐标
+            global_pos = mouse_event.globalPosition().toPoint()
+            # 转换为窗口坐标
+            local_pos = self.mapFromGlobal(global_pos)
+            
+            # 判断点击是否在窗口外
+            if not self.rect().contains(local_pos):
+                print(f"[简化窗口] eventFilter - 检测到窗口外点击")
+                
+                # 检查是否点击在下拉框的弹出列表上
+                for combo in self.findChildren(QComboBox):
+                    combo_view = combo.view()
+                    if combo_view.isVisible():
+                        # 获取下拉框弹出列表的几何信息
+                        view_geo = combo_view.geometry()
+                        view_global_pos = combo_view.mapToGlobal(view_geo.topLeft())
+                        view_rect = view_geo
+                        view_rect.moveTo(view_global_pos)
+                        
+                        # 判断点击是否在下拉列表上
+                        if view_rect.contains(global_pos):
+                            print(f"[简化窗口]   点击在下拉列表上，不隐藏")
+                            return super().eventFilter(obj, event)
+                        
+                        # 下拉框展开，但点击不在列表上，延迟处理
+                        print(f"[简化窗口]   下拉框展开中，延迟检查")
+                        QTimer.singleShot(100, self._check_and_hide)
+                        return super().eventFilter(obj, event)
+                
+                # 没有下拉框展开，直接隐藏
+                print(f"[简化窗口]   没有下拉框，隐藏窗口")
+                self.hide()
+                return False
+        
+        return super().eventFilter(obj, event)
+    
+
+
 # 程序入口
 if __name__ == '__main__':
     try:
