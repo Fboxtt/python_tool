@@ -134,6 +134,7 @@ def build_exe(mode: str, version: str):
     # 模式名称映射
     mode_names = {
         'factoryApp': '工厂版',
+        'userApp': '用户版',
         'developerApp': '开发者版本',
         'firstuse': '首次使用版'
     }
@@ -247,7 +248,7 @@ if __name__ == "__main__":
     # 步骤5: 编译版本
     print("\n步骤5: 编译可执行文件...")
     built_files = []
-    for mode in ["factoryApp", "firstuse"]:
+    for mode in ["factoryApp", "userApp", "firstuse"]:
         print(f"\n{'='*50}")
         output_dir, exe_name = build_exe(mode, version)
         built_files.append((output_dir, exe_name))

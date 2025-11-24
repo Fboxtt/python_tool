@@ -74,29 +74,53 @@ class EnhancedMainWindow(QMainWindow):
         
     def init_ui(self):
         """初始化UI"""
-        # 构建窗口标题，包含版本信息
-        base_title = '增强版BMS调试工具 - 多窗口管理'
-        if VERSION_INFO_AVAILABLE:
-            try:
-                version_str = build_version_info.get_version_string()
-                self.setWindowTitle(f'{base_title} | {version_str}')
-                
-                # 打印详细信息到日志
-                detailed_info = build_version_info.get_detailed_info()
-                self.logger.write_log("="*60)
-                self.logger.write_log("版本信息:")
-                self.logger.write_log(f"  打包日期: {detailed_info['build_date']}")
-                self.logger.write_log(f"  Git分支: {detailed_info['git_branch']}")
-                self.logger.write_log(f"  Commit: {detailed_info['git_commit_hash']}")
-                self.logger.write_log(f"  提交信息: {detailed_info['git_commit_message']}")
-                self.logger.write_log(f"  提交作者: {detailed_info['git_commit_author']}")
-                self.logger.write_log(f"  提交时间: {detailed_info['git_commit_date']}")
-                self.logger.write_log("="*60)
-            except Exception as e:
-                self.logger.write_log(f"读取版本信息出错: {e}")
-                self.setWindowTitle(base_title)
+        # 获取APP模式
+        app_mode = os.environ.get('APP_MODE', 'factoryApp')
+        
+        # 构建窗口标题，根据模式使用不同格式
+        if app_mode == 'userApp':
+            # 用户版：使用简化标题
+            if VERSION_INFO_AVAILABLE:
+                try:
+                    version = build_version_info.VERSION
+                    window_title = f'安培电池系统软件 v{version}'
+                    company_info = f'深圳安培时代数字新能源科技有限公司 - 电池系统软件 v{version}'
+                    self.setWindowTitle(window_title)
+                    
+                    # 打印公司信息到日志
+                    self.logger.write_log("="*60)
+                    self.logger.write_log(company_info)
+                    self.logger.write_log(f"版本号: v{version}")
+                    self.logger.write_log("="*60)
+                except Exception as e:
+                    self.logger.write_log(f"读取版本信息出错: {e}")
+                    self.setWindowTitle('安培电池系统软件')
+            else:
+                self.setWindowTitle('安培电池系统软件')
         else:
-            self.setWindowTitle(base_title)
+            # 工厂版/开发版/firstuse：使用完整标题
+            base_title = '增强版BMS调试工具 - 多窗口管理'
+            if VERSION_INFO_AVAILABLE:
+                try:
+                    version_str = build_version_info.get_version_string()
+                    self.setWindowTitle(f'{base_title} | {version_str}')
+                    
+                    # 打印详细信息到日志
+                    detailed_info = build_version_info.get_detailed_info()
+                    self.logger.write_log("="*60)
+                    self.logger.write_log("版本信息:")
+                    self.logger.write_log(f"  打包日期: {detailed_info['build_date']}")
+                    self.logger.write_log(f"  Git分支: {detailed_info['git_branch']}")
+                    self.logger.write_log(f"  Commit: {detailed_info['git_commit_hash']}")
+                    self.logger.write_log(f"  提交信息: {detailed_info['git_commit_message']}")
+                    self.logger.write_log(f"  提交作者: {detailed_info['git_commit_author']}")
+                    self.logger.write_log(f"  提交时间: {detailed_info['git_commit_date']}")
+                    self.logger.write_log("="*60)
+                except Exception as e:
+                    self.logger.write_log(f"读取版本信息出错: {e}")
+                    self.setWindowTitle(base_title)
+            else:
+                self.setWindowTitle(base_title)
         
         # 获取屏幕大小，设置窗口为屏幕的2/3
         screen = QApplication.primaryScreen().geometry()
@@ -175,10 +199,12 @@ class EnhancedMainWindow(QMainWindow):
         
         # 根据APP_MODE设置checkbox状态
         app_mode = os.environ.get('APP_MODE', 'factoryApp')
-        if app_mode == 'firstuse':
+        if app_mode == 'userApp':
+            # 用户版：默认简化窗口，不可切换
             self.use_simplified_window.setChecked(True)
             self.use_simplified_window.setEnabled(False)
         else:
+            # 工厂版/firstuse：可切换，默认原窗口
             self.use_simplified_window.setChecked(False)
             self.use_simplified_window.setEnabled(True)
         
