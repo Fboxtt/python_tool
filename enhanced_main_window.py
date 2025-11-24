@@ -279,27 +279,32 @@ class EnhancedMainWindow(QMainWindow):
     def check_connection_status(self):
         """检查连接状态"""
         is_connected = False
-        
-        if self.bluetooth_tool.client and self.bluetooth_tool.client.is_connected:
-            is_connected = True
-            self.conn_status_label.setText('📡 连接状态: 蓝牙已连接')
-        elif self.bluetooth_tool.serial_port and self.bluetooth_tool.serial_port.is_open:
-            is_connected = True
-            self.conn_status_label.setText('📡 连接状态: 串口已连接')
-        else:
+        try:
+            if self.bluetooth_tool.client and self.bluetooth_tool.client.is_connected:
+                is_connected = True
+                self.conn_status_label.setText('📡 连接状态: 蓝牙已连接')
+            elif self.bluetooth_tool.is_serial_connected:
+                is_connected = True
+                self.conn_status_label.setText('📡 连接状态: 串口已连接')
+            else:
+                self.conn_status_label.setText('📡 连接状态: 未连接')
+        except:
             self.conn_status_label.setText('📡 连接状态: 未连接')
-            
-        # 更新按钮状态
         self.disconnect_btn.setEnabled(is_connected)
         self.monitor_btn.setEnabled(is_connected)
         
     def disconnect_device(self):
         """断开设备连接"""
         if self.scan_task:
-            self.toggle_monitoring()  # 停止监控
-            
-        self.bluetooth_tool.on_disconnect_device_clicked()
-        
+            self.toggle_monitoring()
+        # 判断连接类型并断开
+        try:
+            if self.bluetooth_tool.client and self.bluetooth_tool.client.is_connected:
+                asyncio.create_task(self.bluetooth_tool.disconnect_device())
+            elif self.bluetooth_tool.is_serial_connected:
+                asyncio.create_task(self.bluetooth_tool.disconnect_serial())
+        except:
+            pass
         QTimer.singleShot(200, self.check_connection_status)
         
     def toggle_monitoring(self):

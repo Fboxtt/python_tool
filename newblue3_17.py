@@ -633,7 +633,7 @@ class BluetoothTool(QWidget):
 
     async def disconnect_serial(self):
         """断开串口连接"""
-        pass
+        await self.handle_serial_disconnect()
 
     async def handle_serial_disconnect(self):
         """处理串口意外断开"""
@@ -641,19 +641,16 @@ class BluetoothTool(QWidget):
         if self.serial_receive_task:
             self.serial_receive_task.cancel()
             self.serial_receive_task = None
-
         # 关闭串口
         if self.serial_port:
             try:
                 self.serial_port.close()
             except Exception as e:
                 self.blue_write_log(f"关闭串口时出错: {str(e)}")
-
         # 重置状态
         self.is_serial_connected = False
         self.commu_type = "none"
         self.serial_port = None
-
         # 更新UI
         self.serial_connect_button.setText('连接串口')
         self.disable_serial_settings(False)
@@ -1040,19 +1037,14 @@ class BluetoothTool(QWidget):
         if self.client and self.client.is_connected:
             try:
                 await self.client.disconnect()
-
                 # 更新状态：未连接
                 self.update_bluetooth_status('未连接', color='#666', bg_color='#f0f0f0')
-
                 # 创建消息框
                 msg_box = QMessageBox(QMessageBox.Icon.Information, '断开成功', '设备已断开')
-
                 # 设置定时器自动关闭 (3秒后)
                 QTimer.singleShot(1000, msg_box.close)
-
                 # 显示消息框
                 msg_box.exec()
-
                 # 禁用断开按钮和发送按钮
                 self.disconnect_button.setEnabled(False)
                 self.send_button.setEnabled(False)
