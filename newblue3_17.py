@@ -2566,57 +2566,57 @@ class SimplifiedBluetoothTool(QWidget):
     
     def focusOutEvent(self, event):
         """失去焦点时隐藏（点击窗口外部）"""
-        print(f"[简化窗口] focusOutEvent 被触发")
+        # print(f"[简化窗口] focusOutEvent 被触发")
         # 延迟检查，给下拉框时间展开（可能点击的就是下拉框）
-        print(f"[简化窗口]   延迟150ms检查是否隐藏")
+        # print(f"[简化窗口]   延迟150ms检查是否隐藏")
         QTimer.singleShot(150, self._check_and_hide)
         super().focusOutEvent(event)
     
     def _check_and_hide(self):
         """延迟检查并隐藏（用于下拉框情况）"""
-        print(f"[简化窗口] _check_and_hide 被调用")
+        # print(f"[简化窗口] _check_and_hide 被调用")
         from PyQt6.QtWidgets import QComboBox
         from PyQt6.QtGui import QCursor
         
         # 检查鼠标是否回到窗口内
         cursor_pos = self.mapFromGlobal(QCursor.pos())
         if self.rect().contains(cursor_pos):
-            print(f"[简化窗口]   鼠标在窗口内，取消隐藏")
+            # print(f"[简化窗口]   鼠标在窗口内，取消隐藏")
             return
         
         # 检查下拉框是否展开
         for combo in self.findChildren(QComboBox):
             if combo.view().isVisible():
-                print(f"[简化窗口]   下拉框展开中，取消隐藏")
+                # print(f"[简化窗口]   下拉框展开中，取消隐藏")
                 return
         
         # 下拉框已关闭且鼠标不在窗口内，隐藏窗口
-        print(f"[简化窗口]   可以隐藏，执行隐藏")
+        # print(f"[简化窗口]   可以隐藏，执行隐藏")
         self.hide()
     
     def showEvent(self, event):
         """窗口显示事件"""
-        print(f"[简化窗口] showEvent - 窗口被显示")
+        # print(f"[简化窗口] showEvent - 窗口被显示")
         super().showEvent(event)
     
     def hideEvent(self, event):
         """窗口隐藏事件"""
-        print(f"[简化窗口] hideEvent - 窗口被隐藏")
+        # print(f"[简化窗口] hideEvent - 窗口被隐藏")
         super().hideEvent(event)
     
     def focusInEvent(self, event):
         """简化窗口获得焦点"""
-        print(f"[简化窗口] focusInEvent - 获得焦点")
+        # print(f"[简化窗口] focusInEvent - 获得焦点")
         super().focusInEvent(event)
     
     def enterEvent(self, event):
         """鼠标进入窗口"""
-        print(f"[简化窗口] enterEvent - 鼠标进入")
+        # print(f"[简化窗口] enterEvent - 鼠标进入")
         super().enterEvent(event)
     
     def leaveEvent(self, event):
         """鼠标离开窗口"""
-        print(f"[简化窗口] leaveEvent - 鼠标离开")
+        # print(f"[简化窗口] leaveEvent - 鼠标离开")
         super().leaveEvent(event)
     
     def eventFilter(self, obj, event):
@@ -2639,7 +2639,7 @@ class SimplifiedBluetoothTool(QWidget):
             
             # 判断点击是否在窗口外
             if not self.rect().contains(local_pos):
-                print(f"[简化窗口] eventFilter - 检测到窗口外点击")
+                # print(f"[简化窗口] eventFilter - 检测到窗口外点击")
                 
                 # 检查是否点击在下拉框的弹出列表上
                 for combo in self.findChildren(QComboBox):
@@ -2653,16 +2653,16 @@ class SimplifiedBluetoothTool(QWidget):
                         
                         # 判断点击是否在下拉列表上
                         if view_rect.contains(global_pos):
-                            print(f"[简化窗口]   点击在下拉列表上，不隐藏")
+                            # print(f"[简化窗口]   点击在下拉列表上，不隐藏")
                             return super().eventFilter(obj, event)
                         
                         # 下拉框展开，但点击不在列表上，延迟处理
-                        print(f"[简化窗口]   下拉框展开中，延迟检查")
+                        # print(f"[简化窗口]   下拉框展开中，延迟检查")
                         QTimer.singleShot(100, self._check_and_hide)
                         return super().eventFilter(obj, event)
                 
                 # 没有下拉框展开，直接隐藏
-                print(f"[简化窗口]   没有下拉框，隐藏窗口")
+                # print(f"[简化窗口]   没有下拉框，隐藏窗口")
                 self.hide()
                 return False
         

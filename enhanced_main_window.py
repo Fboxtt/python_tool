@@ -310,7 +310,7 @@ class EnhancedMainWindow(QMainWindow):
     def _activate_simplified_window(self):
         """延迟激活简化窗口，确保获得焦点"""
         if hasattr(self, 'simplified_bluetooth_tool') and self.simplified_bluetooth_tool.isVisible():
-            print(f"[主窗口] 强制激活简化窗口")
+            # print(f"[主窗口] 强制激活简化窗口")
             self.simplified_bluetooth_tool.activateWindow()
             self.simplified_bluetooth_tool.setFocus()
     
@@ -321,17 +321,17 @@ class EnhancedMainWindow(QMainWindow):
         if self.use_simplified_window.isChecked():
             # 简化窗口：切换显示/隐藏
             if not hasattr(self, 'simplified_bluetooth_tool'):
-                print(f"[主窗口] 创建简化窗口")
+                # print(f"[主窗口] 创建简化窗口")
                 self.simplified_bluetooth_tool = SimplifiedBluetoothTool(self.bluetooth_tool)
             
             is_visible = self.simplified_bluetooth_tool.isVisible()
-            print(f"[主窗口] show_bluetooth_tool: 简化窗口可见性={is_visible}")
+            # print(f"[主窗口] show_bluetooth_tool: 简化窗口可见性={is_visible}")
             
             if is_visible:
-                print(f"[主窗口] 隐藏简化窗口")
+                # print(f"[主窗口] 隐藏简化窗口")
                 self.simplified_bluetooth_tool.hide()
             else:
-                print(f"[主窗口] 显示简化窗口在: {cursor_pos}")
+                # print(f"[主窗口] 显示简化窗口在: {cursor_pos}")
                 self.simplified_bluetooth_tool.move(cursor_pos)
                 self.simplified_bluetooth_tool.show()
                 self.simplified_bluetooth_tool.raise_()
@@ -340,13 +340,13 @@ class EnhancedMainWindow(QMainWindow):
         else:
             # 原窗口：切换显示/隐藏
             is_visible = self.bluetooth_tool.isVisible()
-            print(f"[主窗口] show_bluetooth_tool: 原窗口可见性={is_visible}")
+            # print(f"[主窗口] show_bluetooth_tool: 原窗口可见性={is_visible}")
             
             if is_visible:
-                print(f"[主窗口] 隐藏原窗口")
+                # print(f"[主窗口] 隐藏原窗口")
                 self.bluetooth_tool.hide()
             else:
-                print(f"[主窗口] 显示原窗口在: {cursor_pos}")
+                # print(f"[主窗口] 显示原窗口在: {cursor_pos}")
                 self.bluetooth_tool.move(cursor_pos)
                 self.bluetooth_tool.show()
                 self.bluetooth_tool.raise_()
@@ -723,12 +723,12 @@ class EnhancedMainWindow(QMainWindow):
             
     def focusInEvent(self, event):
         """主窗口获得焦点时，隐藏简化窗口"""
-        print(f"[主窗口] focusInEvent - 主窗口获得焦点")
+        # print(f"[主窗口] focusInEvent - 主窗口获得焦点")
         if hasattr(self, 'simplified_bluetooth_tool'):
             is_visible = self.simplified_bluetooth_tool.isVisible()
-            print(f"[主窗口]   简化窗口可见性: {is_visible}")
+            # print(f"[主窗口]   简化窗口可见性: {is_visible}")
             if is_visible:
-                print(f"[主窗口]   隐藏简化窗口")
+                # print(f"[主窗口]   隐藏简化窗口")
                 self.simplified_bluetooth_tool.hide()
         super().focusInEvent(event)
     
