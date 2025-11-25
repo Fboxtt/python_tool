@@ -324,6 +324,10 @@ class EnhancedMainWindow(QMainWindow):
                 # print(f"[主窗口] 创建简化窗口")
                 self.simplified_bluetooth_tool = SimplifiedBluetoothTool(self.bluetooth_tool)
             
+            # 确保原窗口隐藏
+            if self.bluetooth_tool.isVisible():
+                self.bluetooth_tool.hide()
+            
             is_visible = self.simplified_bluetooth_tool.isVisible()
             # print(f"[主窗口] show_bluetooth_tool: 简化窗口可见性={is_visible}")
             
@@ -339,6 +343,10 @@ class EnhancedMainWindow(QMainWindow):
                 QTimer.singleShot(10, self._activate_simplified_window)
         else:
             # 原窗口：切换显示/隐藏
+            # 确保简化窗口隐藏
+            if hasattr(self, 'simplified_bluetooth_tool') and self.simplified_bluetooth_tool.isVisible():
+                self.simplified_bluetooth_tool.hide()
+            
             is_visible = self.bluetooth_tool.isVisible()
             # print(f"[主窗口] show_bluetooth_tool: 原窗口可见性={is_visible}")
             
@@ -347,6 +355,8 @@ class EnhancedMainWindow(QMainWindow):
                 self.bluetooth_tool.hide()
             else:
                 # print(f"[主窗口] 显示原窗口在: {cursor_pos}")
+                # 恢复device_list到原窗口
+                self.bluetooth_tool.restore_device_list()
                 self.bluetooth_tool.move(cursor_pos)
                 self.bluetooth_tool.show()
                 self.bluetooth_tool.raise_()

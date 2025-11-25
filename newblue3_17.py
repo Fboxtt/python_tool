@@ -176,6 +176,10 @@ class BluetoothTool(QWidget):
         self.device_list.itemDoubleClicked.connect(self.on_device_double_clicked)
         bluetooth_layout.addWidget(self.label)
         bluetooth_layout.addWidget(self.device_list)
+        
+        # 保存布局引用，用于切换窗口时恢复控件
+        self.bluetooth_layout = bluetooth_layout
+        self.device_list_index = bluetooth_layout.count() - 1  # 记录device_list在布局中的位置
 
         # 信号强度筛选部分
         self.rssi_threshold_layout = QHBoxLayout()
@@ -774,6 +778,19 @@ class BluetoothTool(QWidget):
                 send_data = input_data.decode('utf-8', errors='replace')
         self.blue_write_log(f"TX->,{self.commu_type},{self.device_name},cmd,{send_data}")
 
+    def restore_device_list(self):
+        """恢复device_list到原窗口的布局中"""
+        if self.device_list.parent() != self:
+            # device_list不在原窗口中，需要恢复
+            # 先从当前父级移除
+            current_parent = self.device_list.parent()
+            if current_parent:
+                layout = current_parent.layout()
+                if layout:
+                    layout.removeWidget(self.device_list)
+            # 重新添加到原布局
+            self.bluetooth_layout.insertWidget(self.device_list_index, self.device_list)
+    
     def on_scan_devices_clicked(self):
         """同步方法，用于触发异步扫描"""
         asyncio.create_task(self.scan_devices())
@@ -2442,10 +2459,14 @@ class SimplifiedBluetoothTool(QWidget):
         bluetooth_title.setFont(QFont('Arial', 11, QFont.Weight.Bold))
         bluetooth_layout.addWidget(bluetooth_title)
         
-        # 使用原窗口的设备列表（直接引用）
+        # 直接使用原窗口的设备列表
         self.device_list = self.bluetooth_tool.device_list
         self.device_list.setMinimumHeight(175)
         bluetooth_layout.addWidget(self.device_list)
+        
+        # 保存布局引用，用于后续动态添加/移除device_list
+        self.simplified_bluetooth_layout = bluetooth_layout
+        self.device_list_position = bluetooth_layout.count() - 1
         
         # 使用原窗口的RSSI筛选输入
         rssi_layout = QHBoxLayout()
@@ -2597,6 +2618,16 @@ class SimplifiedBluetoothTool(QWidget):
     def showEvent(self, event):
         """窗口显示事件"""
         # print(f"[简化窗口] showEvent - 窗口被显示")
+        # 把device_list添加到简化窗口的布局中
+        if self.device_list.parent() != self:
+            # 从当前父级移除
+            current_parent = self.device_list.parent()
+            if current_parent:
+                layout = current_parent.layout()
+                if layout:
+                    layout.removeWidget(self.device_list)
+            # 添加到简化窗口的布局
+            self.simplified_bluetooth_layout.insertWidget(self.device_list_position, self.device_list)
         super().showEvent(event)
     
     def hideEvent(self, event):
