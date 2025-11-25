@@ -989,48 +989,55 @@ class BluetoothTool(QWidget):
     async def connect_device(self):
         """异步方法，连接蓝牙设备"""
         selected_device = self.device_list.currentItem()
-        if selected_device:
-            # 从显示文本中提取设备名
-            device_text = selected_device.text()
-            device_name = device_text.split(' (RSSI:')[0]  # 提取设备名
-
-            # 通过设备名查找地址
-            device_address = self.device_name_to_address.get(device_name)
-            if not device_address:
-                QMessageBox.warning(self, '警告', '无法找到设备地址，请重新扫描')
-                return
-            try:
-                # 更新状态：正在连接
-                self.update_bluetooth_status('正在连接...', color='#ff8c00', bg_color='#fff3cd')
-                
-                self.client = BleakClient(device_address, disconnected_callback=self.on_bluetooth_disconnected)
-                await self.client.connect()
-                self.commu_type = "bluetooth"
-                
-                # 更新状态：已连接
-                self.update_bluetooth_status('已连接', color='#28a745', bg_color='#d4edda')
-                
-                # 创建消息框实例
-                connectMessage = QMessageBox(QMessageBox.Icon.Information, '连接成功', f'已连接到 {device_address}')
-                # 设置定时器自动关闭 (3000毫秒后)
-                QTimer.singleShot(300, connectMessage.close)
-                # 显示消息框
-                connectMessage.exec()
-                # 启用断开按钮和发送按钮
-                self.disconnect_button.setEnabled(True)
-                self.send_button.setEnabled(True)
-                # 开始监听数据
-                if self.client and self.client.is_connected:
-                    self.device_name = device_name  # 使用之前提取的设备名
-                    await self.client.start_notify("0000ffe1-0000-1000-8000-00805f9b34fb", self.on_data_received)
-                QTimer.singleShot(1000, self.send_find_version_cmd)
-            except Exception as e:
-                self.commu_type = "none"
-                # 更新状态：连接失败，回到未连接
-                self.update_bluetooth_status('未连接', color='#666', bg_color='#f0f0f0')
-                QMessageBox.critical(self, '连接失败', str(e))
-        else:
+        if not selected_device:
             QMessageBox.warning(self, '警告', '请先选择一个设备')
+            return
+        # 从显示文本中提取设备名
+        device_text = selected_device.text()
+        device_name = device_text.split(' (RSSI:')[0]
+        # 通过设备名查找地址
+        device_address = self.device_name_to_address.get(device_name)
+        if not device_address:
+            QMessageBox.warning(self, '警告', '无法找到设备地址，请重新扫描')
+            return
+        try:
+            # 更新状态：正在连接
+            self.update_bluetooth_status('正在连接...', color='#ff8c00', bg_color='#fff3cd')
+            # 如果之前的客户端存在，先清理
+            if self.client:
+                try:
+                    if self.client.is_connected:
+                        await self.client.disconnect()
+                except:
+                    pass
+                self.client = None
+            self.client = BleakClient(device_address, disconnected_callback=self.on_bluetooth_disconnected, timeout=10.0)
+            await asyncio.wait_for(self.client.connect(), timeout=10.0)
+            self.commu_type = "bluetooth"
+            # 更新状态：已连接
+            self.update_bluetooth_status('已连接', color='#28a745', bg_color='#d4edda')
+            # 创建消息框实例
+            connectMessage = QMessageBox(QMessageBox.Icon.Information, '连接成功', f'已连接到 {device_address}')
+            QTimer.singleShot(300, connectMessage.close)
+            connectMessage.exec()
+            # 启用断开按钮和发送按钮
+            self.disconnect_button.setEnabled(True)
+            self.send_button.setEnabled(True)
+            # 开始监听数据
+            if self.client and self.client.is_connected:
+                self.device_name = device_name
+                await self.client.start_notify("0000ffe1-0000-1000-8000-00805f9b34fb", self.on_data_received)
+            QTimer.singleShot(1000, self.send_find_version_cmd)
+        except asyncio.TimeoutError:
+            self.commu_type = "none"
+            self.client = None
+            self.update_bluetooth_status('未连接', color='#666', bg_color='#f0f0f0')
+            QMessageBox.critical(self, '连接失败', '连接超时，设备可能已断电或不在范围内')
+        except Exception as e:
+            self.commu_type = "none"
+            self.client = None
+            self.update_bluetooth_status('未连接', color='#666', bg_color='#f0f0f0')
+            QMessageBox.critical(self, '连接失败', str(e))
 
     async def disconnect_device(self):
         """异步方法，断开蓝牙设备"""

@@ -356,7 +356,7 @@ class EnhancedMainWindow(QMainWindow):
         QTimer.singleShot(100, self.check_connection_status)
         
     def check_connection_status(self):
-        """检查连接状态（两个窗口共享同一个bluetooth_tool）"""
+        """检查连接状态"""
         is_connected = False
         try:
             if self.bluetooth_tool.client and self.bluetooth_tool.client.is_connected:
@@ -365,15 +365,19 @@ class EnhancedMainWindow(QMainWindow):
             elif self.bluetooth_tool.is_serial_connected:
                 is_connected = True
                 self.conn_status_label.setText('📡 连接状态: 串口已连接')
-            else:
-                self.conn_status_label.setText('📡 连接状态: 未连接')
         except:
+            pass
+        if not is_connected:
             self.conn_status_label.setText('📡 连接状态: 未连接')
+            if self.scan_task:
+                self.monitor_btn.setText('▶️ 开始监控')
+                self.scan_task.cancel()
+                self.scan_task = None
         self.disconnect_btn.setEnabled(is_connected)
         self.monitor_btn.setEnabled(is_connected)
         
     def disconnect_device(self):
-        """断开设备连接（两个窗口共享同一个bluetooth_tool）"""
+        """断开设备连接"""
         if self.scan_task:
             self.toggle_monitoring()
         try:
@@ -402,22 +406,25 @@ class EnhancedMainWindow(QMainWindow):
         """监控循环 - 定期查询数据"""
         try:
             while True:
+                # 检查连接状态
+                try:
+                    is_connected = (self.bluetooth_tool.client and self.bluetooth_tool.client.is_connected) or self.bluetooth_tool.is_serial_connected
+                except:
+                    is_connected = False
+                if not is_connected:
+                    break
                 # 获取监控间隔时间
                 interval = self.bluetooth_tool.monitor_interval_spinbox.value()
-                
                 # 查询SBS数据
                 await self.queue_send_command(0x13, "PC_GET_SBS")
                 await asyncio.sleep(interval)
-                
-                # 查询TBS数据
-                # await self.queue_send_command(0x15, "PC_GET_TBS")
-                # await asyncio.sleep(interval)
-                
         except asyncio.CancelledError:
-            self.logger.write_log("监控循环已停止")
+            pass
         except Exception as e:
             self.logger.write_log(f"监控循环错误: {str(e)}")
-            traceback.print_exc()
+        finally:
+            self.monitor_btn.setText('▶️ 开始监控')
+            self.scan_task = None
             
     async def queue_send_command(self, cmd_code, struct_name=None, priority=False):
         """通过队列发送命令
