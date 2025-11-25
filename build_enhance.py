@@ -140,11 +140,16 @@ def build_exe(mode: str, version: str):
     }
     mode_name = mode_names.get(mode, mode)
     
-    # firstuse保持简单命名，其他版本使用：【模式】安培上位机v版本号
+    # 根据不同模式设置文件名
     if mode == 'firstuse':
         exe_name = "firstuse"
         output_dir = "dist/firstuse"
+    elif mode == 'userApp':
+        # 用户版：安培电池系统软件 + 版本号
+        exe_name = f"安培电池系统软件v{version}"
+        output_dir = f"dist/{mode_name}_v{version}"
     else:
+        # 工厂版等其他版本：【模式】安培上位机v版本号
         exe_name = f"【{mode_name}】安培上位机v{version}"
         output_dir = f"dist/{mode_name}_v{version}"
     

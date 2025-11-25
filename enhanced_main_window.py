@@ -193,12 +193,24 @@ class EnhancedMainWindow(QMainWindow):
         
         layout.addStretch()
         
-        # 窗口模式切换checkbox
-        self.use_simplified_window = QCheckBox('使用简化连接窗口')
-        layout.addWidget(self.use_simplified_window)
-        
-        # 根据APP_MODE设置checkbox状态
+        # 获取APP模式
         app_mode = os.environ.get('APP_MODE', 'factoryApp')
+        
+        # 工厂模式checkbox
+        self.factory_mode_checkbox = QCheckBox('🏭 工厂模式')
+        if app_mode == 'userApp':
+            # 用户版：不可切换，强制不勾选（用户模式）
+            self.factory_mode_checkbox.setChecked(False)
+            self.factory_mode_checkbox.setEnabled(False)
+        else:
+            # 工厂版/firstuse：可切换，默认勾选（工厂模式）
+            self.factory_mode_checkbox.setChecked(True)
+            self.factory_mode_checkbox.setEnabled(True)
+        self.factory_mode_checkbox.stateChanged.connect(self.on_factory_mode_changed)
+        layout.addWidget(self.factory_mode_checkbox)
+        
+        # 窗口模式切换checkbox
+        self.use_simplified_window = QCheckBox('📱 简化窗口')
         if app_mode == 'userApp':
             # 用户版：默认简化窗口，不可切换
             self.use_simplified_window.setChecked(True)
@@ -207,6 +219,7 @@ class EnhancedMainWindow(QMainWindow):
             # 工厂版/firstuse：可切换，默认原窗口
             self.use_simplified_window.setChecked(False)
             self.use_simplified_window.setEnabled(True)
+        layout.addWidget(self.use_simplified_window)
         
         # 连接控制
         self.connect_btn = QPushButton('📱 打开连接窗口')
@@ -299,6 +312,11 @@ class EnhancedMainWindow(QMainWindow):
             )
         
         self.logger.write_log(f"✅ 已自动配置 {len(window_configs)} 个显示窗口")
+        
+        # 初始化写入功能状态（根据工厂模式checkbox的初始状态）
+        QTimer.singleShot(100, lambda: self.multi_window_manager.set_write_enabled(
+            self.factory_mode_checkbox.isChecked()
+        ))
         
     def setup_timers(self):
         """设置定时器"""
@@ -454,6 +472,14 @@ class EnhancedMainWindow(QMainWindow):
         except Exception as e:
             self.logger.write_log(f"发送命令失败: {str(e)}")
             
+    def on_factory_mode_changed(self, state):
+        """工厂模式checkbox状态改变"""
+        is_factory_mode = (state == Qt.CheckState.Checked.value)
+        self.logger.write_log(f"切换到{'工厂' if is_factory_mode else '用户'}模式")
+        
+        # 更新所有数据窗口的写入功能状态
+        self.multi_window_manager.set_write_enabled(is_factory_mode)
+        
     def query_version(self):
         """查询版本"""
         asyncio.create_task(self.queue_send_command(0x71, "VERSION"))

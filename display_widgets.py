@@ -194,6 +194,7 @@ class BatteryTableModel(QAbstractTableModel):
         self._max_rows_per_column = 25  # 每列组最大行数
         self._headers = ['参数名1', '当前值1', '写入值1', '参数名2', '当前值2', '写入值2', '参数名3', '当前值3', '写入值3']
         self._organized_data = []  # 重新组织后的数据
+        self._write_enabled = True  # 默认启用写入
 
         # 性能优化：建立参数名到索引的映射（用于快速查找）
         self._name_to_index = {}
@@ -431,10 +432,10 @@ class BatteryTableModel(QAbstractTableModel):
         return False
 
     def flags(self, index):
-        """设置单元格标志，写入值列可编辑"""
+        """设置单元格标志，写入值列根据_write_enabled决定是否可编辑"""
         flags = Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable
         col = index.column()
-        if col in [2, 5, 8]:  # 写入值列可编辑
+        if col in [2, 5, 8] and self._write_enabled:  # 写入值列，且写入功能已启用
             flags |= Qt.ItemFlag.ItemIsEditable
         return flags
 
@@ -711,6 +712,10 @@ class BatteryTableModel(QAbstractTableModel):
             self.endResetModel()
             return True
         return False
+    
+    def set_write_enabled(self, enabled):
+        """设置写入功能启用状态"""
+        self._write_enabled = enabled
 
 
 # ============== 状态位显示委托（确保背景颜色正确显示）==============

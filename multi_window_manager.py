@@ -845,6 +845,22 @@ class DataDisplayWindow(QWidget):
         """清空写入值（仅3列模式）"""
         if self.column_mode == 3 and hasattr(self.table_model, 'clear_write_values'):
             self.table_model.clear_write_values()
+    
+    def set_write_enabled(self, enabled):
+        """设置写入功能启用状态
+        
+        Args:
+            enabled: True=启用, False=禁用
+        """
+        # 更新写入按钮状态
+        if hasattr(self, 'write_button'):
+            self.write_button.setEnabled(enabled)
+        
+        # 更新表格模型的写入列编辑状态
+        if hasattr(self.table_model, 'set_write_enabled'):
+            self.table_model.set_write_enabled(enabled)
+            # 强制刷新视图
+            self.table_view.viewport().update()
             
     def print_column_widths(self):
         """打印表格每一列的实际宽度 - 用于调试"""
@@ -935,6 +951,7 @@ class ThreeColumnTableModel(BatteryTableModel):
         super().__init__(data, parent)
         self._columns = 3
         self._headers = ['参数名', '读取值', '写入值']
+        self._write_enabled = True  # 默认启用写入
         
     def _organize_data(self):
         """重新组织数据为3列（保留现有的写入值）"""
@@ -951,8 +968,8 @@ class ThreeColumnTableModel(BatteryTableModel):
                 ])
     
     def flags(self, index):
-        """3列模式：名称和读取值不可编辑，写入值可编辑"""
-        if index.column() == 2:  # 写入值列可编辑
+        """3列模式：名称和读取值不可编辑，写入值根据_write_enabled决定是否可编辑"""
+        if index.column() == 2 and self._write_enabled:  # 写入值列，且写入功能已启用
             return Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEditable
         return Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable
     
@@ -972,6 +989,10 @@ class ThreeColumnTableModel(BatteryTableModel):
             if len(row_data) >= 3:
                 row_data[2] = ""
         self.layoutChanged.emit()
+    
+    def set_write_enabled(self, enabled):
+        """设置写入功能启用状态"""
+        self._write_enabled = enabled
 
 
 # ============== 多窗口管理器主窗口 ==============
@@ -1005,6 +1026,9 @@ class MultiWindowManager(QWidget):
         
         # checkbox字典 {window_id: QCheckBox}
         self.checkboxes = {}
+        
+        # 写入功能启用状态（默认启用）
+        self._write_enabled = True
         
         # 初始化蓝牙队列发送器
         self.queue_sender = BluetoothQueueSender(bluetooth_tool, logger)
@@ -1178,6 +1202,10 @@ class MultiWindowManager(QWidget):
                 window.write_button.clicked.connect(lambda checked=False, wid=window_id: self.on_write_clicked(wid))
             
         self.windows[window_id] = window
+        
+        # 应用当前的写入启用状态
+        if hasattr(window, 'set_write_enabled'):
+            window.set_write_enabled(self._write_enabled)
         
         # 添加到布局
         self.rearrange_windows()
@@ -1450,6 +1478,23 @@ class MultiWindowManager(QWidget):
         if window_id in self.windows:
             return self.windows[window_id].get_modified_data()
         return []
+    
+    def set_write_enabled(self, enabled):
+        """设置所有窗口的写入功能启用状态
+        
+        Args:
+            enabled: True=启用写入功能, False=禁用写入功能
+        """
+        # 保存状态，用于后续创建新窗口时应用
+        self._write_enabled = enabled
+        
+        # 更新所有已存在的窗口
+        for window_id, window in self.windows.items():
+            if hasattr(window, 'set_write_enabled'):
+                window.set_write_enabled(enabled)
+        
+        if self.logger:
+            self.logger.write_log(f"{'启用' if enabled else '禁用'}所有窗口写入功能")
         
     def clear_window_write_values(self, window_id):
         """清空指定窗口的写入值"""
