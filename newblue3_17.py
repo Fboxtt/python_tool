@@ -717,9 +717,13 @@ class BluetoothTool(QWidget):
                 # 16进制发送
                 try:
                     print(f"send data type = {type(input_data)}")
-                    hex_data = input_data.replace(" ", "")
-                    if not all(c in '0123456789ABCDEFabcdef' for c in hex_data):
-                        raise ValueError("Invalid hex string")
+                    # 只保留数字和字母（0-9, A-F, a-f），移除所有其他字符
+                    import re
+                    hex_data = re.sub(r'[^0-9A-Fa-f]', '', input_data)
+                    if not hex_data:
+                        raise ValueError("没有有效的十六进制字符")
+                    if len(hex_data) % 2 != 0:
+                        raise ValueError("十六进制字符数必须为偶数")
                     data_bytes = bytes.fromhex(hex_data)
 
                     # 如果选中了\r\n发送，添加回车换行符
@@ -727,7 +731,8 @@ class BluetoothTool(QWidget):
                         data_bytes += b'\r\n'
 
                 except ValueError as e:
-                    QMessageBox.warning(self, '警告', '无效的16进制数据')
+                    self.blue_write_log(f"无效的16进制数据: {e}")
+                    QMessageBox.warning(self, '警告', f'无效的16进制数据\n{str(e)}')
                     return
             else:
                 # 文本发送
@@ -1086,14 +1091,17 @@ class BluetoothTool(QWidget):
                 if self.hex_send_checkbox.isChecked():
                     # 16进制发送
                     try:
-                        # 移除所有空格并检查是否为有效的16进制字符串
-                        hex_data = data.replace(" ", "")
-                        if not all(c in '0123456789ABCDEFabcdef' for c in hex_data):
-                            raise ValueError("Invalid hex string")
+                        # 只保留数字和字母（0-9, A-F, a-f），移除所有其他字符
+                        import re
+                        hex_data = re.sub(r'[^0-9A-Fa-f]', '', data)
+                        if not hex_data:
+                            raise ValueError("没有有效的十六进制字符")
+                        if len(hex_data) % 2 != 0:
+                            raise ValueError("十六进制字符数必须为偶数")
                         # 将16进制字符串转换为字节
                         data_bytes = bytes.fromhex(hex_data)
                     except ValueError as e:
-                        QMessageBox.warning(self, '警告', '无效的16进制数据')
+                        QMessageBox.warning(self, '警告', f'无效的16进制数据\n{str(e)}')
                         return
                 else:
                     # 文本发送
