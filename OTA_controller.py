@@ -175,6 +175,7 @@ class TextDecode:
         self.no_packet_len = 0
         self.no_packet_hex = bytearray()
         self.cmd_packet_num = 0
+        self.is_download_cmd = False
 
     def split_data(self, hex_data: bytearray):
         # 重置所有属性
@@ -252,13 +253,13 @@ class TextDecode:
                     self.cmd_packet_num = (self.data_hex[0] & 0xFF) + (self.data_hex[1] & 0xFF) * 256
             # else:
             #     raise Exception("PC_SET_WRITE_FLASH命令长度错误")
+            
+            # 如果没有异常，说明解析成功
+            self.legality = ERR_NOTHING
+            
         except Exception as e:
-            print(f"接收命令无法解析: {e}")
-            traceback.print_exc()
-            LogManager.get_instance().write_log(f"接收命令无法解析: {e}")
-
-        if self.legality == ERR_NO:
-            print(f"slave cmd = 0x{self.cmd:02x} cmd_ack = 0x{self.cmd_ack:02x} cmd_data_len = {self.data_len}")
+            # 解析失败时只记录到日志文件
+            LogManager.get_instance().write_log(f"数据解析失败: {e}")
         return
     def send_hex_fill(self, cmd_type, data_array = bytearray()) -> bytearray:
         """获取下载数据包

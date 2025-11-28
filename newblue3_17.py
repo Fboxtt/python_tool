@@ -1243,12 +1243,51 @@ class BluetoothTool(QWidget):
         # 重启定时器
         self.data_timer.start(100)  # 100ms
 
+    def is_ota_command(self, data):
+        """判断是否为OTA编程命令
+        
+        OTA命令特征：
+        - 长度 >= 9
+        - data[0] = 0x00 (地址)
+        - data[4] 的高位为1 (响应标志)，低7位为OTA命令码
+        - OTA命令码：0x76(握手), 0x75(擦除), 0x77(写入), 0x78(校验), 0x71(查询), 0x01(注册)等
+        """
+        if len(data) < 9:
+            return False
+        
+        # 检查是否符合OTA协议格式
+        if data[0] != 0x00:  # 地址字段
+            return False
+        
+        if data[5] != 0x55 or data[6] != 0xAA:  # 协议标识
+            return False
+        
+        # 提取命令码（去除最高位的响应标志）
+        cmd = data[4] & 0x7F
+        
+        # OTA相关的命令码列表
+        ota_commands = [
+            0x76,  # 握手命令
+            0x75,  # 擦除命令  
+            0x77,  # 写入Flash
+            0x78,  # 总校验和
+            0x71,  # 读取IC信息
+            0x01,  # 注册命令（也用于OTA流程）
+        ]
+        
+        return cmd in ota_commands
+    
     def process_complete_data(self):
-        """处理完整的数据包（使用data_display_mgr解析）"""
+        """处理完整的数据包（自动路由到OTA或普通数据解析器）"""
         if self.check_new_password_response(self.received_data_buffer):
             self.handle_new_password_response(self.received_data_buffer)
         else:
-            if hasattr(self, 'data_display_mgr') and hasattr(self.data_display_mgr, 'parse_and_update_displays'):
+            # 🔥 自动判断：根据数据特征选择解析器
+            if self.is_ota_command(self.received_data_buffer):
+                # OTA指令：使用 text_decode 解析
+                self.text_decode.split_data(self.received_data_buffer)
+            # 正常数据指令：使用 data_display_mgr 解析
+            elif hasattr(self, 'data_display_mgr') and hasattr(self.data_display_mgr, 'parse_and_update_displays'):
                 # 一站式：解析 + 自动更新显示（方案A优化）
                 success, result = self.data_display_mgr.parse_and_update_displays(self.received_data_buffer)
                 if success:
@@ -1389,19 +1428,20 @@ class BluetoothTool(QWidget):
                     data = bytearray([0x00,0x00,0x04,0x01,0x76,0x55,0xaa,0x7a])
                     self.display_send_data(data)
                     await self.byte_send(data)
-                    # self.blue_write_log("76发送")
                     await asyncio.sleep(time512 * 2)
                     if(self.text_decode.is_download_cmd):
+                        self.blue_write_log(f"✅ 握手命令发送成功")
+                        shake_success = True
                         break
+                    self.blue_write_log(f"❌ 握手未成功，继续重试 (err_count={err_count})")
                     err_count += 1
                 else:
                     if err_count == 3:
-                        self.blue_write_log(f"握手命令发送失败")
-                        # raise Exception("握手命令发送失败")
+                        self.blue_write_log(f"握手失败")
                 shake_count += 1
             else:
                 self.packet_success_label.setText('握手成功')
-                self.blue_write_log(f"握手命令发送成功")
+                self.blue_write_log(f"握手最终成功")
             # self.text_decode.legality = ReceveDataStatus.ERR_NOTHING
 
 
@@ -1411,18 +1451,19 @@ class BluetoothTool(QWidget):
                 data = self.download_data.get_download_data(BmsCmdType.DOWNLOAD_BUFFER)
                 self.display_send_data(data)
                 await self.byte_send(data)
-                # self.blue_write_log("75发送")
+                self.blue_write_log(f"擦除命令发送")
                 await asyncio.sleep(time512 * 2)
                 if self.text_decode.legality == ReceveDataStatus.ERR_NOTHING:
                     await asyncio.sleep(time512 * 4)
                 if(self.text_decode.no80_cmd == BmsCmdType.DOWNLOAD_BUFFER  and self.text_decode.cmd_ack == 0x00):
-                    self.blue_write_log(f"擦除命令发送成功")
+                    self.blue_write_log(f"✅ 擦除命令发送成功")
                     self.packet_success_label.setText('擦除成功')
                     break
                 else:
+                    self.blue_write_log(f"❌ 擦除未成功，继续重试 (err_count={err_count})")
                     err_count += 1
             else:
-                self.blue_write_log(f"擦除命令发送失败")
+                self.blue_write_log(f"擦除失败")
 
             # while
 
@@ -1446,24 +1487,24 @@ class BluetoothTool(QWidget):
                         while err_count < 5:
                             self.display_send_data(data)
                             await self.byte_send(data)
-                            # current_time = datetime.now().strftime("%H:%M:%S.%f")[:-3]
-                            # self.blue_write_log(f"TX->数据包发送完成 - 时间: {current_time}")
                             await asyncio.sleep(time512)
                             if self.text_decode.legality == ReceveDataStatus.ERR_NOTHING:
                                 await asyncio.sleep(time512)
                             if(self.text_decode.no80_cmd == BmsCmdType.WRITE_FLASH  and
                                 self.text_decode.cmd_ack == 0x00 and
                                 self.text_decode.cmd_packet_num == hex_packet + 1):
+                                    self.blue_write_log(f"✅ 包{hex_packet + 1}发送成功")
                                     self.packet_success_label.setText(f'包号: {hex_packet + 1} 总包数: {self.download_data.packet_num}')
                                     err_count = 0
                                     hex_packet += 1
                                     break
                             else:
+                                self.blue_write_log(f"❌ 包{hex_packet + 1}未成功，重试 (err_count={err_count})")
                                 await asyncio.sleep(time512*3)
                                 err_count += 1
                         else:
-                            self.blue_write_log(f"数据发送失败")
-                            raise Exception("writeflash次数超限")
+                            self.blue_write_log(f"包{hex_packet + 1}发送失败")
+                            raise Exception("烧录失败")
 
                     except BleakError:
                         # traceback.print_exc()
@@ -1482,8 +1523,10 @@ class BluetoothTool(QWidget):
                 await self.byte_send(data)
                 await asyncio.sleep(time512 * 4)
                 if(self.text_decode.no80_cmd == BmsCmdType.REC_TOTAL_CHECKSUM  and self.text_decode.cmd_ack == 0x00):
+                    self.blue_write_log(f"✅ 总校验和验证成功")
                     break
                 else:
+                    self.blue_write_log(f"❌ 总校验和未成功，重试 (err_count={err_count})")
                     err_count += 1
             self.blue_write_log("烧录完成")
             await asyncio.sleep(6)
@@ -1499,9 +1542,11 @@ class BluetoothTool(QWidget):
                 await self.byte_send(data)
                 await asyncio.sleep(time512 * 3)
                 if(self.text_decode.no80_cmd == BmsCmdType.READ_IC_INF  and self.text_decode.cmd_ack == 0x00):
+                    self.blue_write_log(f"✅ 71指令查询成功，烧录完成")
                     self.ota_ok_count += 1
                     break
                 else:
+                    self.blue_write_log(f"❌ 71指令查询失败，重试 (err_count={err_count})")
                     err_count += 1
 
         except Exception as e:

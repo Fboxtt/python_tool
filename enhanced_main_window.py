@@ -633,13 +633,17 @@ class EnhancedMainWindow(QMainWindow):
             # 检查是否是密码响应（原始方法的逻辑）
             if self.bluetooth_tool.check_new_password_response(data_buffer):
                 self.bluetooth_tool.handle_new_password_response(data_buffer)
+            # 🔥 检查是否是OTA指令
+            elif self.bluetooth_tool.is_ota_command(data_buffer):
+                # OTA指令：使用 text_decode 解析
+                self.bluetooth_tool.text_decode.split_data(bytearray(data_buffer))
             else:
                 # 提取响应命令码（用于发射信号）
                 response_cmd_code = None
                 if len(data_buffer) >= 5:
                     response_cmd_code = data_buffer[4] & 0x7F  # 去掉0x80标志，获取原始命令码
                 
-                # 使用data_display_mgr解析数据
+                # 普通数据指令：使用data_display_mgr解析
                 if hasattr(self.bluetooth_tool, 'data_display_mgr') and self.bluetooth_tool.data_display_mgr:
                     success, result = self.bluetooth_tool.data_display_mgr.parse_and_update_displays(data_buffer)
                     
