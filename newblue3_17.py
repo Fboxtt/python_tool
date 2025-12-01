@@ -440,6 +440,17 @@ class BluetoothTool(QWidget):
         # 将充电控制部分添加到左侧布局
         left_layout.addLayout(charge_layout)
 
+        # 添加关机控制部分
+        shutdown_layout = QHBoxLayout()
+
+        # 关机按钮
+        self.shutdown_button = QPushButton('🔌 设备关机')
+        self.shutdown_button.clicked.connect(self.on_shutdown_clicked)
+        shutdown_layout.addWidget(self.shutdown_button)
+
+        # 将关机控制部分添加到左侧布局
+        left_layout.addLayout(shutdown_layout)
+
         # 添加RT控制部分
         rt_layout = QVBoxLayout()
 
@@ -1651,6 +1662,24 @@ class BluetoothTool(QWidget):
         """发送版本号查询命令"""
         self.send_command(self.text_decode.send_hex_fill(0x71))
 
+    def on_shutdown_clicked(self):
+        """处理关机按钮点击事件"""
+        from PyQt6.QtWidgets import QMessageBox
+        reply = QMessageBox.question(
+            self,
+            '确认关机',
+            '确定要关闭设备吗？\n设备将进入关机状态。',
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No
+        )
+        if reply == QMessageBox.StandardButton.Yes:
+            self.send_shutdown_cmd()
+            self.blue_write_log("已发送关机指令 (0x60)")
+
+    def send_shutdown_cmd(self):
+        """发送关机指令"""
+        self.send_command(self.text_decode.send_hex_fill(0x60))
+
     def on_batch_program_clicked(self):
         """同步方法，批量烧录100次"""
         if self.batch_task:
@@ -2617,23 +2646,29 @@ class SimplifiedBluetoothTool(QWidget):
         # ========== 充放电控制（横排紧凑）==========
         charge_discharge_layout = QHBoxLayout()
         charge_discharge_layout.setSpacing(3)
-        
+
         # 使用原窗口的充放电按钮
         self.open_charge_button = self.bluetooth_tool.open_charge_button
         self.close_charge_button = self.bluetooth_tool.close_charge_button
         self.open_discharge_button = self.bluetooth_tool.open_discharge_button
         self.close_discharge_button = self.bluetooth_tool.close_discharge_button
-        
+
         for btn in [self.open_charge_button, self.close_charge_button, 
                     self.open_discharge_button, self.close_discharge_button]:
             btn.setMaximumWidth(90)
-        
+
         charge_discharge_layout.addWidget(self.open_charge_button)
         charge_discharge_layout.addWidget(self.close_charge_button)
         charge_discharge_layout.addWidget(self.open_discharge_button)
         charge_discharge_layout.addWidget(self.close_discharge_button)
-        
+
         main_layout.addLayout(charge_discharge_layout)
+
+        # ========== 关机控制 ==========
+        shutdown_layout = QHBoxLayout()
+        self.shutdown_button = self.bluetooth_tool.shutdown_button
+        shutdown_layout.addWidget(self.shutdown_button)
+        main_layout.addLayout(shutdown_layout)
         
         self.setLayout(main_layout)
         self.setFixedSize(520, 460)
