@@ -185,7 +185,14 @@ def build_exe(mode: str, version: str):
         "--exclude-module=PySide6.QtCore",
         "--exclude-module=PySide6.QtGui", 
         "--exclude-module=PySide6.QtWidgets",
-        "--exclude-module=shiboken6"
+        "--exclude-module=shiboken6",
+        # 包含WinRT模块（Windows 11蓝牙支持）
+        "--hidden-import=winrt",
+        "--hidden-import=winrt.windows.devices.bluetooth",
+        "--hidden-import=winrt.windows.devices.radios",
+        "--hidden-import=winrt.windows.foundation",
+        "--hidden-import=winrt.windows.foundation.collections",
+        "--hidden-import=winrt._winrt"
     ]
     
     # 调试版额外配置
