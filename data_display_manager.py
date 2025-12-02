@@ -15,17 +15,26 @@ from PyQt6.QtGui import QFont
 
 # 导入显示组件（从独立模块，避免循环导入）
 try:
-    from display_widgets import BatteryTableModel, BitFlagsWidget
+    from display_widgets import BatteryTableModel, BitFlagsWidget, MultiColumnBitFlagsWidget
 except ImportError as e:
     print(f"警告：无法导入BatteryTableModel和BitFlagsWidget: {e}")
     print("请确保display_widgets.py在同一目录下")
     BatteryTableModel = None
     BitFlagsWidget = None
+    MultiColumnBitFlagsWidget = None
 
 from struct_model import (
     get_all_status_bits_for_display, parse_all_status_from_sbs,
     HexParserApp, STRUCT_COMMANDS
 )
+# SN码解析规则映射表
+SN_PRODUCT_TYPE = {'B': '电池', 'C': '充电器', 'M': 'MPPT', 'D': 'DCDC', 'H': '逆充控', 'A': '逆充', 'I': '纯逆变器'}
+SN_FACTORY = {'A': '安培时代新能源', 'D': '安培时代数字能源', 'S': '坪山一厂', 'H': '坪山二厂', 'W': '东莞一厂'}
+SN_BRAND = {'L': 'Li Time', 'P': 'Power queen', 'T': 'Time USB', 'R': 'Redodo', 'S': 'Starrysea'}
+SN_CELL_BRAND = {'P': '鹏辉', 'G': '国轩', 'Y': '亿纬', 'R': '瑞浦', 'X': '欣旺达', 'H': '中航', 'B': '比亚迪', 'F': '赣锋', 'A': '安驰', 'U': '玉皇', 'Z': '中比', 'N': '宁德时代'}
+SN_FUNCTION = {'G': '高尔夫球车', 'S': '启动电池', 'B': '蓝牙款', 'C': '并机通讯', 'L': '低温款', 'H': '加热款', 'P': 'Plus', 'E': '串联', 'M': '信率款', 'D': '两用启动', 'I': '逆变器通讯', 'R': '外接显示屏', 'N': '空位符'}
+SN_INSTALL = {'Z': '正面不能朝下', 'F': '反面不能朝下', 'L': '左面不能朝下', 'R': '右面不能朝下', 'A': '正面+反面不能朝下', 'B': '正面+左面不能朝下', 'C': '正面+右面不能朝下', 'D': '反面+左面不能朝下', 'E': '反面+右面不能朝下', 'G': '左面+右面不能朝下', 'H': '只有默认顶面不能朝下'}
+SN_BMS = {'Y': '自研硬件板', 'R': '自研软件板', 'S': '赛航', 'W': '唯美', 'J': '嘉佰达', 'P': '沛城'}
 
 # 导入数据解析器
 try:
@@ -35,6 +44,63 @@ except ImportError as e:
     TextDecode = None
 
 
+class SNCodeParser:
+    """SN码解析器"""
+    def parse_sn_code(self, sn_code):
+        """解析SN码
+        Args:
+            sn_code: SN码字符串，例如 "BALP12100-NNN-A110001A-100Y"
+        Returns:
+            (success, result) 元组
+        """
+        try:
+            sn_code = sn_code.strip().upper()
+            if len(sn_code) != 27:
+                return False, f"SN码长度错误：期望27位，实际{len(sn_code)}位"
+            if sn_code[9] != '-' or sn_code[13] != '-' or sn_code[22] != '-':
+                return False, f"SN码格式错误：分隔符位置不正确"
+            result = {}
+            result['产品品类'] = SN_PRODUCT_TYPE.get(sn_code[0], f'未知({sn_code[0]})')
+            result['生产工厂'] = SN_FACTORY.get(sn_code[1], f'未知({sn_code[1]})')
+            result['产品品牌'] = SN_BRAND.get(sn_code[2], f'未知({sn_code[2]})')
+            result['电芯品牌'] = SN_CELL_BRAND.get(sn_code[3], f'未知({sn_code[3]})')
+            model_str = sn_code[4:9]
+            if 'N' in model_str:
+                voltage = model_str[:model_str.index('N')] + '.' + model_str[model_str.index('N')+1:]
+                capacity = ''
+            else:
+                voltage = model_str[:2]
+                capacity = model_str[2:].lstrip('0') or '0'
+            result['型号'] = f"{voltage}V {capacity}Ah" if capacity else voltage
+            func_str = sn_code[10:13]
+            functions = []
+            for c in func_str:
+                func = SN_FUNCTION.get(c, '')
+                if func and func != '空位符':
+                    functions.append(func)
+            result['功能'] = '+'.join(functions) if functions else '基础款'
+            date_str = sn_code[14:17]
+            year_char, month_char, day_char = date_str[0], date_str[1], date_str[2]
+            year_offset = ord(year_char) - ord('A')
+            year = 2024 + year_offset
+            month_map = {'1':'01','2':'02','3':'03','4':'04','5':'05','6':'06','7':'07','8':'08','9':'09','A':'10','B':'11','C':'12'}
+            month = month_map.get(month_char, '??')
+            day_map = {'1':'01','2':'02','3':'03','4':'04','5':'05','6':'06','7':'07','8':'08','9':'09','A':'10','B':'11','C':'12','D':'13','E':'14','F':'15','G':'16','H':'17','I':'18','J':'19','K':'20','L':'21','M':'22','N':'23','O':'24','P':'25','Q':'26','R':'27','S':'28','T':'29','U':'30','V':'31'}
+            day = day_map.get(day_char, '??')
+            result['打包日期'] = f"{year}-{month}-{day}"
+            result['序列号'] = sn_code[17:21]
+            result['安装方式识别号'] = SN_INSTALL.get(sn_code[21], f'未知({sn_code[21]})')
+            shell_code = sn_code[23:26]
+            if shell_code.startswith('A'):
+                result['壳体型号'] = shell_code
+            elif shell_code[0] in 'HS':
+                result['壳体型号'] = shell_code
+            else:
+                result['壳体型号'] = 'A' + shell_code
+            result['BMS板厂家'] = SN_BMS.get(sn_code[26], f'未知({sn_code[26]})')
+            return True, result
+        except Exception as e:
+            return False, f"解析失败: {str(e)}"
 class DataParserManager:
     """数据解析管理器 - 封装数据解析逻辑"""
 
@@ -42,6 +108,7 @@ class DataParserManager:
         self.logger = logger
         self.text_decoder = TextDecode() if TextDecode else None
         self.hex_parser = HexParserApp() if HexParserApp else None
+        self.sn_parser = SNCodeParser()
 
     def parse_hex_string(self, hex_string):
         """解析十六进制字符串
@@ -205,11 +272,14 @@ class BatteryWindowManager:
 class BitWindowManager:
     """位标志窗口管理器"""
 
-    def __init__(self, parent=None, logger=None):
+    def __init__(self, parent=None, logger=None, multi_column=False):
         self.parent = parent
         self.logger = logger
+        self.multi_column = multi_column
 
-        if BitFlagsWidget:
+        if multi_column and MultiColumnBitFlagsWidget:
+            self.widget = MultiColumnBitFlagsWidget(parent=parent, logger=logger)
+        elif BitFlagsWidget:
             self.widget = BitFlagsWidget(parent=parent, logger=logger)
         else:
             # 备用方案：创建简单的错误显示
@@ -302,11 +372,17 @@ class DataDisplayManager(QMainWindow):
         main_layout.addWidget(control_panel)
 
         # 创建分割器（上下分割）
-        splitter = QSplitter(Qt.Orientation.Vertical)
+        main_splitter = QSplitter(Qt.Orientation.Vertical)
 
-        # ========== 上半部分：数据输入和解析 ==========
+        # ========== 上半部分：数据输入和解析（再次垂直分割）==========
+        parse_splitter = QSplitter(Qt.Orientation.Horizontal)
         parse_panel = self.create_parse_panel()
-        splitter.addWidget(parse_panel)
+        parse_splitter.addWidget(parse_panel)
+        sn_panel = self.create_sn_parse_panel()
+        parse_splitter.addWidget(sn_panel)
+        parse_splitter.setStretchFactor(0, 1)
+        parse_splitter.setStretchFactor(1, 1)
+        main_splitter.addWidget(parse_splitter)
 
         # ========== 下半部分：数据显示窗口 ==========
         display_panel = QWidget()
@@ -314,22 +390,22 @@ class DataDisplayManager(QMainWindow):
 
         # 创建battery_window（电池参数窗口）
         self.battery_window_manager = BatteryWindowManager(parent=display_panel)
-        self.battery_window_manager.widget.setMinimumSize(580, 400)
+        self.battery_window_manager.widget.setMinimumSize(400, 400)
         display_layout.addWidget(self.battery_window_manager.widget)
 
-        # 创建bit_window（位标志窗口）
-        self.bit_window_manager = BitWindowManager(parent=display_panel, logger=self.logger)
-        self.bit_window_manager.widget.setMinimumSize(390, 400)
+        # 创建bit_window（位标志窗口 - 独立模式使用多列显示）
+        self.bit_window_manager = BitWindowManager(parent=display_panel, logger=self.logger, multi_column=True)
+        self.bit_window_manager.widget.setMinimumSize(600, 400)
         display_layout.addWidget(self.bit_window_manager.widget)
 
         display_panel.setLayout(display_layout)
-        splitter.addWidget(display_panel)
+        main_splitter.addWidget(display_panel)
 
         # 设置分割器比例
-        splitter.setStretchFactor(0, 1)
-        splitter.setStretchFactor(1, 2)
+        main_splitter.setStretchFactor(0, 1)
+        main_splitter.setStretchFactor(1, 2)
 
-        main_layout.addWidget(splitter)
+        main_layout.addWidget(main_splitter)
         central_widget.setLayout(main_layout)
 
         # 连接信号
@@ -449,6 +525,93 @@ class DataDisplayManager(QMainWindow):
 
         group_box.setLayout(layout)
         return group_box
+    def create_sn_parse_panel(self):
+        """创建SN码解析面板"""
+        group_box = QGroupBox("🏷️ SN码解析工具")
+        font = group_box.font()
+        font.setBold(True)
+        font.setPointSize(13)
+        group_box.setFont(font)
+        layout = QVBoxLayout()
+        input_layout = QVBoxLayout()
+        input_label = QLabel('输入SN码:')
+        input_label_font = input_label.font()
+        input_label_font.setPointSize(10)
+        input_label_font.setBold(True)
+        input_label.setFont(input_label_font)
+        input_layout.addWidget(input_label)
+        self.sn_input = QTextEdit()
+        self.sn_input.setMaximumHeight(60)
+        self.sn_input.setPlaceholderText("输入27位SN码，例如：BALP12100-NNN-A110001A-100Y")
+        font = self.sn_input.font()
+        font.setFamily('Consolas, Courier New, monospace')
+        font.setPointSize(12)
+        self.sn_input.setFont(font)
+        input_layout.addWidget(self.sn_input)
+        button_layout = QHBoxLayout()
+        parse_sn_btn = QPushButton('🔍 解析SN码')
+        parse_sn_btn.setMinimumWidth(150)
+        parse_sn_btn.setMinimumHeight(35)
+        font = parse_sn_btn.font()
+        font.setBold(True)
+        font.setPointSize(11)
+        parse_sn_btn.setFont(font)
+        parse_sn_btn.clicked.connect(self.parse_sn_code)
+        button_layout.addWidget(parse_sn_btn)
+        example1_btn = QPushButton('示例1: 12V100Ah')
+        example1_btn.clicked.connect(lambda: self.sn_input.setText('BALP12100-NNN-A110001A-100Y'))
+        button_layout.addWidget(example1_btn)
+        example2_btn = QPushButton('示例2: 蓝牙款')
+        example2_btn.clicked.connect(lambda: self.sn_input.setText('BALP12100-BNN-A110001A-100Y'))
+        button_layout.addWidget(example2_btn)
+        button_layout.addStretch()
+        input_layout.addLayout(button_layout)
+        layout.addLayout(input_layout)
+        output_label = QLabel('解析结果:')
+        output_label_font = output_label.font()
+        output_label_font.setPointSize(10)
+        output_label_font.setBold(True)
+        output_label.setFont(output_label_font)
+        layout.addWidget(output_label)
+        self.sn_output = QTextEdit()
+        self.sn_output.setReadOnly(True)
+        self.sn_output.setMinimumHeight(250)
+        font = self.sn_output.font()
+        font.setFamily('Consolas, Courier New, monospace')
+        font.setPointSize(11)
+        self.sn_output.setFont(font)
+        layout.addWidget(self.sn_output, 1)
+        group_box.setLayout(layout)
+        return group_box
+    def parse_sn_code(self):
+        """解析SN码"""
+        sn_code = self.sn_input.toPlainText().strip()
+        if not sn_code:
+            self.sn_output.setText("❌ 错误：输入为空")
+            return
+        self.sn_output.append(f"\n{'='*60}")
+        self.sn_output.append(f"⏳ 开始解析SN码...")
+        self.sn_output.append(f"{'='*60}\n")
+        success, result = self.data_parser.sn_parser.parse_sn_code(sn_code)
+        if success:
+            self.sn_output.append(f"✅ 解析成功！")
+            self.sn_output.append(f"📋 SN码: {sn_code}")
+            self.sn_output.append(f"")
+            self.sn_output.append(f"📊 详细信息:")
+            self.sn_output.append(f"{'-'*60}")
+            max_label_len = 8
+            for key, value in result.items():
+                key_len = len(key)
+                padding = '　' * (max_label_len - key_len)
+                self.sn_output.append(f"  {key}{padding} : {value}")
+        else:
+            self.sn_output.append(f"❌ 解析失败！")
+            self.sn_output.append(f"")
+            self.sn_output.append(f"错误信息:")
+            self.sn_output.append(f"{result}")
+        self.sn_output.verticalScrollBar().setValue(
+            self.sn_output.verticalScrollBar().maximum()
+        )
 
     def parse_input_data(self):
         """解析输入的数据"""
@@ -751,35 +914,18 @@ class DataDisplayManager(QMainWindow):
     def test_status_data(self):
         """生成测试状态位数据"""
         test_data = []
-
-        # 生成测试数据（告警）
-        for i in range(14):
-            test_data.append({
-                'name': f'告_测试{i:02d}',
-                'value': random.randint(0, 1)
-            })
-
-        # 生成测试数据（保护）
-        for i in range(21):
-            test_data.append({
-                'name': f'护_测试{i:02d}',
-                'value': random.randint(0, 1)
-            })
-
-        # 生成测试数据（失效）
-        for i in range(12):
-            test_data.append({
-                'name': f'错_测试{i:02d}',
-                'value': random.randint(0, 1)
-            })
-
-        # 生成测试数据（其他）
-        for i in range(21):
-            test_data.append({
-                'name': f'另_测试{i:02d}',
-                'value': random.randint(0, 1)
-            })
-
+        alarm_names = ['Pack过压', 'Batt过压', '电芯过压', 'Pack欠压', 'Batt欠压', '电芯欠压', '充电过流', '放电过流', '充电高温', '放电高温', '充电低温', '放电低温', 'MOS高温', 'Batt高温']
+        protect_names = ['Pack过压', 'Batt过压', '电芯过压', 'Pack欠压', 'Batt欠压', '电芯欠压', '充电过流', '放电过流', '充电高温', '放电高温', '充电低温', '放电低温', 'MOS高温', 'Batt高温', '短路保护', '放电欠温', '充电欠温', '预放失效', '预充失效', '低电关机', '充电MOSOP']
+        fault_names = ['电芯检测', '温度检测', '电流检测', '电压检测', '温差检测', '均衡异常', '过流监控', '充电MOS', '放电MOS', '预放MOS', '预充MOS', 'NTC异常']
+        info_names = ['充电MOSST', '放电MOSST', '预放MOS状态', '预充MOS状态', '充电中', '放电中', 'FullCharge', 'Empty', '无连接', '电池停用', 'Pack欠压告警', '告警可清除', 'Pack超温告警', 'Pack低温告警', '单体超温告警', '单体低温告警', '充电状态', '放电状态', 'Volt检测', 'Curr检测', 'Temp检测']
+        for name in alarm_names:
+            test_data.append({'name': name, 'value': random.randint(0, 1), 'type': 'alarm'})
+        for name in protect_names:
+            test_data.append({'name': name, 'value': random.randint(0, 1), 'type': 'protect'})
+        for name in fault_names:
+            test_data.append({'name': name, 'value': random.randint(0, 1), 'type': 'fault'})
+        for name in info_names:
+            test_data.append({'name': name, 'value': random.randint(0, 1), 'type': 'info'})
         self.update_status_bits_direct(test_data)
         if self.logger:
             self.logger.write_log(f"生成测试状态位数据: {len(test_data)} 个")
@@ -810,18 +956,40 @@ class SimpleLogger:
 def main():
     """独立运行主函数"""
     app = QApplication(sys.argv)
-
+    
+    # 应用系统主题自适应
+    from display_widgets import is_dark_theme
+    if is_dark_theme():
+        from PyQt6.QtGui import QPalette, QColor
+        # 深色主题调色板
+        dark_palette = QPalette()
+        dark_palette.setColor(QPalette.ColorRole.Window, QColor(53, 53, 53))
+        dark_palette.setColor(QPalette.ColorRole.WindowText, QColor(255, 255, 255))
+        dark_palette.setColor(QPalette.ColorRole.Base, QColor(35, 35, 35))
+        dark_palette.setColor(QPalette.ColorRole.AlternateBase, QColor(53, 53, 53))
+        dark_palette.setColor(QPalette.ColorRole.ToolTipBase, QColor(25, 25, 25))
+        dark_palette.setColor(QPalette.ColorRole.ToolTipText, QColor(255, 255, 255))
+        dark_palette.setColor(QPalette.ColorRole.Text, QColor(255, 255, 255))
+        dark_palette.setColor(QPalette.ColorRole.Button, QColor(53, 53, 53))
+        dark_palette.setColor(QPalette.ColorRole.ButtonText, QColor(255, 255, 255))
+        dark_palette.setColor(QPalette.ColorRole.BrightText, QColor(255, 0, 0))
+        dark_palette.setColor(QPalette.ColorRole.Link, QColor(42, 130, 218))
+        dark_palette.setColor(QPalette.ColorRole.Highlight, QColor(42, 130, 218))
+        dark_palette.setColor(QPalette.ColorRole.HighlightedText, QColor(255, 255, 255))
+        app.setPalette(dark_palette)
+        app.setStyle("Fusion")
+    
     # 创建简单日志
     logger = SimpleLogger()
-
+    
     # 创建数据显示管理器（独立模式）
     manager = DataDisplayManager(logger=logger, standalone=True)
     manager.show()
-
+    
     # 自动生成测试数据
     QTimer.singleShot(500, manager.test_bit_data)
     QTimer.singleShot(1000, manager.test_status_data)
-
+    
     sys.exit(app.exec())
 
 

@@ -823,23 +823,23 @@ class BitFlagsTableModel(QAbstractTableModel):
 
     def _get_gradient_color_for_bit(self, row_idx, value):
         """计算位标志的渐变颜色（从鲜艳到陈旧）"""
+        if not self._gradient_enabled:
+            return self._color_cache['green'] if value == 0 else self._color_cache['red']
         if row_idx >= len(self._status_bits) or 'last_update' not in self._status_bits[row_idx]:
             return self._color_green_stale if value == 0 else self._color_red_stale
-        
         elapsed = time.time() - self._status_bits[row_idx]['last_update']
+        if elapsed > self._timeout_seconds:
+            return self._color_cache['gray']
         progress = min(elapsed / self._gradient_duration, 1.0)
-        
         if value == 0:
             color_fresh = self._color_green_fresh
             color_stale = self._color_green_stale
         else:
             color_fresh = self._color_red_fresh
             color_stale = self._color_red_stale
-        
         r = int(color_fresh.red() + (color_stale.red() - color_fresh.red()) * progress)
         g = int(color_fresh.green() + (color_stale.green() - color_fresh.green()) * progress)
         b = int(color_fresh.blue() + (color_stale.blue() - color_fresh.blue()) * progress)
-        
         return QColor(r, g, b)
 
     def data(self, index, role):
@@ -1082,37 +1082,19 @@ class BitFlagsWidget(QWidget):
     def test_status_bits(self):
         """测试按钮：生成测试数据"""
         try:
-            # 生成分类测试数据
             test_data = []
-
-            # 告警状态 14个
-            for i in range(14):
-                test_data.append({
-                    'name': f'告_测试{i:02d}',
-                    'value': random.randint(0, 1)
-                })
-
-            # 保护状态 21个
-            for i in range(21):
-                test_data.append({
-                    'name': f'护_测试{i:02d}',
-                    'value': random.randint(0, 1)
-                })
-
-            # 失效状态 12个
-            for i in range(12):
-                test_data.append({
-                    'name': f'错_测试{i:02d}',
-                    'value': random.randint(0, 1)
-                })
-
-            # 信息状态 21个
-            for i in range(21):
-                test_data.append({
-                    'name': f'另_测试{i:02d}',
-                    'value': random.randint(0, 1)
-                })
-
+            alarm_names = ['Pack过压', 'Batt过压', '电芯过压', 'Pack欠压', 'Batt欠压', '电芯欠压', '充电过流', '放电过流', '充电高温', '放电高温', '充电低温', '放电低温', 'MOS高温', 'Batt高温']
+            protect_names = ['Pack过压', 'Batt过压', '电芯过压', 'Pack欠压', 'Batt欠压', '电芯欠压', '充电过流', '放电过流', '充电高温', '放电高温', '充电低温', '放电低温', 'MOS高温', 'Batt高温', '短路保护', '放电欠温', '充电欠温', '预放失效', '预充失效', '低电关机', '充电MOSOP']
+            fault_names = ['电芯检测', '温度检测', '电流检测', '电压检测', '温差检测', '均衡异常', '过流监控', '充电MOS', '放电MOS', '预放MOS', '预充MOS', 'NTC异常']
+            info_names = ['充电MOSST', '放电MOSST', '预放MOS状态', '预充MOS状态', '充电中', '放电中', 'FullCharge', 'Empty', '无连接', '电池停用', 'Pack欠压告警', '告警可清除', 'Pack超温告警', 'Pack低温告警', '单体超温告警', '单体低温告警', '充电状态', '放电状态', 'Volt检测', 'Curr检测', 'Temp检测']
+            for name in alarm_names:
+                test_data.append({'name': name, 'value': random.randint(0, 1)})
+            for name in protect_names:
+                test_data.append({'name': name, 'value': random.randint(0, 1)})
+            for name in fault_names:
+                test_data.append({'name': name, 'value': random.randint(0, 1)})
+            for name in info_names:
+                test_data.append({'name': name, 'value': random.randint(0, 1)})
             self.update_status_bits(test_data)
             if self.logger:
                 self.logger.write_log(f"生成测试位标志数据: {len(test_data)} 个")
@@ -1143,4 +1125,127 @@ class BitFlagsWidget(QWidget):
     def get_status_bit(self, col, row):
         """获取指定位置的状态位信息"""
         return self.table_model.get_status_bit(col, row)
+
+
+class MultiColumnBitFlagsWidget(QWidget):
+    """多列位标志显示窗口，按类别分列显示（用于独立调试模式）"""
+
+    def __init__(self, parent=None, logger=None):
+        super().__init__(parent)
+        self.logger = logger
+        self.init_ui()
+
+    def init_ui(self):
+        """初始化UI组件"""
+        self.title_label = QLabel('位标志监控 - 分类显示（绿=0正常 红=1告警 灰=未刷新）')
+        self.title_label.setStyleSheet("QLabel { color: blue; font-weight: bold; font-size: 9px; }")
+        button_layout = QHBoxLayout()
+        self.clear_button = QPushButton('清空')
+        self.test_button = QPushButton('测试')
+        button_font = QFont()
+        button_font.setPointSize(7)
+        self.clear_button.setFont(button_font)
+        self.test_button.setFont(button_font)
+        button_layout.addWidget(self.clear_button)
+        button_layout.addWidget(self.test_button)
+        button_layout.addStretch()
+        self.table_view = QTableView()
+        headers = ['告警', '值', '保护', '值', '错误', '值', '其他', '值']
+        value_columns = [1, 3, 5, 7]
+        self.table_model = BitFlagsTableModel(num_columns=8, headers=headers, value_columns=value_columns)
+        self.table_view.setModel(self.table_model)
+        self.table_view.setAlternatingRowColors(False)
+        self.table_view.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.table_view.horizontalHeader().setStretchLastSection(False)
+        self.table_view.verticalHeader().setVisible(False)
+        table_font = self.table_view.font()
+        table_font.setPointSize(8)
+        self.table_view.setFont(table_font)
+        header_font = self.table_view.horizontalHeader().font()
+        header_font.setPointSize(8)
+        header_font.setBold(True)
+        self.table_view.horizontalHeader().setFont(header_font)
+        col_widths = [100, 35, 100, 35, 100, 35, 100, 35]
+        for i, width in enumerate(col_widths):
+            self.table_view.setColumnWidth(i, width)
+        self.table_view.verticalHeader().setDefaultSectionSize(18)
+        self.table_view.verticalHeader().setMinimumSectionSize(16)
+        main_layout = QVBoxLayout()
+        main_layout.addWidget(self.title_label)
+        main_layout.addLayout(button_layout)
+        main_layout.addWidget(self.table_view)
+        self.setLayout(main_layout)
+        self.clear_button.clicked.connect(self.clear_status_bits)
+        self.test_button.clicked.connect(self.test_status_bits)
+
+    def clear_status_bits(self):
+        """清空所有位标志"""
+        try:
+            self.table_model.clear_all()
+            if self.logger:
+                self.logger.write_log("已清空所有位标志")
+        except Exception as e:
+            if self.logger:
+                self.logger.write_log(f"清空位标志失败: {e}")
+
+    def test_status_bits(self):
+        """测试按钮：生成测试数据"""
+        try:
+            test_data = []
+            alarm_names = ['Pack过压', 'Batt过压', '电芯过压', 'Pack欠压', 'Batt欠压', '电芯欠压', '充电过流', '放电过流', '充电高温', '放电高温', '充电低温', '放电低温', 'MOS高温', 'Batt高温']
+            protect_names = ['Pack过压', 'Batt过压', '电芯过压', 'Pack欠压', 'Batt欠压', '电芯欠压', '充电过流', '放电过流', '充电高温', '放电高温', '充电低温', '放电低温', 'MOS高温', 'Batt高温', '短路保护', '放电欠温', '充电欠温', '预放失效', '预充失效', '低电关机', '充电MOSOP']
+            fault_names = ['电芯检测', '温度检测', '电流检测', '电压检测', '温差检测', '均衡异常', '过流监控', '充电MOS', '放电MOS', '预放MOS', '预充MOS', 'NTC异常']
+            info_names = ['充电MOSST', '放电MOSST', '预放MOS状态', '预充MOS状态', '充电中', '放电中', 'FullCharge', 'Empty', '无连接', '电池停用', 'Pack欠压告警', '告警可清除', 'Pack超温告警', 'Pack低温告警', '单体超温告警', '单体低温告警', '充电状态', '放电状态', 'Volt检测', 'Curr检测', 'Temp检测']
+            for name in alarm_names:
+                test_data.append({'name': name, 'value': random.randint(0, 1), 'type': 'alarm'})
+            for name in protect_names:
+                test_data.append({'name': name, 'value': random.randint(0, 1), 'type': 'protect'})
+            for name in fault_names:
+                test_data.append({'name': name, 'value': random.randint(0, 1), 'type': 'fault'})
+            for name in info_names:
+                test_data.append({'name': name, 'value': random.randint(0, 1), 'type': 'info'})
+            self.update_status_bits(test_data)
+            if self.logger:
+                self.logger.write_log(f"生成测试位标志数据: {len(test_data)} 个")
+        except Exception as e:
+            if self.logger:
+                self.logger.write_log(f"生成测试数据失败: {e}")
+
+    def update_status_bits(self, status_list):
+        """更新位标志（按类别分组）
+        Args:
+            status_list: 列表，每项格式为 {'name': str, 'value': int, 'type': str}
+        """
+        try:
+            categories = {'alarm': [], 'protect': [], 'fault': [], 'info': []}
+            for item in status_list:
+                if isinstance(item, dict):
+                    name = item.get('name', '')
+                    value = item.get('value', 0)
+                    item_type = item.get('type', 'info')
+                    if item_type in categories:
+                        categories[item_type].append((name, value))
+                else:
+                    name, value = item
+                    categories['info'].append((name, value))
+            max_rows = max(len(categories['alarm']), len(categories['protect']), len(categories['fault']), len(categories['info'])) if any(categories.values()) else 0
+            table_data = []
+            for i in range(max_rows):
+                row = []
+                for cat in ['alarm', 'protect', 'fault', 'info']:
+                    if i < len(categories[cat]):
+                        row.append(categories[cat][i][0])
+                        row.append(str(categories[cat][i][1]))
+                    else:
+                        row.append('')
+                        row.append('')
+                table_data.append(row)
+            self.table_model.update_data(table_data)
+        except Exception as e:
+            if self.logger:
+                self.logger.write_log(f"更新位标志失败: {e}")
+
+    def set_timeout_seconds(self, seconds):
+        """设置超时时间"""
+        self.table_model.set_timeout_seconds(seconds)
 

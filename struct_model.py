@@ -300,30 +300,30 @@ def get_all_status_bits_for_display(sbs_data_dict):
         sbs_data_dict: PC_GET_SBS 解析后的字典
 
     Returns:
-        list: 状态位列表，每项格式 {'name': str, 'value': int}，适合直接传给 update_status_bits()
+        list: 状态位列表，每项格式 {'name': str, 'value': int, 'type': str}，适合直接传给 update_status_bits()
     """
     all_status = parse_all_status_from_sbs(sbs_data_dict)
     display_list = []
 
-    # 添加告警状态（名称已包含"告_"前缀）
+    # 添加告警状态
     if 'alarm' in all_status:
         for bit in all_status['alarm']:
-            display_list.append({'name': bit['name'], 'value': bit['value']})
+            display_list.append({'name': bit['name'], 'value': bit['value'], 'type': 'alarm'})
 
-    # 添加保护状态（名称已包含"护_"前缀）
+    # 添加保护状态
     if 'protect' in all_status:
         for bit in all_status['protect']:
-            display_list.append({'name': bit['name'], 'value': bit['value']})
+            display_list.append({'name': bit['name'], 'value': bit['value'], 'type': 'protect'})
 
-    # 添加失效状态（名称已包含"错_"前缀）
+    # 添加失效状态
     if 'fault' in all_status:
         for bit in all_status['fault']:
-            display_list.append({'name': bit['name'], 'value': bit['value']})
+            display_list.append({'name': bit['name'], 'value': bit['value'], 'type': 'fault'})
 
-    # 添加其他信息（名称已包含"另_"前缀）
+    # 添加其他信息
     if 'info' in all_status:
         for bit in all_status['info']:
-            display_list.append({'name': bit['name'], 'value': bit['value']})
+            display_list.append({'name': bit['name'], 'value': bit['value'], 'type': 'info'})
 
     return display_list
 
