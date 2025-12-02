@@ -78,7 +78,6 @@ class SNCodeParser:
             result['产品品类'] = SN_PRODUCT_TYPE.get(sn_code[0], f'未知({sn_code[0]})')
             result['生产工厂'] = SN_FACTORY.get(sn_code[1], f'未知({sn_code[1]})')
             result['产品品牌'] = SN_BRAND.get(sn_code[2], f'未知({sn_code[2]})')
-            result['电芯品牌'] = SN_CELL_BRAND.get(sn_code[3], f'未知({sn_code[3]})')
             model_str = sn_code[4:9]
             if 'N' in model_str:
                 voltage = model_str[:model_str.index('N')] + '.' + model_str[model_str.index('N')+1:]
