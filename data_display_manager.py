@@ -45,21 +45,36 @@ except ImportError as e:
 
 
 class SNCodeParser:
-    """SN码解析器"""
+    """SN码解析器 - 支持电池和核心部件SN码"""
+    
     def parse_sn_code(self, sn_code):
-        """解析SN码
+        """自动识别并解析SN码
         Args:
-            sn_code: SN码字符串，例如 "BALP12100-NNN-A110001A-100Y"
+            sn_code: SN码字符串
         Returns:
             (success, result) 元组
         """
         try:
             sn_code = sn_code.strip().upper()
-            if len(sn_code) != 27:
-                return False, f"SN码长度错误：期望27位，实际{len(sn_code)}位"
+            if not sn_code:
+                return False, "输入为空"
+            first_char = sn_code[0]
+            if first_char == 'B' and len(sn_code) == 27:
+                return self.parse_battery_sn(sn_code)
+            elif first_char in 'CDIMAH' and len(sn_code) >= 25:
+                return self.parse_core_component_sn(sn_code)
+            else:
+                return False, f"无法识别的SN码格式（首字符: {first_char}, 长度: {len(sn_code)}）"
+        except Exception as e:
+            return False, f"解析失败: {str(e)}"
+    
+    def parse_battery_sn(self, sn_code):
+        """解析电池SN码（27位）"""
+        try:
             if sn_code[9] != '-' or sn_code[13] != '-' or sn_code[22] != '-':
-                return False, f"SN码格式错误：分隔符位置不正确"
+                return False, f"电池SN码格式错误：分隔符位置不正确"
             result = {}
+            result['SN码类型'] = '电池'
             result['产品品类'] = SN_PRODUCT_TYPE.get(sn_code[0], f'未知({sn_code[0]})')
             result['生产工厂'] = SN_FACTORY.get(sn_code[1], f'未知({sn_code[1]})')
             result['产品品牌'] = SN_BRAND.get(sn_code[2], f'未知({sn_code[2]})')
@@ -79,15 +94,7 @@ class SNCodeParser:
                 if func and func != '空位符':
                     functions.append(func)
             result['功能'] = '+'.join(functions) if functions else '基础款'
-            date_str = sn_code[14:17]
-            year_char, month_char, day_char = date_str[0], date_str[1], date_str[2]
-            year_offset = ord(year_char) - ord('A')
-            year = 2024 + year_offset
-            month_map = {'1':'01','2':'02','3':'03','4':'04','5':'05','6':'06','7':'07','8':'08','9':'09','A':'10','B':'11','C':'12'}
-            month = month_map.get(month_char, '??')
-            day_map = {'1':'01','2':'02','3':'03','4':'04','5':'05','6':'06','7':'07','8':'08','9':'09','A':'10','B':'11','C':'12','D':'13','E':'14','F':'15','G':'16','H':'17','I':'18','J':'19','K':'20','L':'21','M':'22','N':'23','O':'24','P':'25','Q':'26','R':'27','S':'28','T':'29','U':'30','V':'31'}
-            day = day_map.get(day_char, '??')
-            result['打包日期'] = f"{year}-{month}-{day}"
+            result['打包日期'] = self._parse_date(sn_code[14:17])
             result['序列号'] = sn_code[17:21]
             result['安装方式识别号'] = SN_INSTALL.get(sn_code[21], f'未知({sn_code[21]})')
             shell_code = sn_code[23:26]
@@ -100,7 +107,169 @@ class SNCodeParser:
             result['BMS板厂家'] = SN_BMS.get(sn_code[26], f'未知({sn_code[26]})')
             return True, result
         except Exception as e:
-            return False, f"解析失败: {str(e)}"
+            return False, f"电池SN码解析失败: {str(e)}"
+    
+    def parse_core_component_sn(self, sn_code):
+        """解析核心部件SN码（25-27位）"""
+        try:
+            result = {}
+            result['SN码类型'] = '核心部件'
+            product_types = {'C': 'AC-DC充电器', 'D': 'DC-DC充电器', 'I': '逆变器', 'M': 'MPPT太阳能控制器', 'A': '逆充一体机', 'H': '逆充控一体机'}
+            product_type = sn_code[0]
+            result['产品品类'] = product_types.get(product_type, f'未知({product_type})')
+            result['供应商代码'] = sn_code[1]
+            brands = {'L': 'Li Time', 'A': 'Ampere Time', 'P': 'Power Queen', 'R': 'REDODO', 'T': 'Time USB', 'S': 'Starry Sea'}
+            result['产品品牌'] = brands.get(sn_code[2], f'未知({sn_code[2]})')
+            specs = {'U': '美规', 'E': '欧规', 'J': '日规', 'R': '其他'}
+            result['出口规格'] = specs.get(sn_code[3], f'未知({sn_code[3]})')
+            if product_type == 'C':
+                result['型号'] = self._parse_charger_model(sn_code[4:9])
+                result['功能配置'] = self._parse_charger_functions(sn_code[10:13])
+            elif product_type == 'D':
+                result['型号'] = self._parse_dcdc_model(sn_code[4:9])
+                result['功能配置'] = self._parse_dcdc_functions(sn_code[10:13])
+            elif product_type == 'I':
+                result['型号'] = self._parse_inverter_model(sn_code[4:9])
+                result['功能配置'] = self._parse_inverter_functions(sn_code[10:13])
+            elif product_type == 'M':
+                result['型号'] = self._parse_mppt_model(sn_code[4:9])
+                result['功能配置'] = self._parse_mppt_functions(sn_code[10:13])
+            elif product_type == 'A':
+                result['型号'] = self._parse_inverter_charger_model(sn_code[4:9])
+                result['功能配置'] = self._parse_inverter_charger_functions(sn_code[10:13])
+            elif product_type == 'H':
+                result['型号'] = self._parse_hybrid_model(sn_code[4:9])
+                result['功能配置'] = self._parse_hybrid_functions(sn_code[10:13])
+            result['打包日期'] = self._parse_date(sn_code[14:17])
+            result['序列号'] = sn_code[17:21]
+            result['特殊功能'] = sn_code[21] if len(sn_code) > 21 else '-'
+            if len(sn_code) >= 25:
+                if product_type in ['A', 'H']:
+                    result['AC配置'] = sn_code[23:] if len(sn_code) > 23 else '-'
+                else:
+                    result['扩展信息'] = sn_code[23:] if len(sn_code) > 23 else '-'
+            return True, result
+        except Exception as e:
+            return False, f"核心部件SN码解析失败: {str(e)}"
+    
+    def _parse_date(self, date_str):
+        """解析打包日期"""
+        year_char, month_char, day_char = date_str[0], date_str[1], date_str[2]
+        year = 2024 + (ord(year_char) - ord('A'))
+        month_map = {'1':'01','2':'02','3':'03','4':'04','5':'05','6':'06','7':'07','8':'08','9':'09','A':'10','B':'11','C':'12'}
+        month = month_map.get(month_char, '??')
+        day_map = {'1':'01','2':'02','3':'03','4':'04','5':'05','6':'06','7':'07','8':'08','9':'09','A':'10','B':'11','C':'12','D':'13','E':'14','F':'15','G':'16','H':'17','I':'18','J':'19','K':'20','L':'21','M':'22','N':'23','O':'24','P':'25','Q':'26','R':'27','S':'28','T':'29','U':'30','V':'31'}
+        day = day_map.get(day_char, '??')
+        return f"{year}-{month}-{day}"
+    
+    def _parse_charger_model(self, model_str):
+        """解析AC-DC充电器型号"""
+        voltage_map = {'A': '12V', 'B': '24V', 'C': '36V', 'D': '48V', 'E': '72V'}
+        voltage = voltage_map.get(model_str[0], '未知')
+        current = model_str[1:3]
+        app_map = {'B': '蓝牙', 'W': 'WIFI', 'M': '蓝牙+WIFI', 'N': '无APP'}
+        app = app_map.get(model_str[4], '未知')
+        return f"{voltage} {current}A {app}"
+    
+    def _parse_dcdc_model(self, model_str):
+        """解析DC-DC充电器型号"""
+        voltage_map = {'A': '12V', 'B': '24V', 'C': '36V', 'D': '48V', 'E': '72V'}
+        voltage = voltage_map.get(model_str[0], '未知')
+        current = int(model_str[1:3])
+        app_map = {'B': '蓝牙', 'W': 'WIFI', 'N': '无APP'}
+        app = app_map.get(model_str[4], '未知')
+        return f"{voltage} {current}A {app}"
+    
+    def _parse_inverter_model(self, model_str):
+        """解析逆变器型号"""
+        voltage_map = {'A': '12V', 'B': '24V', 'C': '36V', 'D': '48V', 'E': '72V'}
+        voltage = voltage_map.get(model_str[0], '未知')
+        power = int(model_str[1:3]) * 100
+        return f"{voltage} {power}W"
+    
+    def _parse_mppt_model(self, model_str):
+        """解析MPPT型号"""
+        voltage_map = {'A': '12V', 'B': '24V', 'C': '36V', 'D': '48V', 'E': '72V'}
+        voltage = voltage_map.get(model_str[0], '未知')
+        current = int(model_str[1:3])
+        app_map = {'B': '蓝牙', 'W': 'WIFI', 'N': '无APP'}
+        app = app_map.get(model_str[4], '未知')
+        return f"{voltage} {current}A {app}"
+    
+    def _parse_inverter_charger_model(self, model_str):
+        """解析逆充一体机型号"""
+        voltage_map = {'A': '12V', 'B': '24V', 'C': '36V', 'D': '48V', 'E': '72V'}
+        voltage = voltage_map.get(model_str[0], '未知')
+        power = int(model_str[1:3]) * 100
+        charge_current = int(model_str[3:5])
+        return f"{voltage} {power}W 充电{charge_current}A"
+    
+    def _parse_hybrid_model(self, model_str):
+        """解析逆充控一体机型号"""
+        voltage_map = {'A': '12V', 'B': '24V', 'C': '36V', 'D': '48V', 'E': '72V'}
+        voltage = voltage_map.get(model_str[0], '未知')
+        power = int(model_str[1:3]) * 100
+        pv_voltage = 'PV低压' if model_str[3] == 'L' else 'PV高压'
+        app_map = {'B': '蓝牙', 'W': 'WIFI', 'M': '蓝牙+WIFI', 'N': '无APP'}
+        app = app_map.get(model_str[4], '无APP')
+        return f"{voltage} {power}W {pv_voltage} {app}"
+    
+    def _parse_charger_functions(self, func_str):
+        """解析充电器功能配置"""
+        functions = []
+        if func_str[0] == 'P': functions.append('PFC')
+        if func_str[1] == 'F': functions.append('风冷散热')
+        elif func_str[1] == 'N': functions.append('自然散热')
+        if func_str[2] == 'W': functions.append('防水')
+        return '+'.join(functions) if functions else '标准配置'
+    
+    def _parse_dcdc_functions(self, func_str):
+        """解析DC-DC功能配置"""
+        functions = []
+        if func_str[0] == 'E': functions.append('发电机')
+        if func_str[1] == 'L': functions.append('锂电池模式')
+        if func_str[2] != 'N': functions.append(f'通讯-{func_str[2]}')
+        return '+'.join(functions) if functions else '标准配置'
+    
+    def _parse_inverter_functions(self, func_str):
+        """解析逆变器功能配置"""
+        functions = []
+        if func_str[0] == 'H': functions.append('高频')
+        elif func_str[0] == 'F': functions.append('工频')
+        screen_map = {'B': '内置屏', 'E': '外置屏', 'N': '无屏'}
+        functions.append(screen_map.get(func_str[1], '未知'))
+        if func_str[2] == 'S': functions.append('远程开关')
+        return '+'.join(functions)
+    
+    def _parse_mppt_functions(self, func_str):
+        """解析MPPT功能配置"""
+        functions = []
+        if func_str[0] == 'F': functions.append('负载端口')
+        if func_str[1] == 'L': functions.append('低温保护')
+        if func_str[2] == 'W': functions.append('防水')
+        return '+'.join(functions) if functions else '标准配置'
+    
+    def _parse_inverter_charger_functions(self, func_str):
+        """解析逆充一体机功能配置"""
+        functions = []
+        if func_str[0] == 'H': functions.append('高频')
+        elif func_str[0] == 'F': functions.append('工频')
+        screen_map = {'B': '内置屏', 'E': '外置屏', 'N': '无屏'}
+        functions.append(screen_map.get(func_str[1], '未知'))
+        if func_str[2] == 'S': functions.append('远程开关')
+        return '+'.join(functions)
+    
+    def _parse_hybrid_functions(self, func_str):
+        """解析逆充控一体机功能配置"""
+        functions = []
+        if func_str[0] == 'H': functions.append('高频')
+        elif func_str[0] == 'F': functions.append('工频')
+        comm_map = {'C': 'CAN', '4': 'RS485', '2': 'RS232', 'N': '无通讯'}
+        functions.append(comm_map.get(func_str[1], '未知'))
+        parallel = func_str[2]
+        if parallel != '1':
+            functions.append(f'可并机{parallel}台')
+        return '+'.join(functions)
 class DataParserManager:
     """数据解析管理器 - 封装数据解析逻辑"""
 
@@ -542,7 +711,7 @@ class DataDisplayManager(QMainWindow):
         input_layout.addWidget(input_label)
         self.sn_input = QTextEdit()
         self.sn_input.setMaximumHeight(60)
-        self.sn_input.setPlaceholderText("输入27位SN码，例如：BALP12100-NNN-A110001A-100Y")
+        self.sn_input.setPlaceholderText("输入SN码（自动识别电池或核心部件）\n例如：BALP12100-NNN-A110001A-100Y")
         font = self.sn_input.font()
         font.setFamily('Consolas, Courier New, monospace')
         font.setPointSize(12)
@@ -558,14 +727,33 @@ class DataDisplayManager(QMainWindow):
         parse_sn_btn.setFont(font)
         parse_sn_btn.clicked.connect(self.parse_sn_code)
         button_layout.addWidget(parse_sn_btn)
-        example1_btn = QPushButton('示例1: 12V100Ah')
-        example1_btn.clicked.connect(lambda: self.sn_input.setText('BALP12100-NNN-A110001A-100Y'))
-        button_layout.addWidget(example1_btn)
-        example2_btn = QPushButton('示例2: 蓝牙款')
-        example2_btn.clicked.connect(lambda: self.sn_input.setText('BALP12100-BNN-A110001A-100Y'))
-        button_layout.addWidget(example2_btn)
         button_layout.addStretch()
         input_layout.addLayout(button_layout)
+        example_layout = QHBoxLayout()
+        example_label = QLabel('电池示例:')
+        example_layout.addWidget(example_label)
+        example1_btn = QPushButton('12V100Ah')
+        example1_btn.clicked.connect(lambda: self.sn_input.setText('BALP12100-NNN-A110001A-100Y'))
+        example_layout.addWidget(example1_btn)
+        example2_btn = QPushButton('蓝牙款')
+        example2_btn.clicked.connect(lambda: self.sn_input.setText('BALP12100-BNN-A110001A-100Y'))
+        example_layout.addWidget(example2_btn)
+        example_layout.addStretch()
+        input_layout.addLayout(example_layout)
+        example_layout2 = QHBoxLayout()
+        example_label2 = QLabel('核心部件示例:')
+        example_layout2.addWidget(example_label2)
+        example3_btn = QPushButton('充电器')
+        example3_btn.clicked.connect(lambda: self.sn_input.setText('CHLRA2030B-PFN-A110001R-NNN'))
+        example_layout2.addWidget(example3_btn)
+        example4_btn = QPushButton('逆变器')
+        example4_btn.clicked.connect(lambda: self.sn_input.setText('IHLRA3000N-HEN-A110001R-NNN'))
+        example_layout2.addWidget(example4_btn)
+        example5_btn = QPushButton('MPPT')
+        example5_btn.clicked.connect(lambda: self.sn_input.setText('MHLRB030B-FLN-A110001R-N4RR'))
+        example_layout2.addWidget(example5_btn)
+        example_layout2.addStretch()
+        input_layout.addLayout(example_layout2)
         layout.addLayout(input_layout)
         output_label = QLabel('解析结果:')
         output_label_font = output_label.font()
@@ -594,13 +782,18 @@ class DataDisplayManager(QMainWindow):
         self.sn_output.append(f"{'='*60}\n")
         success, result = self.data_parser.sn_parser.parse_sn_code(sn_code)
         if success:
+            sn_type = result.get('SN码类型', '未知')
+            type_emoji = '🔋' if sn_type == '电池' else '⚡'
             self.sn_output.append(f"✅ 解析成功！")
+            self.sn_output.append(f"{type_emoji} SN码类型: {sn_type}")
             self.sn_output.append(f"📋 SN码: {sn_code}")
             self.sn_output.append(f"")
             self.sn_output.append(f"📊 详细信息:")
             self.sn_output.append(f"{'-'*60}")
             max_label_len = 8
             for key, value in result.items():
+                if key == 'SN码类型':
+                    continue
                 key_len = len(key)
                 padding = '　' * (max_label_len - key_len)
                 self.sn_output.append(f"  {key}{padding} : {value}")
