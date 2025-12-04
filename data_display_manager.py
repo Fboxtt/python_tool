@@ -103,39 +103,49 @@ class SNCodeParser:
                 result['壳体型号'] = shell_code
             else:
                 result['壳体型号'] = 'A' + shell_code
-            result['BMS板厂家'] = SN_BMS.get(sn_code[26], f'未知({sn_code[26]})')
+            # result['BMS板厂家'] = SN_BMS.get(sn_code[26], f'未知({sn_code[26]})')
             return True, result
         except Exception as e:
             return False, f"电池SN码解析失败: {str(e)}"
     
     def parse_core_component_sn(self, sn_code):
         """解析核心部件SN码（27位）
-        格式：品类(1)+供应商(1)+品牌(1)+规格(1)+型号(5-6)+-+功能(3)+-+日期(3)+序列(4)+特殊(1)+-+扩展(3-4)
-        注意：不同产品类型的型号长度不同，需要动态查找分隔符
+        格式：品类(1)+供应商(1)+品牌(1)+预留(1)+型号(5-6)+-+功能(3)+-+日期(3)+序列(4)+预留(1)+-+特殊(3)+规格(1)
+        参考文件：APSD-WI-PD-01 核心部件SN码编码规则
+        注意：型号长度可能是5位或6位，需动态查找分隔符
         """
         try:
             if len(sn_code) != 27:
                 return False, f"核心部件SN码长度错误：期望27位，实际{len(sn_code)}位"
+            
+            # 动态查找分隔符位置
             separators = [i for i, c in enumerate(sn_code) if c == '-']
             if len(separators) != 3:
                 return False, f"核心部件SN码格式错误：应包含3个分隔符，实际{len(separators)}个"
             sep1, sep2, sep3 = separators
+
             result = {}
             result['SN码类型'] = '核心部件'
-            product_types = {'C': 'AC-DC充电器', 'D': 'DC-DC充电器', 'I': '逆变器', 'M': 'MPPT太阳能控制器', 'A': '逆充一体机', 'H': '逆充控一体机'}
+            product_types = {'C': 'AC-DC充电器', 'D': 'DC-DC充电器', 'I': '逆变器', 'M': 'MPPT太阳能控制器', 'P': 'PWM太阳能控制器', 'A': '逆充一体机', 'H': '逆充控一体机'}
             product_type = sn_code[0]
             result['产品品类'] = product_types.get(product_type, f'未知({product_type})')
             result['供应商代码'] = sn_code[1]
             brands = {'L': 'Li Time', 'A': 'Ampere Time', 'P': 'Power Queen', 'R': 'REDODO', 'T': 'Time USB', 'S': 'Starry Sea'}
             result['产品品牌'] = brands.get(sn_code[2], f'未知({sn_code[2]})')
-            specs = {'U': '美规', 'E': '欧规', 'J': '日规', 'R': '其他'}
-            result['出口规格'] = specs.get(sn_code[3], f'未知({sn_code[3]})')
+            
+            # 第4位是预留位
+            result['功能预留位'] = sn_code[3]
+
+            # 动态提取各字段
             model_str = sn_code[4:sep1]
             func_str = sn_code[sep1+1:sep2]
             date_str = sn_code[sep2+1:sep2+4]
-            serial_str = sn_code[sep2+4:sep3]
-            special_char = sn_code[sep3-1]
-            extend_str = sn_code[sep3+1:]
+            serial_str = sn_code[sep2+4:sep2+8]  # 序列号4位
+            reserved_char = sn_code[sep2+8]       # 分隔符前一位是预留位
+            special_str = sn_code[sep3+1:sep3+4] # 特殊功能位3位
+            spec_char = sn_code[sep3+4] if len(sn_code) > sep3+4 else 'R'  # 最后一位
+
+            # 解析型号
             if product_type == 'C':
                 result['型号'] = self._parse_charger_model(model_str)
                 result['功能配置'] = self._parse_charger_functions(func_str)
@@ -145,7 +155,7 @@ class SNCodeParser:
             elif product_type == 'I':
                 result['型号'] = self._parse_inverter_model(model_str)
                 result['功能配置'] = self._parse_inverter_functions(func_str)
-            elif product_type == 'M':
+            elif product_type in ['M', 'P']:
                 result['型号'] = self._parse_mppt_model(model_str)
                 result['功能配置'] = self._parse_mppt_functions(func_str)
             elif product_type == 'A':
@@ -154,13 +164,26 @@ class SNCodeParser:
             elif product_type == 'H':
                 result['型号'] = self._parse_hybrid_model(model_str)
                 result['功能配置'] = self._parse_hybrid_functions(func_str)
+
             result['打包日期'] = self._parse_date(date_str)
             result['序列号'] = serial_str
-            result['特殊功能'] = special_char
-            result['扩展信息'] = extend_str
+            result['特殊预留位'] = '保留' if reserved_char == 'R' else reserved_char
+            
+            # 解析特殊功能位
+            result['特殊功能'] = self._parse_special_features(special_str, product_type)
+            
+            # 解析出口规格
+            specs = {'U': '美规', 'E': '欧规', 'J': '日规', 'R': '其他'}
+            if product_type in ['C', 'I', 'A', 'H']:
+                result['出口规格'] = specs.get(spec_char, f'未知({spec_char})')
+            else:
+                result['出口规格'] = '保留' if spec_char == 'R' else spec_char
+
             return True, result
         except Exception as e:
-            return False, f"核心部件SN码解析失败: {str(e)}"
+            import traceback
+            error_detail = traceback.format_exc()
+            return False, f"核心部件SN码解析失败: {str(e)}\n{error_detail}"
     
     def _parse_date(self, date_str):
         """解析打包日期"""
@@ -173,59 +196,122 @@ class SNCodeParser:
         return f"{year}-{month}-{day}"
     
     def _parse_charger_model(self, model_str):
-        """解析AC-DC充电器型号（6位：电压+电流2位+保留2位+APP）"""
-        voltage_map = {'A': '12V', 'B': '24V', 'C': '36V', 'D': '48V', 'E': '72V'}
+        """解析AC-DC充电器型号（5-6位）"""
+        if len(model_str) < 5: return f"未知型号({model_str})"
+        voltage_map = {'A': '12V', 'B': '24V', 'C': '36V', 'D': '48V', 'E': '72V', 'X': '16V'}
         voltage = voltage_map.get(model_str[0], '未知')
-        current = model_str[1:3]
-        app_map = {'B': '蓝牙', 'W': 'WIFI', 'M': '蓝牙+WIFI', 'N': '无APP'}
-        app = app_map.get(model_str[5] if len(model_str) > 5 else 'N', '未知')
-        return f"{voltage} {current}A {app}"
+        # 电流位在最后2位
+        current_code = model_str[-2:]
+        return f"{voltage} {current_code}A"
     
     def _parse_dcdc_model(self, model_str):
-        """解析DC-DC充电器型号（5位：电压+电流2位+保留+APP）"""
-        voltage_map = {'A': '12V', 'B': '24V', 'C': '36V', 'D': '48V', 'E': '72V'}
-        voltage = voltage_map.get(model_str[0], '未知')
-        current = model_str[1:3]
-        app_map = {'B': '蓝牙', 'W': 'WIFI', 'N': '无APP', '0': '无APP'}
-        app = app_map.get(model_str[4] if len(model_str) > 4 else 'N', '未知')
-        return f"{voltage} {current}A {app}"
+        """解析DC-DC充电器型号（5位）"""
+        if len(model_str) < 5: return f"未知型号({model_str})"
+        voltage_map = {'A': '12V', 'B': '24V', 'C': '36V', 'D': '48V', 'E': '72V', 'X': '16V'}
+        in_voltage = voltage_map.get(model_str[0], '未知')
+        out_voltage = voltage_map.get(model_str[1], '未知')
+        current_code = model_str[-2:]
+        return f"{in_voltage}-{out_voltage} {current_code}A"
     
     def _parse_inverter_model(self, model_str):
-        """解析逆变器型号（6位：电压+功率2位+保留2位+APP）"""
+        """解析逆变器型号（5-6位）"""
+        if len(model_str) < 5: return f"未知型号({model_str})"
         voltage_map = {'A': '12V', 'B': '24V', 'C': '36V', 'D': '48V', 'E': '72V'}
         voltage = voltage_map.get(model_str[0], '未知')
-        power = int(model_str[1:3]) * 100
-        app_map = {'B': '蓝牙', 'W': 'WIFI', 'N': '无APP'}
-        app = app_map.get(model_str[5] if len(model_str) > 5 else 'N', '未知')
-        return f"{voltage} {power}W {app}"
+        # 功率在中间，波形在最后一位
+        wave = '纯正弦波' if model_str[-1] == 'P' else '修正弦波'
+        power_str = model_str[1:-1]  # 去掉首尾
+        try:
+            power = int(power_str) * 10
+        except:
+            power = power_str
+        return f"{voltage} {power}W {wave}"
     
     def _parse_mppt_model(self, model_str):
-        """解析MPPT型号（5位：电压+电流3位+APP）"""
+        """解析MPPT型号（5位）"""
+        if len(model_str) < 5: return f"未知型号({model_str})"
         voltage_map = {'A': '12V', 'B': '24V', 'C': '36V', 'D': '48V', 'E': '72V'}
         voltage = voltage_map.get(model_str[0], '未知')
         current = model_str[1:4]
-        app_map = {'B': '蓝牙', 'W': 'WIFI', 'N': '无APP', '0': '无APP'}
-        app = app_map.get(model_str[4] if len(model_str) > 4 else 'N', '未知')
+        app_map = {'B': '蓝牙', 'W': 'WIFI', 'N': '无APP'}
+        app = app_map.get(model_str[4], '未知')
         return f"{voltage} {current}A {app}"
     
     def _parse_inverter_charger_model(self, model_str):
-        """解析逆充一体机型号（6位：电压+功率2位+充电电流2位+APP）"""
+        """解析逆充一体机型号（5位）"""
+        if len(model_str) < 5: return f"未知型号({model_str})"
         voltage_map = {'A': '12V', 'B': '24V', 'C': '36V', 'D': '48V', 'E': '72V'}
         voltage = voltage_map.get(model_str[0], '未知')
-        power = int(model_str[1:3]) * 100
+        power = model_str[1:3]
         charge_current = model_str[3:5]
-        app = '蓝牙' if len(model_str) > 5 and model_str[5] == 'B' else '无APP'
-        return f"{voltage} {power}W 充电{charge_current}A {app}"
+        try:
+            power = int(power) * 100
+        except:
+            pass
+        return f"{voltage} {power}W 充电{charge_current}A"
     
     def _parse_hybrid_model(self, model_str):
-        """解析逆充控一体机型号（6位：电压+功率2位+PV电压+保留+APP）"""
+        """解析逆充控一体机型号（5位）"""
+        if len(model_str) < 5: return f"未知型号({model_str})"
         voltage_map = {'A': '12V', 'B': '24V', 'C': '36V', 'D': '48V', 'E': '72V'}
         voltage = voltage_map.get(model_str[0], '未知')
-        power = int(model_str[1:3]) * 100
-        pv_voltage = 'PV低压' if len(model_str) > 3 and model_str[3] == 'L' else 'PV高压'
+        power = model_str[1:3]
+        try:
+            power = int(power) * 100
+        except:
+            pass
+        pv_voltage = 'PV低压' if model_str[3] == 'L' else 'PV高压'
         app_map = {'B': '蓝牙', 'W': 'WIFI', 'M': '蓝牙+WIFI', 'N': '无APP'}
-        app = app_map.get(model_str[5] if len(model_str) > 5 else 'N', '无APP')
+        app = app_map.get(model_str[4], '无APP')
         return f"{voltage} {power}W {pv_voltage} {app}"
+
+    def _parse_special_features(self, special_str, product_type):
+        """解析特殊功能位（3位）"""
+        if len(special_str) != 3: return special_str
+        
+        info_parts = []
+        c1, c2, c3 = special_str[0], special_str[1], special_str[2]
+        
+        if product_type == 'C': # AC-DC: 转接头+提手+显示屏
+            info_parts.append('AC可换转接头' if c1 == 'T' else ('AC不可转接头' if c1 == 'N' else c1))
+            info_parts.append('带提手' if c2 == 'H' else ('不带提手' if c2 == 'N' else c2))
+            info_parts.append('带显示屏' if c3 == 'D' else ('保留' if c3 == 'R' else c3))
+            
+        elif product_type == 'D': # DC-DC: 反向+限流+预留
+            info_parts.append('反向充电' if c1 == 'F' else ('无反向充电' if c1 == 'N' else c1))
+            info_parts.append('限流功能' if c2 == 'S' else ('保留' if c2 == 'R' else c2))
+            info_parts.append('保留' if c3 == 'R' else c3)
+            
+        elif product_type == 'I': # 逆变器: AC接口数+USB+接线
+            if c1.isdigit(): info_parts.append(f"{c1}个AC接口")
+            else: info_parts.append(c1)
+            usb_map = {'U': 'USB-A', 'T': 'Type-C', 'M': 'USB-A+Type-C', 'N': '无USB'}
+            info_parts.append(usb_map.get(c2, c2))
+            conn_map = {'L': '接线', 'G': '接地', 'M': '接地+接线'}
+            info_parts.append(conn_map.get(c3, c3))
+            
+        elif product_type in ['M', 'P']: # MPPT: 散热+通讯+并机
+            cooling_map = {'A': '风冷散热', 'N': '自然散热'}
+            info_parts.append(cooling_map.get(c1, c1))
+            comm_map = {'C': 'CAN', '4': '485', '2': '232', 'N': '无通讯'}
+            info_parts.append(comm_map.get(c2, c2))
+            info_parts.append('可并机' if c3 == 'P' else ('保留' if c3 == 'R' else c3))
+            
+        elif product_type == 'A': # 逆充: AC接口数+端子+预留
+            if c1.isdigit(): info_parts.append(f"{c1}个AC接口")
+            else: info_parts.append(c1)
+            term_map = {'L': 'AC输出端子', 'G': '接地', 'M': '接地+输出端子'}
+            info_parts.append(term_map.get(c2, c2))
+            info_parts.append('保留' if c3 == 'R' else c3)
+            
+        elif product_type == 'H': # 逆充控: 离并网+相数+防水
+            grid_map = {'A': '离网', 'B': '并网', 'X': '混合'}
+            info_parts.append(grid_map.get(c1, c1))
+            phase_map = {'S': '单相', 'T': '三相', 'P': '分相'}
+            info_parts.append(phase_map.get(c2, c2))
+            info_parts.append('防水' if c3 == 'W' else ('保留' if c3 == 'R' else c3))
+            
+        return '+'.join(info_parts)
     
     def _parse_charger_functions(self, func_str):
         """解析充电器功能配置"""
@@ -283,6 +369,7 @@ class SNCodeParser:
         if parallel != '1':
             functions.append(f'可并机{parallel}台')
         return '+'.join(functions)
+    
 class DataParserManager:
     """数据解析管理器 - 封装数据解析逻辑"""
 
@@ -806,12 +893,20 @@ class DataDisplayManager(QMainWindow):
             self.sn_output.append(f"")
             self.sn_output.append(f"📊 详细信息:")
             self.sn_output.append(f"{'-'*60}")
-            max_label_len = 8
+            
+            # 动态计算最长的标签长度
+            keys = [k for k in result.keys() if k != 'SN码类型']
+            max_label_len = max((len(k) + (k.count('BMS') * 0.5) for k in keys), default=8)
+            max_label_len = int(max_label_len) + 2 # 增加一点余量
+
             for key, value in result.items():
                 if key == 'SN码类型':
                     continue
-                key_len = len(key)
-                padding = '　' * (max_label_len - key_len)
+                # 简单对齐逻辑：中文占2位，英文占1位
+                # 这里使用全角空格填充
+                current_len = len(key)
+                padding_len = max(0, max_label_len - current_len)
+                padding = '　' * padding_len
                 self.sn_output.append(f"  {key}{padding} : {value}")
         else:
             self.sn_output.append(f"❌ 解析失败！")
