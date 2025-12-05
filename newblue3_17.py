@@ -451,6 +451,58 @@ class BluetoothTool(QWidget):
         # 将关机控制部分添加到左侧布局
         left_layout.addLayout(shutdown_layout)
 
+        # 添加加热模式控制部分
+        heating_layout = QVBoxLayout()
+
+        # 加热模式标题
+        heating_title = QLabel('加热模式控制')
+        heating_title.setFont(QFont('Arial', 12, QFont.Weight.Bold))
+        heating_layout.addWidget(heating_title)
+
+        # 加热模式按钮行
+        heating_buttons_layout = QHBoxLayout()
+
+        # 自加热模式按钮
+        self.self_heating_button = QPushButton('🔥 自加热模式')
+        self.self_heating_button.clicked.connect(self.on_self_heating_clicked)
+        self.self_heating_button.setStyleSheet("""
+            QPushButton {
+                background-color: #e74c3c;
+                color: white;
+                border: none;
+                padding: 8px;
+                border-radius: 4px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #c0392b;
+            }
+        """)
+        heating_buttons_layout.addWidget(self.self_heating_button)
+
+        # 充电器加热模式按钮
+        self.charger_heating_button = QPushButton('⚡ 充电器加热模式')
+        self.charger_heating_button.clicked.connect(self.on_charger_heating_clicked)
+        self.charger_heating_button.setStyleSheet("""
+            QPushButton {
+                background-color: #3498db;
+                color: white;
+                border: none;
+                padding: 8px;
+                border-radius: 4px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #2980b9;
+            }
+        """)
+        heating_buttons_layout.addWidget(self.charger_heating_button)
+
+        heating_layout.addLayout(heating_buttons_layout)
+
+        # 将加热模式控制部分添加到左侧布局
+        left_layout.addLayout(heating_layout)
+
         # 添加RT控制部分
         rt_layout = QVBoxLayout()
 
@@ -1680,6 +1732,20 @@ class BluetoothTool(QWidget):
         """发送关机指令"""
         self.send_command(self.text_decode.send_hex_fill(0x60))
 
+    def on_self_heating_clicked(self):
+        """处理自加热模式按钮点击事件"""
+        # 发送自加热模式指令: 00 00 08 01 17 55 AA 02 00 00 00 21
+        bytedata = bytes([0x00, 0x00, 0x08, 0x01, 0x17, 0x55, 0xAA, 0x02, 0x00, 0x00, 0x00, 0x21])
+        self.send_command(bytedata)
+        self.blue_write_log("已发送自加热模式指令 (0x00210000)")
+
+    def on_charger_heating_clicked(self):
+        """处理充电器加热模式按钮点击事件"""
+        # 发送充电器加热模式指令: 00 00 08 01 17 55 AA 01 00 00 00 20
+        bytedata = bytes([0x00, 0x00, 0x08, 0x01, 0x17, 0x55, 0xAA, 0x01, 0x00, 0x00, 0x00, 0x20])
+        self.send_command(bytedata)
+        self.blue_write_log("已发送充电器加热模式指令 (0x00010000)")
+
     def on_batch_program_clicked(self):
         """同步方法，批量烧录100次"""
         if self.batch_task:
@@ -2669,9 +2735,31 @@ class SimplifiedBluetoothTool(QWidget):
         self.shutdown_button = self.bluetooth_tool.shutdown_button
         shutdown_layout.addWidget(self.shutdown_button)
         main_layout.addLayout(shutdown_layout)
+
+        # ========== 加热模式控制 ==========
+        heating_layout = QVBoxLayout()
+        heating_title = QLabel('加热模式')
+        heating_title.setFont(QFont('Arial', 11, QFont.Weight.Bold))
+        heating_layout.addWidget(heating_title)
+
+        heating_buttons_layout = QHBoxLayout()
+        heating_buttons_layout.setSpacing(3)
+
+        # 使用原窗口的加热模式按钮
+        self.self_heating_button = self.bluetooth_tool.self_heating_button
+        self.charger_heating_button = self.bluetooth_tool.charger_heating_button
+
+        for btn in [self.self_heating_button, self.charger_heating_button]:
+            btn.setMaximumWidth(140)
+
+        heating_buttons_layout.addWidget(self.self_heating_button)
+        heating_buttons_layout.addWidget(self.charger_heating_button)
+
+        heating_layout.addLayout(heating_buttons_layout)
+        main_layout.addLayout(heating_layout)
         
         self.setLayout(main_layout)
-        self.setFixedSize(520, 460)
+        self.setFixedSize(520, 520)
     
     def focusOutEvent(self, event):
         """失去焦点时隐藏（点击窗口外部）"""
