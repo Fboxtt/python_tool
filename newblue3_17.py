@@ -987,6 +987,8 @@ class BluetoothTool(QWidget):
 
         self.device_list.clear()
         self.device_name_to_address.clear()  # 清空设备映射
+        # 先收集所有符合条件的设备
+        device_info_list = []
         for device, advertisement_data in discovered_devices.values():
             # 只显示有名字且信号强度符合要求的设备
             if device.name and advertisement_data.rssi > rssi_threshold:
@@ -1010,8 +1012,17 @@ class BluetoothTool(QWidget):
                 # 保存设备名到地址的映射
                 self.device_name_to_address[device.name] = device.address
 
-                # 添加到设备列表，去掉地址显示，添加密码状态
-                self.device_list.addItem(f"{device.name} (RSSI: {advertisement_data.rssi}){password_status_short}")
+                # 收集设备信息
+                device_info_list.append({
+                    'name': device.name,
+                    'rssi': advertisement_data.rssi,
+                    'password_status': password_status_short
+                })
+        # 按信号强度降序排序（从强到弱）
+        device_info_list.sort(key=lambda x: x['rssi'], reverse=True)
+        # 添加到设备列表
+        for device_info in device_info_list:
+            self.device_list.addItem(f"{device_info['name']} (RSSI: {device_info['rssi']}){device_info['password_status']}")
                 # 获取更有用的设备信息
                 # device_info = f"发现设备: {device.name} - {device.address} - (RSSI: {advertisement_data.rssi})"
 
