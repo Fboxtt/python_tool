@@ -446,6 +446,22 @@ class BluetoothTool(QWidget):
         # 将充电控制部分添加到左侧布局
         left_layout.addLayout(charge_layout)
 
+        # 添加保电控制部分
+        store_power_layout = QHBoxLayout()
+
+        # 打开保电按钮
+        self.open_store_power_button = QPushButton('打开保电')
+        self.open_store_power_button.clicked.connect(self.on_open_store_power_clicked)
+        store_power_layout.addWidget(self.open_store_power_button)
+
+        # 关闭保电按钮
+        self.close_store_power_button = QPushButton('关闭保电')
+        self.close_store_power_button.clicked.connect(self.on_close_store_power_clicked)
+        store_power_layout.addWidget(self.close_store_power_button)
+
+        # 将保电控制部分添加到左侧布局
+        left_layout.addLayout(store_power_layout)
+
         # 添加关机控制部分
         shutdown_layout = QHBoxLayout()
 
@@ -1697,6 +1713,20 @@ class BluetoothTool(QWidget):
         bytedata = bytes([0x00,0x00,0x04,0x01,0x0B,0x55,0xaa,0x0F])
         self.send_command(bytedata)
 
+    def on_open_store_power_clicked(self):
+        """处理打开保电按钮点击事件"""
+        # 发送打开保电的指令数据: 00 00 08 01 19 55 AA 55 55 55 55 75
+        bytedata = bytes([0x00, 0x00, 0x08, 0x01, 0x19, 0x55, 0xAA, 0x55, 0x55, 0x55, 0x55, 0x75])
+        self.send_command(bytedata)
+        self.blue_write_log("已发送开启保电指令 (0x00010000)")
+
+    def on_close_store_power_clicked(self):
+        """处理关闭保电按钮点击事件"""
+        # 发送关闭保电的指令数据: 00 00 08 01 19 55 AA AA AA AA AA C9
+        bytedata = bytes([0x00, 0x00, 0x08, 0x01, 0x19, 0x55, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xC9])
+        self.send_command(bytedata)
+        self.blue_write_log("已发送关闭保电指令 (0x00210000)")
+
     def on_rt0_enable_clicked(self):
         """处理RT0使能按钮点击事件"""
         # 发送RT0使能指令 (0x31)
@@ -2768,6 +2798,22 @@ class SimplifiedBluetoothTool(QWidget):
         charge_discharge_layout.addWidget(self.close_discharge_button)
 
         main_layout.addLayout(charge_discharge_layout)
+
+        # ========== 保电控制（横排紧凑）==========
+        store_power_layout = QHBoxLayout()
+        store_power_layout.setSpacing(3)
+
+        # 使用原窗口的保电按钮
+        self.open_store_power_button = self.bluetooth_tool.open_store_power_button
+        self.close_store_power_button = self.bluetooth_tool.close_store_power_button
+
+        for btn in [self.open_store_power_button, self.close_store_power_button]:
+            btn.setMaximumWidth(90)
+
+        store_power_layout.addWidget(self.open_store_power_button)
+        store_power_layout.addWidget(self.close_store_power_button)
+
+        main_layout.addLayout(store_power_layout)
 
         # ========== 关机控制 ==========
         shutdown_layout = QHBoxLayout()
