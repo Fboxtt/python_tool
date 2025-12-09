@@ -122,6 +122,12 @@ class BluetoothTool(QWidget):
         self.ota_start_count = 0
         self.ota_ok_count = 0
         self.batch_task = None
+        # 响应状态标志（用于test_send_data等功能，基于信号机制）
+        self.last_response_status = None  # None=未收到, True=已收到
+        self.last_response_ack = None  # 响应的ACK码
+
+        # 连接receive_ok_signal到内部槽函数
+        self.receive_ok_signal.connect(self._on_receive_response)
 
         # 检测当前配置并设置checkbox状态（不触发信号）
         self.detect_and_set_cell_config()
@@ -1199,25 +1205,32 @@ class BluetoothTool(QWidget):
         """异步方法，发送测试数据"""
         data = self.text_decode.send_hex_fill(0x13)
         self.send_count = 0
-        send_max_count = 100
+        send_max_count = 10000
         while send_max_count:
             send_max_count-=1
             time512 = int(self.test512.text()) / 1000 * 2
             if self.client and self.client.is_connected:
                 try:
+                    # 重置响应状态（基于信号机制，解耦text_decode.legality）
+                    self.last_response_status = None
+                    self.last_response_ack = None
+                    
                     # 假设设备的写特征 UUID 是 "0000ffe1-0000-1000-8000-00805f9b34fb"
                     self.byte_send(data)
                     await self.client.write_gatt_char("0000ffe1-0000-1000-8000-00805f9b34fb", data)
                     self.display_send_data(data)
-                    # time.sleep(time512)
+                    time.sleep(time512)
                     self.send_count += 1
                     self.total_send_label.setText(f'总 = {self.send_count}')
 
+                    # 等待响应（基于信号机制）
                     await asyncio.sleep(0.4)
-                    if self.text_decode.legality == ReceveDataStatus.ERR_NOTHING:
+                    if self.last_response_status is None:
                         await asyncio.sleep(0.7)
-                    if self.text_decode.legality != ReceveDataStatus.ERR_NOTHING:
-                        if self.text_decode.cmd_ack in [0x00]:
+                    
+                    # 检查响应状态（基于信号机制，不再依赖text_decode.legality）
+                    if self.last_response_status is True:
+                        if self.last_response_ack in [0x00]:
                             self.blue_write_log("回复成功")
                         else:
                             self.err_ack_count+=1
@@ -1240,7 +1253,7 @@ class BluetoothTool(QWidget):
                 except Exception as e:
                     traceback.print_exc()
                     self.blue_write_log(f"蓝牙发送失败 {str(e)}")
-                    QMessageBox.critical(self, '发送失败', str(e))
+                    # QMessageBox.critical(self, '发送失败', str(e))
             else:
                 # QMessageBox.warning(self, '警告', '未连接到设备')
                 break
@@ -1248,7 +1261,6 @@ class BluetoothTool(QWidget):
 
     async def byte_send(self,data:bytes):
         """异步方法，发送字节数据"""
-        self.text_decode.legality = ReceveDataStatus.ERR_NOTHING # 初始化数据解析状态
         if(len(data) == 0):
             return
         try:
@@ -1299,6 +1311,22 @@ class BluetoothTool(QWidget):
         self.commu_type = "none"
         # 弹出提示消息
         QMessageBox.warning(self, '连接已断开', '蓝牙设备已断开连接')
+    
+    def _on_receive_response(self, cmd_code, data):
+        """内部槽函数：处理接收到的响应（用于test_send_data等功能）
+        
+        通过信号机制更新响应状态，解耦数据解析器和业务逻辑
+        
+        Args:
+            cmd_code: 命令码
+            data: 响应数据
+        """
+        if len(data) >= 8:
+            self.last_response_status = True
+            self.last_response_ack = data[7]
+        else:
+            self.last_response_status = True
+            self.last_response_ack = 0x00
 
     async def on_data_received(self, sender, data):
         """回调函数，处理接收到的数据"""

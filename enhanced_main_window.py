@@ -664,7 +664,8 @@ class EnhancedMainWindow(QMainWindow):
                         csv_data = ",".join([item[2] for items in dict_data.values() for item in items if len(item) >= 3])
                         ComunManager.get_instance().write_csv(f"{header},{csv_data}")
                         
-                        # 🔥 发射信号通知队列管理器：数据接收成功
+                        # 🔥 发射信号通知队列管理器和其他监听者：数据接收成功
+                        # 使用信号机制解耦，不再直接修改text_decode.legality
                         from struct_model import STRUCT_COMMANDS
                         cmd_code = STRUCT_COMMANDS.get(struct_name, 0)
                         self.bluetooth_tool.receive_ok_signal.emit(cmd_code, data_buffer)
