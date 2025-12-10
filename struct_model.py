@@ -503,6 +503,28 @@ STRUCT_FORMATS = {
         "L",      # uniqueID (4 bytes)
     "PC_GET_SERIALNUM": "<30s",  # 序列号：30字节字符串
     "PC_SET_SERIALNUM": "<30s",  # 序列号：30字节字符串
+    "PC_GET_CLUSTER_SBS": "<"
+        "BB"  # byBrand, byCurrRate
+        "H"   # wBattModuleCap
+        "L"   # dwClusterCap
+        "HH"  # byTotalBatteryNum, wComFailCount
+        "HH"  # wBmsFailCount, wCellFailCount
+        "HH"  # wChgMosOffCount, wDisMosOffCnout
+        "hh"  # sSysMaxCellTemp, sSysMinCellTemp
+        "HH"  # usSysMaxCellVolt, usSysMinCellVolt
+        "LL"  # ulSysMaxBattVolt, ulSysMinBattVolt
+        "ll"  # lSysMaxCurrent, lSysMinCurrent
+        "HH"  # usSysMaxSOC, usSysMinSOC
+        "HH"  # usSysMaxSOH, usSysMinSOH
+        "HH"  # usClusterChgVoltLimit, usClusterDisVoltLimit
+        "LL"  # dwClusterChgCurLimit, dwClusterDisCurLimit
+        "h"   # sClusterTemp
+        "H"   # usClusterVoltInV
+        "l"   # lClusterCurrInA
+        "HH"  # usClusterSoc, usClusterSoh
+        "LL"  # ulClusterProtect, ulClusterFault
+        "L"   # ulClusterCycles
+        "HHHHHHHHHH",  # wReserve[10]
 }
 
 STRUCT_ADDRESSES = {
@@ -592,6 +614,29 @@ STRUCT_VARIABLES = {
     ],
     "PC_SET_SERIALNUM": [
         "序列号"
+    ],
+    "PC_GET_CLUSTER_SBS": [
+        "品牌", "当前倍率",
+        "电池模块容量",
+        "集群容量",
+        "总电池数量", "通信失败次数",
+        "BMS失败次数", "电芯失败次数",
+        "充电MOS关次数", "放电MOS关次数",
+        "系统最高电芯温度", "系统最低电芯温度",
+        "系统最高电芯电压", "系统最低电芯电压",
+        "系统最高电池电压", "系统最低电池电压",
+        "系统最大电流", "系统最小电流",
+        "系统最高SOC", "系统最低SOC",
+        "系统最高SOH", "系统最低SOH",
+        "集群充电电压限制", "集群放电电压限制",
+        "集群充电电流限制", "集群放电电流限制",
+        "集群温度",
+        "集群电压(V)",
+        "集群电流(A)",
+        "集群SOC", "集群SOH",
+        "集群保护状态", "集群故障状态",
+        "集群循环次数",
+        *[f"保留{i+1}" for i in range(10)]
     ]
 }
 
@@ -673,6 +718,9 @@ HEX_DISPLAY_VARIABLES = {
     ],
     "PC_GET_MOSHTDATA": [
         "MOS温度告警", "MOS温度告警恢复", "MOS温度保护", "MOS温度保护恢复"
+    ],
+    "PC_GET_CLUSTER_SBS": [
+        "集群保护状态", "集群故障状态"
     ]
 }
 
@@ -826,6 +874,7 @@ def get_all_display_windows():
             'VER': '📋 版本信息',
             'INF': 'ℹ️ 系统信息',
             'SERIALNUM': '🔢 序列号',
+            'CLUSTER_SBS': '🔗 并机信息',
         }
         
         title = title_map.get(display_name, f'📄 {display_name}')
