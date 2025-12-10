@@ -1781,7 +1781,7 @@ class BluetoothTool(QWidget):
         reply = QMessageBox.question(
             self,
             '确认修改',
-            f'确定要将蓝牙名称修改为 "{new_name}" 吗？',
+            f'确定要将蓝牙名称修改为 "{new_name}" 吗？，修改成功，\n蓝牙会自动断开连接，如果用有线修改要接到蓝牙的串口上',
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No
         )
@@ -1797,25 +1797,33 @@ class BluetoothTool(QWidget):
             self.blue_write_log("取消修改蓝牙名称")
 
     async def send_bt_name_command(self, at_command: str):
-        """异步发送蓝牙名称修改指令"""
+        """异步发送蓝牙名称修改指令（支持蓝牙和串口）"""
         try:
             # 检查连接状态
             if not self.client or not self.client.is_connected:
-                QMessageBox.warning(self, '警告', '请先连接蓝牙设备')
-                self.blue_write_log("错误：未连接到蓝牙设备")
-                return
+                if not self.serial_port or not self.serial_port.is_open:
+                    QMessageBox.warning(self, '警告', '请先连接蓝牙或串口设备')
+                    self.blue_write_log("错误：未连接到任何设备")
+                    return
             
             # 转换为字节
             data_bytes = at_command.encode('utf-8')
             
-            # 使用FFE3 UUID发送数据
-            uuid_ffe3 = "0000ffe3-0000-1000-8000-00805f9b34fb"
-            await self.client.write_gatt_char(uuid_ffe3, data_bytes)
+            # 判断使用蓝牙还是串口发送
+            if self.client and self.client.is_connected:
+                # 蓝牙连接：必须使用FFE3 UUID（byte_send用的是FFE1）
+                uuid_ffe3 = "0000ffe3-0000-1000-8000-00805f9b34fb"
+                await self.client.write_gatt_char(uuid_ffe3, data_bytes)
+                self.blue_write_log(f"✅ 蓝牙名称修改指令已发送 (蓝牙 UUID: FFE3)")
+                self.blue_write_log("提示：修改成功后蓝牙会自动断开连接")
+            elif self.serial_port and self.serial_port.is_open:
+                # 串口连接：直接使用byte_send
+                await self.byte_send(data_bytes)
+                self.blue_write_log(f"✅ 蓝牙名称修改指令已发送 (串口)")
+                self.blue_write_log("提示：修改成功后蓝牙模块可能会重启")
             
             # 显示发送的数据
             self.display_send_data(data_bytes)
-            self.blue_write_log(f"✅ 蓝牙名称修改指令已发送 (UUID: FFE3)")
-            self.blue_write_log("提示：修改成功后蓝牙会自动断开连接")
             
         except Exception as e:
             self.blue_write_log(f"发送错误，但是修改可能成功，因为成功会立马断开蓝牙: {str(e)}")
