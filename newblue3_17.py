@@ -576,6 +576,13 @@ class BluetoothTool(QWidget):
         # 将RT控制部分添加到左侧布局
         left_layout.addLayout(rt_layout)
 
+        # 添加蓝牙名称修改按钮
+        bt_name_layout = QHBoxLayout()
+        self.bt_name_button = QPushButton('修改蓝牙名称')
+        self.bt_name_button.clicked.connect(self.on_change_bt_name_clicked)
+        bt_name_layout.addWidget(self.bt_name_button)
+        left_layout.addLayout(bt_name_layout)
+
         # 添加密码管理部分
         password_layout = QVBoxLayout()
 
@@ -1762,6 +1769,58 @@ class BluetoothTool(QWidget):
         # 发送RT2关闭指令 (0x36)
         self.send_command(self.text_decode.send_hex_fill(0x36))
         self.blue_write_log("发送RT2关闭指令")
+
+    def on_change_bt_name_clicked(self):
+        """处理修改蓝牙名称按钮点击事件"""
+        new_name = self.send_input.text().strip()
+        if not new_name:
+            QMessageBox.warning(self, '警告', '请在输入框中输入新的蓝牙名称')
+            return
+        
+        # 弹出确认窗口
+        reply = QMessageBox.question(
+            self,
+            '确认修改',
+            f'确定要将蓝牙名称修改为 "{new_name}" 吗？',
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No
+        )
+        
+        if reply == QMessageBox.StandardButton.Yes:
+            # 构造AT指令
+            at_command = f"AT+NAME={new_name}\r\n"
+            self.blue_write_log(f"准备发送AT指令: {at_command.strip()}")
+            
+            # 发送指令
+            asyncio.create_task(self.send_bt_name_command(at_command))
+        else:
+            self.blue_write_log("取消修改蓝牙名称")
+
+    async def send_bt_name_command(self, at_command: str):
+        """异步发送蓝牙名称修改指令"""
+        try:
+            # 检查连接状态
+            if not self.client or not self.client.is_connected:
+                QMessageBox.warning(self, '警告', '请先连接蓝牙设备')
+                self.blue_write_log("错误：未连接到蓝牙设备")
+                return
+            
+            # 转换为字节
+            data_bytes = at_command.encode('utf-8')
+            
+            # 使用FFE3 UUID发送数据
+            uuid_ffe3 = "0000ffe3-0000-1000-8000-00805f9b34fb"
+            await self.client.write_gatt_char(uuid_ffe3, data_bytes)
+            
+            # 显示发送的数据
+            self.display_send_data(data_bytes)
+            self.blue_write_log(f"✅ 蓝牙名称修改指令已发送 (UUID: FFE3)")
+            self.blue_write_log("提示：修改成功后蓝牙会自动断开连接")
+            
+        except Exception as e:
+            self.blue_write_log(f"发送错误，但是修改可能成功，因为成功会立马断开蓝牙: {str(e)}")
+            QMessageBox.critical(self, '发送错误，但是修改可能成功，因为成功会立马断开蓝牙', f'发送失败: {str(e)}')
+            traceback.print_exc()
 
     def send_command(self, command:bytes):
         """发送指令数据"""
