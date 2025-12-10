@@ -1787,9 +1787,9 @@ class BluetoothTool(QWidget):
         )
         
         if reply == QMessageBox.StandardButton.Yes:
-            # 构造AT指令
-            at_command = f"AT+NAME={new_name}\r\n"
-            self.blue_write_log(f"准备发送AT指令: {at_command.strip()}")
+            # 构造AT指令（不带\r\n）
+            at_command = f"AT+NAME={new_name}"
+            self.blue_write_log(f"准备发送AT指令: {at_command}")
             
             # 发送指令
             asyncio.create_task(self.send_bt_name_command(at_command))
@@ -1806,20 +1806,19 @@ class BluetoothTool(QWidget):
                     self.blue_write_log("错误：未连接到任何设备")
                     return
             
-            # 转换为字节
-            data_bytes = at_command.encode('utf-8')
-            
             # 判断使用蓝牙还是串口发送
             if self.client and self.client.is_connected:
-                # 蓝牙连接：必须使用FFE3 UUID（byte_send用的是FFE1）
+                # 蓝牙连接：不加\r\n
+                data_bytes = at_command.encode('utf-8')
                 uuid_ffe3 = "0000ffe3-0000-1000-8000-00805f9b34fb"
                 await self.client.write_gatt_char(uuid_ffe3, data_bytes)
-                self.blue_write_log(f"✅ 蓝牙名称修改指令已发送 (蓝牙 UUID: FFE3)")
+                self.blue_write_log(f"✅ 蓝牙名称修改指令已发送 (蓝牙 UUID: FFE3，不加\\r\\n)")
                 self.blue_write_log("提示：修改成功后蓝牙会自动断开连接")
             elif self.serial_port and self.serial_port.is_open:
-                # 串口连接：直接使用byte_send
+                # 串口连接：加\r\n
+                data_bytes = (at_command + '\r\n').encode('utf-8')
                 await self.byte_send(data_bytes)
-                self.blue_write_log(f"✅ 蓝牙名称修改指令已发送 (串口)")
+                self.blue_write_log(f"✅ 蓝牙名称修改指令已发送 (串口，加\\r\\n)")
                 self.blue_write_log("提示：修改成功后蓝牙模块可能会重启")
             
             # 显示发送的数据
