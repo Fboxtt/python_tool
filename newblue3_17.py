@@ -1781,7 +1781,7 @@ class BluetoothTool(QWidget):
         reply = QMessageBox.question(
             self,
             '确认修改',
-            f'确定要将蓝牙名称修改为 "{new_name}" 吗？，修改成功，\n蓝牙会自动断开连接，如果用有线修改要接到蓝牙的串口上',
+            f'确定要将蓝牙名称修改为 "{new_name}" 吗？，修改成功，\n蓝牙会自动断开连接，如果用有线修改要接到蓝牙的串口上\n0023版本无法通过蓝牙修改20位名称，0026可以',
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No
         )
