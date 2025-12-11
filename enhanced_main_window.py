@@ -11,7 +11,7 @@ from PyQt6.QtWidgets import (
     QPushButton, QLabel, QMessageBox, QCheckBox
 )
 from PyQt6.QtCore import Qt, QTimer
-from PyQt6.QtGui import QFont, QCursor
+from PyQt6.QtGui import QFont, QCursor, QIcon, QPixmap
 
 # 导入必要的模块
 from newblue3_17 import BluetoothTool, SimplifiedBluetoothTool, load_ui_dynamically
@@ -122,6 +122,11 @@ class EnhancedMainWindow(QMainWindow):
             else:
                 self.setWindowTitle(base_title)
         
+        # 设置窗口图标
+        icon_path = os.path.join(os.path.dirname(__file__), 'Ampere-Time-logo.ico')
+        if os.path.exists(icon_path):
+            self.setWindowIcon(QIcon(icon_path))
+        
         # 获取屏幕大小，设置窗口为屏幕的2/3
         screen = QApplication.primaryScreen().geometry()
         screen_width = screen.width()
@@ -183,8 +188,15 @@ class EnhancedMainWindow(QMainWindow):
         layout = QHBoxLayout()
         layout.setContentsMargins(10, 10, 10, 10)
         
-        # 标题
-        title_label = QLabel('🔧 BMS调试工具控制面板')
+        # 标题（图标+文字）
+        icon_path = os.path.join(os.path.dirname(__file__), 'Ampere-Time-logo.ico')
+        if os.path.exists(icon_path):
+            icon_label = QLabel()
+            pixmap = QPixmap(icon_path)
+            scaled_pixmap = pixmap.scaled(256, 256, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+            icon_label.setPixmap(scaled_pixmap)
+            layout.addWidget(icon_label)
+        title_label = QLabel('BMS调试工具控制面板')
         font = title_label.font()
         font.setBold(True)
         font.setPointSize(14)
