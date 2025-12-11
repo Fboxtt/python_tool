@@ -691,7 +691,11 @@ class DataDisplayWindow(QWidget):
     
     def _determine_column_widths(self):
         """根据窗口ID和类型确定列宽"""
-        if self.window_id in ['PC_GET_VER', 'PC_GET_SERIALNUM']:
+        if self.window_id == 'PC_GET_SERIALNUM':
+            # 序列号窗口：竖向布局，行名列 + 数据列
+                self.col_widths = [48, 230]
+        elif self.window_id == 'PC_GET_VER':
+            # 版本信息窗口：保持原来的横向布局
             if self.column_mode == 2:
                 self.col_widths = [48, 210]
             else:
@@ -742,6 +746,11 @@ class DataDisplayWindow(QWidget):
             self.table_view.setModel(self.table_model)
             for col, width in enumerate(self.col_widths):
                 self.table_view.setColumnWidth(col, width)
+        elif self.window_id == 'PC_GET_SERIALNUM':
+            # 序列号窗口：使用竖向表格模型（节省纵向空间）
+            self.table_model = VerticalTableModel(column_mode=self.column_mode)
+            self.table_view.setModel(self.table_model)
+            # 竖向模式：列宽在 update_data 后根据实际参数个数动态设置
         elif self.column_mode == 2:
             self.table_model = TwoColumnTableModel()
             self.table_view.setModel(self.table_model)
@@ -835,6 +844,10 @@ class DataDisplayWindow(QWidget):
         if self.table_model:
             self.table_model.update_data(data)
             
+            # 如果是竖向模式，更新列宽
+            if isinstance(self.table_model, VerticalTableModel):
+                self._update_vertical_column_widths()
+            
     def get_modified_data(self):
         """获取修改的数据（仅3列模式）"""
         if self.column_mode == 3 and hasattr(self.table_model, 'get_modified_data'):
@@ -861,6 +874,27 @@ class DataDisplayWindow(QWidget):
             self.table_model.set_write_enabled(enabled)
             # 强制刷新视图
             self.table_view.viewport().update()
+    
+    def _update_vertical_column_widths(self):
+        """更新竖向模式的列宽"""
+        if not isinstance(self.table_model, VerticalTableModel):
+            return
+        
+        num_columns = self.table_model.columnCount()
+        if num_columns <= 1:
+            return
+        
+        self.table_view.setColumnWidth(0, 60)
+        
+        if self.window_id == 'PC_GET_SERIALNUM':
+            data_column_width = 250
+        else:
+            data_column_width = 150
+        
+        for col in range(1, num_columns):
+            self.table_view.setColumnWidth(col, data_column_width)
+        
+        self.col_widths = [60] + [data_column_width] * (num_columns - 1)
             
     def print_column_widths(self):
         """打印表格每一列的实际宽度 - 用于调试"""
@@ -880,7 +914,11 @@ class DataDisplayWindow(QWidget):
         # 获取实际行数，如果没有数据则使用预期行数
         row_count = self.table_model.rowCount()
         if row_count == 0:
-            row_count = self.expected_row_count
+            # 竖向模式下行数固定为2或3
+            if isinstance(self.table_model, VerticalTableModel):
+                row_count = 3 if self.column_mode == 3 else 2
+            else:
+                row_count = self.expected_row_count
         
         row_height = self.table_view.verticalHeader().defaultSectionSize()
         
@@ -889,14 +927,27 @@ class DataDisplayWindow(QWidget):
         if header_height == 0:
             header_height = 30  # 使用合理的默认值
         
-        # 标题和按钮的高度（现在所有窗口都有按钮）
+        # 标题和按钮的高度
         extra_height = 50  # 标题(18) + 按钮(24) + 边距(8)
         
-        # 计算总高度（预留两行位置用于滚动条等）
-        total_height = header_height + row_count * row_height + extra_height + 2 * row_height
+        # 竖向模式下不需要预留额外的行空间
+        if isinstance(self.table_model, VerticalTableModel):
+            total_height = header_height + row_count * row_height + extra_height
+            # 序列号窗口额外增加30像素高度
+            if self.window_id == 'PC_GET_SERIALNUM':
+                total_height += 30
+        else:
+            # 普通模式：预留两行位置用于滚动条等
+            total_height = header_height + row_count * row_height + extra_height + 2 * row_height
         
         # 设置最小高度（至少显示3行）
-        min_height = header_height + 3 * row_height + extra_height + 2 * row_height
+        if isinstance(self.table_model, VerticalTableModel):
+            min_height = header_height + row_count * row_height + extra_height
+            # 序列号窗口最小高度也要增加30像素
+            if self.window_id == 'PC_GET_SERIALNUM':
+                min_height += 30
+        else:
+            min_height = header_height + 3 * row_height + extra_height + 2 * row_height
         total_height = max(total_height, min_height)
         
         # 限制最大高度为容器高度的99%（如果有容器高度限制）
@@ -937,6 +988,30 @@ class TwoColumnTableModel(BatteryTableModel):
                     row_data[0],  # 名称
                     self._get_cached_display_value(self._original_data.index(row_data), row_data[2])  # 当前值
                 ])
+    
+    def update_data(self, data):
+        """更新数据（只在数据变化时才刷新）"""
+        if not data:
+            return
+        
+        # 检查数据是否变化
+        data_changed = False
+        if len(data) != len(self._original_data):
+            data_changed = True
+        else:
+            for i, new_row in enumerate(data):
+                if i < len(self._original_data):
+                    old_row = self._original_data[i]
+                    if len(new_row) >= 3 and len(old_row) >= 3:
+                        if str(new_row[0]) != str(old_row[0]) or str(new_row[2]) != str(old_row[2]):
+                            data_changed = True
+                            break
+        
+        if not data_changed:
+            return
+        
+        # 调用父类方法更新
+        super().update_data(data)
                 
     def flags(self, index):
         """2列模式下所有单元格都不可编辑"""
@@ -967,6 +1042,31 @@ class ThreeColumnTableModel(BatteryTableModel):
                     old_write_values.get(row_data[0], "")  # 写入值（保留或为空）
                 ])
     
+    def update_data(self, data):
+        """更新数据（只在读取值变化时才刷新，保护用户输入）"""
+        if not data:
+            return
+        
+        # 检查数据是否变化
+        data_changed = False
+        if len(data) != len(self._original_data):
+            data_changed = True
+        else:
+            for i, new_row in enumerate(data):
+                if i < len(self._original_data):
+                    old_row = self._original_data[i]
+                    if len(new_row) >= 3 and len(old_row) >= 3:
+                        # 只比较参数名和读取值，不比较写入值
+                        if str(new_row[0]) != str(old_row[0]) or str(new_row[2]) != str(old_row[2]):
+                            data_changed = True
+                            break
+        
+        if not data_changed:
+            return
+        
+        # 调用父类方法更新
+        super().update_data(data)
+    
     def flags(self, index):
         """3列模式：名称和读取值不可编辑，写入值根据_write_enabled决定是否可编辑"""
         if index.column() == 2 and self._write_enabled:  # 写入值列，且写入功能已启用
@@ -993,6 +1093,246 @@ class ThreeColumnTableModel(BatteryTableModel):
     def set_write_enabled(self, enabled):
         """设置写入功能启用状态"""
         self._write_enabled = enabled
+
+
+# ============== 竖向表格模型 ==============
+class VerticalTableModel(BatteryTableModel):
+    """竖向表格模型（参数名横向排列，读取值/写入值各占一行）
+    
+    布局示例（3列模式）：
+              参数1     参数2     参数3
+    参数名    序列号    版本号    ...
+    读取值    12345     1.0.0     ...
+    写入值    67890               ...
+    """
+    
+    def __init__(self, data=None, column_mode=3, parent=None):
+        self._column_mode = column_mode
+        self._write_enabled = True
+        self._param_names = []
+        self._read_values = {}
+        self._write_values = {}
+        
+        super().__init__(data, parent)
+        
+        # 禁用渐变颜色功能（避免影响用户输入）
+        if hasattr(self, '_gradient_enabled'):
+            self._gradient_enabled = False
+        if hasattr(self, '_gradient_timer_manager'):
+            self._gradient_timer_manager.unsubscribe(self)
+        
+    def _organize_data(self):
+        """重新组织数据为竖向格式"""
+        # 保存旧的写入值（避免用户输入被清空）
+        old_write_values = self._write_values.copy() if hasattr(self, '_write_values') else {}
+        
+        # 重置数据
+        self._param_names = []
+        self._read_values = {}
+        self._write_values = {}
+        
+        # 从原始数据提取参数名和值
+        for row_data in self._original_data:
+            if len(row_data) >= 3:
+                param_name = row_data[0]
+                read_value = self._get_cached_display_value(self._original_data.index(row_data), row_data[2])
+                
+                self._param_names.append(param_name)
+                self._read_values[param_name] = read_value
+                self._write_values[param_name] = old_write_values.get(param_name, "")
+    
+    def rowCount(self, parent=None):
+        """行数：2列模式2行（参数名、读取值），3列模式3行（参数名、读取值、写入值）"""
+        if self._column_mode == 2:
+            return 2
+        else:
+            return 3
+    
+    def columnCount(self, parent=None):
+        """列数：1（行名列）+ 参数个数"""
+        # 至少返回2列（行名列 + 1个数据列），避免显示异常
+        return max(2, 1 + len(self._param_names))
+    
+    def data(self, index, role=Qt.ItemDataRole.DisplayRole):
+        """获取单元格数据"""
+        if not index.isValid():
+            return None
+        
+        row = index.row()
+        col = index.column()
+        
+        # 第一列是行名
+        if col == 0:
+            if role == Qt.ItemDataRole.DisplayRole:
+                if row == 0:
+                    return "参数名"
+                elif row == 1:
+                    return "读取值"
+                elif row == 2:
+                    return "写入值"
+            return None
+        
+        # 其他列是数据
+        param_idx = col - 1
+        if param_idx >= len(self._param_names):
+            return None
+        
+        param_name = self._param_names[param_idx]
+        
+        if role == Qt.ItemDataRole.DisplayRole or role == Qt.ItemDataRole.EditRole:
+            if row == 0:
+                return param_name
+            elif row == 1:
+                return self._read_values.get(param_name, "")
+            elif row == 2:
+                return self._write_values.get(param_name, "")
+        
+        return None
+    
+    def setData(self, index, value, role=Qt.ItemDataRole.EditRole):
+        """设置单元格数据（只有写入值行可编辑）"""
+        if not index.isValid() or role != Qt.ItemDataRole.EditRole:
+            return False
+        
+        row = index.row()
+        col = index.column()
+        
+        # 只有写入值行（第3行，row=2）且非第一列可编辑
+        if row == 2 and col > 0:
+            param_idx = col - 1
+            if param_idx < len(self._param_names):
+                param_name = self._param_names[param_idx]
+                self._write_values[param_name] = str(value) if value else ""
+                self.dataChanged.emit(index, index, [Qt.ItemDataRole.DisplayRole])
+                return True
+        
+        return False
+    
+    def headerData(self, section, orientation, role=Qt.ItemDataRole.DisplayRole):
+        """表头数据"""
+        if role == Qt.ItemDataRole.DisplayRole:
+            if orientation == Qt.Orientation.Horizontal:
+                if section == 0:
+                    return ""
+                else:
+                    param_idx = section - 1
+                    if param_idx < len(self._param_names):
+                        return f"值{param_idx + 1}"
+            elif orientation == Qt.Orientation.Vertical:
+                return ""
+        return None
+    
+    def flags(self, index):
+        """设置单元格标志"""
+        if not index.isValid():
+            return Qt.ItemFlag.NoItemFlags
+        
+        row = index.row()
+        col = index.column()
+        
+        # 第一列（行名列）不可编辑
+        if col == 0:
+            return Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable
+        
+        # 参数名行不可编辑
+        if row == 0:
+            return Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable
+        
+        # 读取值行不可编辑
+        if row == 1:
+            return Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable
+        
+        # 写入值行（row=2）根据_write_enabled和column_mode决定是否可编辑
+        if row == 2 and self._column_mode == 3 and self._write_enabled:
+            return Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEditable
+        
+        return Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable
+    
+    def get_modified_data(self):
+        """获取修改的数据（写入值不为空的列）"""
+        modified = []
+        for idx, param_name in enumerate(self._param_names):
+            write_value = self._write_values.get(param_name, "")
+            if write_value:
+                read_value = self._read_values.get(param_name, "")
+                modified.append((idx, param_name, read_value, write_value))
+        return modified
+    
+    def clear_write_values(self):
+        """清空所有写入值"""
+        for param_name in self._param_names:
+            self._write_values[param_name] = ""
+        self.layoutChanged.emit()
+    
+    def set_write_enabled(self, enabled):
+        """设置写入功能启用状态"""
+        self._write_enabled = enabled
+    
+    def update_data(self, data):
+        """更新数据（只在数据变化时才刷新，保护用户输入）"""
+        if not data:
+            return
+        
+        # 检查数据是否真的发生了变化（比较读取值）
+        data_changed = False
+        
+        # 如果数据长度变化，肯定需要更新
+        if len(data) != len(self._original_data):
+            data_changed = True
+        else:
+            # 长度相同，逐行比较参数名和读取值
+            for i, new_row in enumerate(data):
+                if i < len(self._original_data):
+                    old_row = self._original_data[i]
+                    # 确保新旧数据都有足够的字段
+                    if len(new_row) >= 3 and len(old_row) >= 3:
+                        # 比较参数名（索引0）和读取值（索引2）
+                        # 注意：索引1是写入值，我们不比较它
+                        new_name = str(new_row[0])
+                        old_name = str(old_row[0])
+                        new_value = str(new_row[2])
+                        old_value = str(old_row[2])
+                        
+                        if new_name != old_name or new_value != old_value:
+                            data_changed = True
+                            break
+                    else:
+                        # 数据格式不对，强制更新
+                        data_changed = True
+                        break
+        
+        # 如果数据没有变化，直接返回，不刷新（保护用户输入）
+        if not data_changed:
+            return
+        
+        # 保存旧的列数
+        old_col_count = self.columnCount()
+        
+        # 数据有变化，更新原始数据
+        self._original_data = data
+        
+        # 清除显示值缓存
+        if hasattr(self, '_display_value_cache'):
+            self._display_value_cache.clear()
+        
+        # 重新组织数据（_organize_data 内部会保留写入值）
+        self._organize_data()
+        
+        # 获取新的列数
+        new_col_count = self.columnCount()
+        
+        # 刷新视图
+        if old_col_count != new_col_count:
+            # 列数变化，必须使用 layoutChanged
+            self.layoutChanged.emit()
+        else:
+            # 列数不变，使用 dataChanged 避免中断用户输入
+            row_count = self.rowCount()
+            if row_count > 0 and new_col_count > 0:
+                if row_count >= 2:
+                    top_left = self.index(0, 0)
+                    bottom_right = self.index(1, new_col_count - 1)
+                    self.dataChanged.emit(top_left, bottom_right, [Qt.ItemDataRole.DisplayRole])
 
 
 # ============== 多窗口管理器主窗口 ==============
