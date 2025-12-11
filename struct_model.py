@@ -1089,14 +1089,15 @@ class HexParserApp(QMainWindow):
     def set_struct_to_cell_32(self):
         """
         设置为32串配置
-        - PC_GET_SBS: 32个电池单元 + 16个温度传感器
+        - PC_GET_SBS: 32个电池单元 + 16个温度传感器 + 保留字段
         - PC_GET_KB: 32个电池单元 + 16个温度传感器
         """
-        # PC_GET_SBS: 16个温度传感器
+        # PC_GET_SBS: 16个温度传感器（根据C结构体：TSBS）
         STRUCT_FORMATS["PC_GET_SBS"] = "<LL" + \
         "HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH" +\
         "l" +\
         "hhhhhhhhhhhhhhhh" +\
+        "h" +\
         "HHH" +\
         "LLLLL" +\
         "HH" +\
@@ -1105,12 +1106,13 @@ class HexParserApp(QMainWindow):
         *[f"第【{i+1}】节电压" for i in range(32)],
         "电流",
         *[f"环境温度{i+1}" for i in range(16)],
+        "保留字段",
         "剩余容量", "满充容量", "设计容量",
         "其他信息", "告警状态", "保护状态", "失效状态", "均衡状态",
         "电池状态", "SOC",
         "容量保持率", "放电次数", "总放电容量"]
 
-        # PC_GET_KB: 16个温度传感器
+        # PC_GET_KB: 16个温度传感器（根据C结构体：TKB）
         STRUCT_FORMATS["PC_GET_KB"] = "<HH" + \
         "HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH" +\
         "HhHhHhHhHhHh" +\
