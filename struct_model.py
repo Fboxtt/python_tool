@@ -1090,7 +1090,7 @@ class HexParserApp(QMainWindow):
         """
         设置为32串配置
         - PC_GET_SBS: 32个电池单元 + 16个温度传感器
-        - PC_GET_KB: 32个电池单元 + 15个温度传感器
+        - PC_GET_KB: 32个电池单元 + 16个温度传感器
         """
         # PC_GET_SBS: 16个温度传感器
         STRUCT_FORMATS["PC_GET_SBS"] = "<LL" + \
@@ -1110,11 +1110,11 @@ class HexParserApp(QMainWindow):
         "电池状态", "SOC",
         "容量保持率", "放电次数", "总放电容量"]
 
-        # PC_GET_KB: 15个温度传感器
+        # PC_GET_KB: 16个温度传感器
         STRUCT_FORMATS["PC_GET_KB"] = "<HH" + \
         "HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH" +\
         "HhHhHhHhHhHh" +\
-        "HHHHHHHHHHHHHHH"
+        "HHHHHHHHHHHHHHHH"
         STRUCT_VARIABLES["PC_GET_KB"] = ["Pack电压K", "Batt电压K",
         *[f"第【{i+1}】节电压K" for i in range(32)],
         "50-500安K(注，不同电池，电流范围不同，谨慎参考)",     "50-500安B",
@@ -1123,7 +1123,7 @@ class HexParserApp(QMainWindow):
         "-10-50安SK",  "-10-50安SB",
         "0-10安SSK",     "0-10安SSB",
         "-(0-10)安SSK", "-(0-10)安SSB",
-        *[f"温度{i+1}K" for i in range(15)]]
+        *[f"温度{i+1}K" for i in range(16)]]
 
         # 修改完成后，更新 config_data 字典
         config_data["STRUCT_FORMATS"] = STRUCT_FORMATS
