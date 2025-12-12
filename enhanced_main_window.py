@@ -797,6 +797,18 @@ class EnhancedMainWindow(QMainWindow):
         # 断开连接
         if self.bluetooth_tool.client and self.bluetooth_tool.client.is_connected:
             asyncio.create_task(self.bluetooth_tool.disconnect_device())
+        
+        # 关闭蓝牙工具窗口（newblue.py窗口）
+        try:
+            # 关闭简化窗口
+            if hasattr(self, 'simplified_bluetooth_tool'):
+                self.simplified_bluetooth_tool.close()
+            
+            # 关闭原始蓝牙工具窗口
+            if hasattr(self, 'bluetooth_tool'):
+                self.bluetooth_tool.close()
+        except Exception as e:
+            self.logger.write_log(f"关闭蓝牙窗口时出错: {str(e)}")
             
         event.accept()
 
