@@ -1722,17 +1722,17 @@ class BluetoothTool(QWidget):
 
     def on_open_store_power_clicked(self):
         """处理打开保电按钮点击事件"""
-        # 发送打开保电的指令数据: 00 00 08 01 19 55 AA 55 55 55 55 75
-        bytedata = bytes([0x00, 0x00, 0x08, 0x01, 0x19, 0x55, 0xAA, 0x55, 0x55, 0x55, 0x55, 0x75])
+        # 发送打开保电的指令数据: 00 00 08 01 19 55 AA AA AA AA AA C9
+        bytedata = bytes([0x00, 0x00, 0x08, 0x01, 0x19, 0x55, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xC9])
         self.send_command(bytedata)
-        self.blue_write_log("已发送开启保电指令 (0x00010000)")
+        self.blue_write_log("已发送开启保电指令 (0x00210000)")
 
     def on_close_store_power_clicked(self):
         """处理关闭保电按钮点击事件"""
-        # 发送关闭保电的指令数据: 00 00 08 01 19 55 AA AA AA AA AA C9
-        bytedata = bytes([0x00, 0x00, 0x08, 0x01, 0x19, 0x55, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xC9])
+        # 发送关闭保电的指令数据: 00 00 08 01 19 55 AA 55 55 55 55 75
+        bytedata = bytes([0x00, 0x00, 0x08, 0x01, 0x19, 0x55, 0xAA, 0x55, 0x55, 0x55, 0x55, 0x75])
         self.send_command(bytedata)
-        self.blue_write_log("已发送关闭保电指令 (0x00210000)")
+        self.blue_write_log("已发送关闭保电指令 (0x00010000)")
 
     def on_rt0_enable_clicked(self):
         """处理RT0使能按钮点击事件"""
