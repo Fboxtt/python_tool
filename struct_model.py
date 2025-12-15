@@ -1298,7 +1298,15 @@ class HexParserApp(QMainWindow):
                 # 处理字符串字段（bytes类型）
                 if isinstance(value, bytes):
                     # 字节串类型，解码为字符串
-                    str_value = value.decode('utf-8', errors='replace').rstrip('\x00')
+                    # 对于序列号等字段，过滤掉填充字节(0xFF)和控制字符
+                    # 只保留可打印的ASCII字符（0x20-0x7E）
+                    filtered_bytes = bytes([b for b in value if 0x20 <= b <= 0x7E])
+                    try:
+                        # 尝试用ASCII解码（序列号通常是ASCII字符）
+                        str_value = filtered_bytes.decode('ascii', errors='ignore')
+                    except:
+                        # 如果失败，用latin-1解码
+                        str_value = filtered_bytes.decode('latin-1', errors='ignore')
                     dec_values.append(str_value)
                     hex_bytes = ''.join([f"{b:02X}" for b in value])
                     hex_byte_array.append(hex_bytes)
