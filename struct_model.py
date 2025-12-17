@@ -503,6 +503,8 @@ STRUCT_FORMATS = {
         "L",      # uniqueID (4 bytes)
     "PC_GET_SERIALNUM": "<30s",  # 序列号：30字节字符串
     "PC_SET_SERIALNUM": "<30s",  # 序列号：30字节字符串
+    "PC_GET_FUSESTATE": "<HH",  # 保险丝信息：使能状态、保险丝状态
+    "PC_SET_FUSESTATE": "<HH",  # 保险丝信息：使能状态、保险丝状态
     "PC_GET_CLUSTER_SBS": "<"
         "BB"  # byBrand, byCurrRate
         "H"   # wBattModuleCap
@@ -614,6 +616,14 @@ STRUCT_VARIABLES = {
     ],
     "PC_SET_SERIALNUM": [
         "序列号"
+    ],
+    "PC_GET_FUSESTATE": [
+        "保险丝使能",
+        "保险丝状态"
+    ],
+    "PC_SET_FUSESTATE": [
+        "保险丝使能",
+        "保险丝状态"
     ],
     "PC_GET_CLUSTER_SBS": [
         "品牌", "当前倍率",
@@ -743,6 +753,7 @@ WRITE_READ_COMMAND_MAPPING = {
     "PC_SET_LIFE_PARA": "PC_GET_LIFE_PARA",
     "PC_SET_MOSHTDATA": "PC_GET_MOSHTDATA",
     "PC_SET_SERIALNUM": "PC_GET_SERIALNUM",
+    "PC_SET_FUSESTATE": "PC_GET_FUSESTATE",
 }
 
 # 读取写入对应关系管理（反向映射）
@@ -755,6 +766,7 @@ READ_WRITE_COMMAND_MAPPING = {
     "PC_GET_LIFE_PARA": "PC_SET_LIFE_PARA",
     "PC_GET_MOSHTDATA": "PC_SET_MOSHTDATA",
     "PC_GET_SERIALNUM": "PC_SET_SERIALNUM",
+    "PC_GET_FUSESTATE": "PC_SET_FUSESTATE",
 }
 
 def get_write_command_from_read(read_command_name):
@@ -874,6 +886,7 @@ def get_all_display_windows():
             'VER': '📋 版本信息',
             'INF': 'ℹ️ 系统信息',
             'SERIALNUM': '🔢 序列号',
+            'FUSESTATE': '🔌 保险丝信息',
             'CLUSTER_SBS': '🔗 并机信息',
         }
         
