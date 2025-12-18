@@ -641,11 +641,94 @@ class BluetoothTool(QWidget):
         # 初始化时自动扫描蓝牙设备和刷新串口（延迟100ms等待UI加载完成）
         QTimer.singleShot(100, self.on_scan_all_clicked)
 
-    def blue_write_log(self,text):
-        """写入日志"""
+    def blue_write_log(self, text, color=None):
+        """写入日志
+        
+        Args:
+            text: 要写入的文本
+            color: 可选，文字颜色（如 'red', 'blue', '#FF5733' 等）
+        """
         print(text)
-        self.receive_output.append(text)
+        
+        # 如果指定了颜色，使用 QTextCursor 精确控制
+        if color:
+            from PyQt6.QtGui import QTextCursor, QTextCharFormat, QColor
+            
+            cursor = self.receive_output.textCursor()
+            cursor.movePosition(QTextCursor.MoveOperation.End)
+            
+            # 保存原始默认格式（自适应系统颜色）
+            default_fmt = QTextCharFormat()
+            default_fmt.setForeground(self.receive_output.palette().color(self.receive_output.palette().ColorRole.Text))
+            
+            # 设置文本格式（颜色）
+            fmt = QTextCharFormat()
+            fmt.setForeground(QColor(color))
+            cursor.setCharFormat(fmt)
+            
+            # 插入带颜色的文本
+            cursor.insertText(text + '\n')
+            
+            # 恢复为系统默认颜色（自适应深色/浅色主题）
+            cursor.setCharFormat(default_fmt)
+            
+            # 更新光标位置
+            self.receive_output.setTextCursor(cursor)
+        else:
+            self.receive_output.append(text)
+        
+        # 日志文件仍然记录原始文本（不带颜色）
         LogManager.get_instance().write_log(text)
+    
+    def process_print_command(self, data_buffer):
+        """处理 PRINT 指令（0x14 PC_A_PRINT 或 0x94 MCU_A_PRINT）
+        
+        Args:
+            data_buffer: 完整的数据包
+            
+        Returns:
+            bool: 是否成功处理
+        """
+        try:
+            if len(data_buffer) < 9:
+                return False
+            
+            cmd_code = data_buffer[4] & 0x7F
+            if cmd_code not in [0x14, 0x94]:
+                return False
+            
+            cmd_name = "PC_A_PRINT" if cmd_code == 0x14 else "MCU_A_PRINT"
+            
+            # 提取数据部分（跳过帧头8字节，去掉校验1字节）
+            data_start = 8
+            data_end = len(data_buffer) - 1
+            
+            if data_end <= data_start:
+                return False
+            
+            raw_data = data_buffer[data_start:data_end]
+            # 过滤不可打印字符，转成 ASCII
+            filtered_bytes = bytes([b for b in raw_data if 0x20 <= b <= 0x7E])
+            ascii_string = filtered_bytes.decode('ascii', errors='ignore')
+            
+            if not ascii_string:
+                return False
+            
+            # 打印彩色 ASCII
+            self.blue_write_log(f"[ASCII] {ascii_string}", color='#00CED1')
+            
+            # 记录 CSV
+            header = f"RX->,{self.commu_type},{self.device_name},{cmd_name}"
+            ComunManager.get_instance().write_csv(f"{header},{ascii_string}")
+            
+            # 发射信号
+            self.receive_ok_signal.emit(cmd_code, data_buffer)
+            
+            return True
+            
+        except Exception as e:
+            self.blue_write_log(f"处理 PRINT 指令失败: {str(e)}")
+            return False
 
     async def refresh_serial_ports(self):
         """刷新可用串口列表"""
@@ -1366,7 +1449,7 @@ class BluetoothTool(QWidget):
         except (IndexError, Exception):
             pass  # 数据不完整或异常，忽略
         # 重启定时器
-        self.data_timer.start(100)  # 100ms
+        self.data_timer.start(40)  # 20ms - 减少延迟，更快处理数据包
 
     def is_ota_command(self, data):
         """判断是否为OTA编程命令

@@ -649,6 +649,9 @@ class EnhancedMainWindow(QMainWindow):
             elif self.bluetooth_tool.is_ota_command(data_buffer):
                 # OTA指令：使用 text_decode 解析
                 self.bluetooth_tool.text_decode.split_data(bytearray(data_buffer))
+            # 🔥 特殊处理：PRINT 指令（0x14/0x94）- 不校验，直接转ASCII
+            elif self.bluetooth_tool.process_print_command(data_buffer):
+                pass  # 已在 process_print_command 中处理完毕
             else:
                 # 提取响应命令码（用于发射信号）
                 response_cmd_code = None
@@ -662,6 +665,22 @@ class EnhancedMainWindow(QMainWindow):
                     if success:
                         struct_name = result['struct_name']
                         dict_data = result['data']
+                        
+                        # ⭐ 特殊处理：PC_A_PRINT 和 MCU_A_PRINT - 打印 ASCII 字符串到终端
+                        if struct_name in ['PC_A_PRINT', 'MCU_A_PRINT']:
+                            # 提取 ASCII 字符串（第一个字段）
+                            ascii_string = ""
+                            for items in dict_data.values():
+                                if items and len(items) > 0 and len(items[0]) >= 3:
+                                    ascii_string = items[0][2]  # 第一个字段的值
+                                    break
+                            
+                            # 额外打印一行彩色的 ASCII 字符串（便于阅读）
+                            if ascii_string:
+                                self.bluetooth_tool.blue_write_log(
+                                    f"[ASCII] {ascii_string}",
+                                    color='#00CED1'  # 深青色 (DarkTurquoise)
+                                )
                         
                         # 更新多窗口管理器
                         self.update_window_data_from_parsed_result(struct_name, dict_data)
@@ -677,7 +696,6 @@ class EnhancedMainWindow(QMainWindow):
                         ComunManager.get_instance().write_csv(f"{header},{csv_data}")
                         
                         # 🔥 发射信号通知队列管理器和其他监听者：数据接收成功
-                        # 使用信号机制解耦，不再直接修改text_decode.legality
                         from struct_model import STRUCT_COMMANDS
                         cmd_code = STRUCT_COMMANDS.get(struct_name, 0)
                         self.bluetooth_tool.receive_ok_signal.emit(cmd_code, data_buffer)

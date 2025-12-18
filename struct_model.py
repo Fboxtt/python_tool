@@ -1277,6 +1277,10 @@ class HexParserApp(QMainWindow):
         else:
             LogManager.get_instance().write_log(f"解析 {cmd:02X} 失败: 无当前命令")
             return "no_cmd", None
+        
+        # PC_A_PRINT 和 MCU_A_PRINT 指令在 enhanced_main_window.py 中已提前处理
+        # 这里不会执行到，保持代码简洁
+        
         if struct_name not in STRUCT_FORMATS:
             LogManager.get_instance().write_log(f"解析 {struct_name} 失败: 这个命令没有预存格式细节")
             return struct_name, None
