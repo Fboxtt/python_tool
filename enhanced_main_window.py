@@ -178,6 +178,9 @@ class EnhancedMainWindow(QMainWindow):
         
         central_widget.setLayout(main_layout)
         
+        # 同步bluetooth_tool的32电芯配置到主界面
+        QTimer.singleShot(100, self.sync_cell_config_from_bluetooth_tool)
+        
         # 设置定时器
         self.setup_timers()
         
@@ -233,6 +236,12 @@ class EnhancedMainWindow(QMainWindow):
             self.use_simplified_window.setEnabled(True)
         layout.addWidget(self.use_simplified_window)
         
+        # 32电芯配置checkbox
+        self.cell_32_checkbox = QCheckBox('⚡ 32电芯配置')
+        self.cell_32_checkbox.setToolTip('勾选：32电芯+15温度传感器\n不勾选：16电芯+SBS 5温度+KB 8温度')
+        self.cell_32_checkbox.stateChanged.connect(self.on_cell_config_changed)
+        layout.addWidget(self.cell_32_checkbox)
+        
         # 连接控制
         self.connect_btn = QPushButton('📱 打开连接窗口')
         self.connect_btn.clicked.connect(self.show_bluetooth_tool)
@@ -272,10 +281,11 @@ class EnhancedMainWindow(QMainWindow):
         layout.setContentsMargins(5, 5, 5, 5)
         
         # 连接状态
-        self.conn_status_label = QLabel('📡 连接状态: 未连接')
+        self.conn_status_label = QLabel('⭕ 断开')
         font = self.conn_status_label.font()
         font.setPointSize(11)
         self.conn_status_label.setFont(font)
+        self.conn_status_label.setStyleSheet('color: #999;')  # 初始灰色
         self.conn_status_label.setContentsMargins(3, 0, 10, 0)
         layout.addWidget(self.conn_status_label)
         
@@ -446,18 +456,29 @@ class EnhancedMainWindow(QMainWindow):
         try:
             if self.bluetooth_tool.client and self.bluetooth_tool.client.is_connected:
                 is_connected = True
-                self.conn_status_label.setText('📡 连接状态: 蓝牙已连接')
+                # 显示蓝牙设备信息
+                device_name = getattr(self.bluetooth_tool, 'device_name', '未知设备')
+                device_address = getattr(self.bluetooth_tool, 'device_address', '')
+                if device_address:
+                    self.conn_status_label.setText(f'🔗 蓝牙已连接 | 📱 {device_name} | 📍 {device_address}')
+                else:
+                    self.conn_status_label.setText(f'🔗 蓝牙已连接 | 📱 {device_name}')
             elif self.bluetooth_tool.is_serial_connected:
                 is_connected = True
-                self.conn_status_label.setText('📡 连接状态: 串口已连接')
+                # 显示串口信息
+                port_name = self.bluetooth_tool.port_combo.currentText() if hasattr(self.bluetooth_tool, 'port_combo') else '未知串口'
+                self.conn_status_label.setText(f'🔗 串口已连接 | 🔌 {port_name}')
         except:
             pass
         if not is_connected:
-            self.conn_status_label.setText('📡 连接状态: 未连接')
+            self.conn_status_label.setText('⭕ 断开')
+            self.conn_status_label.setStyleSheet('color: #999;')  # 灰色
             if self.scan_task:
                 self.monitor_btn.setText('▶️ 开始监控')
                 self.scan_task.cancel()
                 self.scan_task = None
+        else:
+            self.conn_status_label.setStyleSheet('color: #28a745;')  # 连接时绿色
         self.disconnect_btn.setEnabled(is_connected)
         self.monitor_btn.setEnabled(is_connected)
         
@@ -536,6 +557,39 @@ class EnhancedMainWindow(QMainWindow):
         
         # 更新所有数据窗口的写入功能状态
         self.multi_window_manager.set_write_enabled(is_factory_mode)
+        
+    def on_cell_config_changed(self, state):
+        """32电芯配置checkbox状态改变"""
+        is_32_cell = (state == Qt.CheckState.Checked.value)
+        config_name = "32电芯+15温度" if is_32_cell else "16电芯+SBS 5温度+KB 8温度"
+        self.logger.write_log(f"切换电芯配置: {config_name}")
+        
+        # 同步到bluetooth_tool的配置
+        if hasattr(self, 'bluetooth_tool') and self.bluetooth_tool:
+            # 阻止触发bluetooth_tool的信号，避免循环
+            self.bluetooth_tool.cell_32_checkbox.blockSignals(True)
+            self.bluetooth_tool.cell_32_checkbox.setChecked(is_32_cell)
+            self.bluetooth_tool.cell_32_checkbox.blockSignals(False)
+            
+            # 调用bluetooth_tool的配置切换逻辑
+            self.bluetooth_tool.on_cell_config_changed(state)
+    
+    def sync_cell_config_from_bluetooth_tool(self):
+        """从bluetooth_tool同步32电芯配置到主界面"""
+        if hasattr(self, 'bluetooth_tool') and self.bluetooth_tool:
+            try:
+                # 获取bluetooth_tool的配置状态
+                is_32_cell = self.bluetooth_tool.cell_32_checkbox.isChecked()
+                
+                # 阻止触发主界面的信号，避免循环
+                self.cell_32_checkbox.blockSignals(True)
+                self.cell_32_checkbox.setChecked(is_32_cell)
+                self.cell_32_checkbox.blockSignals(False)
+                
+                config_name = "32电芯+15温度" if is_32_cell else "16电芯+SBS 5温度+KB 8温度"
+                self.logger.write_log(f"已加载电芯配置: {config_name}")
+            except Exception as e:
+                self.logger.write_log(f"同步电芯配置失败: {str(e)}")
         
     def query_version(self):
         """查询版本"""

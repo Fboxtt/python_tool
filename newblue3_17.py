@@ -6,6 +6,8 @@ import json
 from datetime import datetime
 import os
 import random
+from enum import Enum
+from typing import Optional, Callable
 
 from PyQt6.QtCore import QTimer  # 导入 QTimer
 from PyQt6.QtWidgets import (
@@ -36,6 +38,88 @@ import struct
 
 from ui_main import Ui_Form
 from data_display_manager import DataDisplayManager  # ⭐ 导入数据显示管理器
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 连接管理架构 - 枚举和类定义
+# ═══════════════════════════════════════════════════════════════════════════
+
+class ConnectionType(Enum):
+    """连接类型枚举"""
+    NONE = "none"
+    BLUETOOTH = "bluetooth"
+    SERIAL = "serial"
+
+
+class ConnectionState(Enum):
+    """连接状态枚举"""
+    DISCONNECTED = "disconnected"  # 断开
+    CONNECTING = "connecting"      # 正在连接
+    CONNECTED = "connected"        # 已连接
+
+
+class ConnectionManager:
+    """连接管理器 - 统一管理蓝牙和串口连接状态
+    
+    职责:
+    - 跟踪当前连接类型和状态
+    - 提供统一的状态查询接口
+    - 管理连接锁，防止并发连接
+    """
+    
+    def __init__(self):
+        self.bluetooth_state = ConnectionState.DISCONNECTED
+        self.serial_state = ConnectionState.DISCONNECTED
+        self.is_connecting = False  # 全局连接锁
+        
+    def get_bluetooth_state(self) -> ConnectionState:
+        """获取蓝牙连接状态"""
+        return self.bluetooth_state
+    
+    def set_bluetooth_state(self, state: ConnectionState):
+        """设置蓝牙连接状态"""
+        self.bluetooth_state = state
+        
+    def get_serial_state(self) -> ConnectionState:
+        """获取串口连接状态"""
+        return self.serial_state
+    
+    def set_serial_state(self, state: ConnectionState):
+        """设置串口连接状态"""
+        self.serial_state = state
+    
+    def is_bluetooth_connected(self) -> bool:
+        """检查蓝牙是否已连接"""
+        return self.bluetooth_state == ConnectionState.CONNECTED
+    
+    def is_serial_connected(self) -> bool:
+        """检查串口是否已连接"""
+        return self.serial_state == ConnectionState.CONNECTED
+    
+    def is_any_connected(self) -> bool:
+        """检查是否有任何连接（蓝牙或串口）"""
+        return self.is_bluetooth_connected() or self.is_serial_connected()
+    
+    def acquire_connection_lock(self) -> bool:
+        """尝试获取连接锁
+        
+        Returns:
+            bool: True=成功获取，False=已被占用
+        """
+        if self.is_connecting:
+            return False
+        self.is_connecting = True
+        return True
+    
+    def release_connection_lock(self):
+        """释放连接锁"""
+        self.is_connecting = False
+    
+    def reset(self):
+        """重置所有状态"""
+        self.bluetooth_state = ConnectionState.DISCONNECTED
+        self.serial_state = ConnectionState.DISCONNECTED
+        self.release_connection_lock()
 # ============== 重复的类定义已移除 ==============
 # 以下类已移至 display_widgets.py：
 # - BatteryTableModel (电池参数表格模型)
@@ -94,21 +178,36 @@ class BluetoothTool(QWidget):
     receive_ok_signal = pyqtSignal(int,bytes)
     def __init__(self):
         super().__init__()
+        # ==================== 连接管理 ====================
+        self.connection_manager = ConnectionManager()  # 统一连接管理器
+        
+        # 蓝牙相关
         self.client = None  # 当前连接的蓝牙设备
-        # self.connection_type = None  # 用于存储连接类型
-        self.serial_port = None  # 串口对象
-        self.commu_type = None
         self.device_name = None
+        self.device_address = None  # 当前连接的设备MAC地址
+        self.device_name_to_address = {}  # 设备名到地址的映射
+        
+        # 串口相关
+        self.serial_port = None  # 串口对象
         self.is_serial_connected = False
         self.serial_receive_task = None #串口接收任务对象
+        
+        # 通信类型（兼容旧代码）
+        self.commu_type = None
+        
+        # 其他任务
         self.program_task = None #烧录任务对象
         self.task_flag = False
-        self.device_name_to_address = {}  # 设备名到地址的映射
+        
+        # 初始化UI
         self.initUI()
+        
+        # 初始化业务模块
         self.hex_model = HexFileModel()
         self.text_decode = TextDecode()
         self.download_data = OtaController()
         self.hex_parser = HexParserApp()
+        
         # 初始化定时器
         self.data_timer = QTimer()
         self.data_timer.setSingleShot(True) #单次定时器可能会影响实际数据接收数量上限
@@ -134,7 +233,6 @@ class BluetoothTool(QWidget):
         self.auto_connect_device_name = ""
         self.auto_connect_mac_address = ""
         self.is_auto_reconnecting = False  # 防止重连循环
-        self.is_connecting = False  # 连接锁，防止并发连接
         self.is_auto_scanning = False  # 自动扫描标志
         
         # 自动连接定时器（定期尝试连接）
@@ -241,28 +339,13 @@ class BluetoothTool(QWidget):
         bt_layout.addLayout(rssi_row)
         self.rssi_threshold_layout = rssi_row
         
-        # 连接按钮
-        bt_btn_layout = QHBoxLayout()
-        self.connect_button = self._create_compact_button('连接', '#27ae60')
-        self.connect_button.clicked.connect(self.on_connect_device_clicked)
-        self.disconnect_button = self._create_compact_button('断开', '#e74c3c')
-        self.disconnect_button.clicked.connect(self.on_disconnect_device_clicked)
-        self.disconnect_button.setEnabled(False)
-        bt_btn_layout.addWidget(self.connect_button)
-        bt_btn_layout.addWidget(self.disconnect_button)
-        bt_layout.addLayout(bt_btn_layout)
-        self.connect_layout = bt_btn_layout
+        # 连接/断开按钮（合并为一个按钮，文字切换）
+        self.bt_connect_button = self._create_compact_button('连接', '#27ae60')
+        self.bt_connect_button.clicked.connect(self.on_bt_connect_clicked)
+        bt_layout.addWidget(self.bt_connect_button)
         
         # 状态标签
-        self.bluetooth_status_label = QLabel('状态: 未连接')
-        self.bluetooth_status_label.setStyleSheet("""
-            font-size: 9px;
-            padding: 2px;
-            border: 1px solid #ccc;
-            border-radius: 2px;
-            background-color: #f0f0f0;
-            color: #666;
-        """)
+        self.bluetooth_status_label = QLabel()
         bt_layout.addWidget(self.bluetooth_status_label)
         
         bt_group.setLayout(bt_layout)
@@ -464,16 +547,24 @@ class BluetoothTool(QWidget):
         hex_layout = QVBoxLayout()
         hex_layout.setSpacing(2)
         
-        hex_file_row = QHBoxLayout()
-        self.hex_file_label = QLabel('未选择')
-        self.hex_file_label.setStyleSheet("font-size: 10px;")
-        self.hex_file_button = QPushButton('选择')
+        # 选择按钮单独一行
+        hex_btn_row = QHBoxLayout()
+        self.hex_file_button = QPushButton('选择HEX文件')
         self.hex_file_button.setFixedHeight(22)
         self.hex_file_button.clicked.connect(self.on_select_hex_file)
-        hex_file_row.addWidget(self.hex_file_label, 1)
-        hex_file_row.addWidget(self.hex_file_button)
-        hex_layout.addLayout(hex_file_row)
+        hex_btn_row.addWidget(self.hex_file_button)
+        hex_btn_row.addStretch()
+        hex_layout.addLayout(hex_btn_row)
         
+        # 文件名标签单独一行，支持换行
+        self.hex_file_label = QLabel('未选择文件')
+        self.hex_file_label.setStyleSheet("font-size: 10px; color: #333; padding: 2px;")
+        self.hex_file_label.setWordWrap(True)  # 允许自动换行
+        self.hex_file_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
+        self.hex_file_label.setMaximumWidth(400)  # 限制最大宽度，确保换行
+        hex_layout.addWidget(self.hex_file_label)
+        
+        # 文件大小信息
         self.hex_info_label = QLabel('大小: 0B')
         self.hex_info_label.setStyleSheet("font-size: 9px; color: #666;")
         hex_layout.addWidget(self.hex_info_label)
@@ -672,6 +763,9 @@ class BluetoothTool(QWidget):
         self.setLayout(main_layout)
         self.resize(850, 550)  # 紧凑的窗口尺寸
         
+        # 初始化UI状态为断开（所有UI组件创建完成后）
+        self.update_bluetooth_status('断开')
+        
         # 初始化时自动扫描
         QTimer.singleShot(100, self.on_scan_all_clicked)
     
@@ -728,6 +822,31 @@ class BluetoothTool(QWidget):
         r, g, b = tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
         r, g, b = int(r * factor), int(g * factor), int(b * factor)
         return f'#{r:02x}{g:02x}{b:02x}'
+    
+    def _get_button_style(self, color):
+        """获取按钮样式"""
+        return f"""
+            QPushButton {{
+                background-color: {color};
+                color: white;
+                border: none;
+                padding: 3px 6px;
+                border-radius: 3px;
+                font-size: 10px;
+                min-height: 20px;
+                max-height: 22px;
+            }}
+            QPushButton:hover {{
+                background-color: {self._darken_color(color)};
+            }}
+            QPushButton:pressed {{
+                background-color: {self._darken_color(color, 0.8)};
+            }}
+            QPushButton:disabled {{
+                background-color: #cccccc;
+                color: #666666;
+            }}
+        """
 
     def blue_write_log(self, text, color=None):
         """写入日志
@@ -846,13 +965,16 @@ class BluetoothTool(QWidget):
                 self.serial_receive_task = None
 
             if self.serial_port and self.serial_port.is_open:
-                self.send_button.setEnabled(False)
                 self.serial_port.close()
                 self.commu_type = "none"
 
             self.is_serial_connected = False
             self.serial_connect_button.setText('连接串口')
             self.disable_serial_settings(False)
+            
+            # 更新共享按钮状态（考虑蓝牙连接状态）
+            self.update_shared_buttons()
+            
             self.blue_write_log("串口已断开")
             
             # 主动断开串口时，取消自动连接勾选并停止定时器
@@ -899,8 +1021,10 @@ class BluetoothTool(QWidget):
                 # 禁用参数设置
                 self.disable_serial_settings(True)
                 
+                # 更新共享按钮状态（考虑蓝牙连接状态）
+                self.update_shared_buttons()
+                
                 # 启动接收任务
-                self.send_button.setEnabled(True)
                 self.serial_receive_task = asyncio.create_task(self.serial_receive_loop())
                 
                 # 串口连接成功后，停止自动连接定时器
@@ -936,7 +1060,9 @@ class BluetoothTool(QWidget):
         # 更新UI
         self.serial_connect_button.setText('连接串口')
         self.disable_serial_settings(False)
-        self.send_button.setEnabled(False)
+        
+        # 更新共享按钮状态（考虑蓝牙连接状态）
+        self.update_shared_buttons()
 
         self.blue_write_log("串口连接已断开")
         
@@ -1083,14 +1209,34 @@ class BluetoothTool(QWidget):
         """同步方法，用于触发异步扫描"""
         asyncio.create_task(self.scan_devices())
 
+    def on_bt_connect_clicked(self):
+        """蓝牙连接/断开按钮点击处理（合并逻辑）"""
+        bluetooth_connected = bool(self.client and self.client.is_connected)
+        
+        if not bluetooth_connected:
+            # 当前未连接，执行连接
+            asyncio.create_task(self.connect_device())
+        else:
+            # 当前已连接，执行断开
+            asyncio.create_task(self.disconnect_device())
+    
     def on_connect_device_clicked(self):
-        """同步方法，用于触发异步连接"""
+        """同步方法，用于触发异步连接（兼容性保留）"""
         asyncio.create_task(self.connect_device())
 
     def on_disconnect_device_clicked(self):
-        """同步方法，用于触发异步断开连接"""
-        asyncio.create_task(self.disconnect_device())
-        asyncio.create_task(self.disconnect_serial())
+        """同步方法，断开所有连接（用于主窗口调用）"""
+        bluetooth_connected = bool(self.client and self.client.is_connected)
+        serial_connected = bool(self.is_serial_connected and self.serial_port and self.serial_port.is_open)
+        
+        # 断开所有已连接的通道
+        if bluetooth_connected:
+            asyncio.create_task(self.disconnect_device())
+        if serial_connected:
+            asyncio.create_task(self.disconnect_serial())
+        
+        if not bluetooth_connected and not serial_connected:
+            self.blue_write_log("⚠️ 当前没有活动连接")
 
     def on_device_double_clicked(self, item):
         """双击设备列表项时触发连接"""
@@ -1104,25 +1250,113 @@ class BluetoothTool(QWidget):
         else:
             QMessageBox.warning(self, '警告', '请输入要发送的数据')
 
-    def update_bluetooth_status(self, status, color='#666', bg_color='#f0f0f0'):
-        """更新蓝牙连接状态显示
+    def update_ui_state(self, state='disconnected', device_name=None, device_address=None):
+        """统一更新UI控件状态
         
         Args:
-            status: 状态文本，如 '未连接', '正在连接...', '已连接'
-            color: 文字颜色
-            bg_color: 背景颜色
+            state: 连接状态 'disconnected'/'connecting'/'connected'
+            device_name: 设备名称（可选）
+            device_address: 设备MAC地址（可选）
+        
+        注意: 此方法只管理蓝牙相关的UI状态，不影响串口功能
         """
-        self.bluetooth_status_label.setText(f'蓝牙状态: {status}')
+        # 检查串口是否已连接（串口和蓝牙可以同时工作）
+        serial_connected = self.is_serial_connected and self.serial_port and self.serial_port.is_open
+        bluetooth_connected = (state == 'connected')
+        
+        if state == 'connected':
+            # ========== 蓝牙已连接状态 ==========
+            # 状态显示 - 绿色
+            color = '#28a745'
+            bg_color = '#d4edda'
+            if device_name and device_address:
+                status_text = f'🔗 已连接\n📱 {device_name}\n📍 {device_address}'
+            elif device_name:
+                status_text = f'🔗 已连接\n📱 {device_name}'
+            else:
+                status_text = '🔗 已连接'
+            
+            # 蓝牙按钮状态
+            self.scan_button.setEnabled(False)  # 禁用扫描
+            self.device_list.setEnabled(False)  # 禁用设备列表
+            self.bt_connect_button.setEnabled(True)  # 启用按钮（用于断开）
+            self.bt_connect_button.setText('断开')  # 改为"断开"
+            self.bt_connect_button.setStyleSheet(self._get_button_style('#e74c3c'))  # 红色
+            
+        elif state == 'connecting':
+            # ========== 蓝牙正在连接状态 ==========
+            # 状态显示 - 橙色
+            color = '#ff8c00'
+            bg_color = '#fff3cd'
+            status_text = '🔄 正在连接...'
+            
+            # 蓝牙按钮 - 连接中禁用
+            self.scan_button.setEnabled(False)
+            self.device_list.setEnabled(False)
+            self.bt_connect_button.setEnabled(False)  # 禁用按钮
+            
+        else:  # 'disconnected'
+            # ========== 蓝牙断开状态 ==========
+            # 状态显示 - 灰色
+            color = '#999'
+            bg_color = '#f5f5f5'
+            status_text = '⭕ 断开'
+            
+            # 蓝牙按钮状态
+            self.scan_button.setEnabled(True)  # 启用扫描
+            self.device_list.setEnabled(True)  # 启用设备列表
+            self.bt_connect_button.setEnabled(True)  # 启用按钮（用于连接）
+            self.bt_connect_button.setText('连接')  # 改为"连接"
+            self.bt_connect_button.setStyleSheet(self._get_button_style('#27ae60'))  # 绿色
+        
+        # 更新蓝牙状态标签
+        self.bluetooth_status_label.setText(status_text)
         self.bluetooth_status_label.setStyleSheet(f"""
             QLabel {{
                 padding: 5px;
-                border: 1px solid #ccc;
+                border: 1px solid #ddd;
                 border-radius: 3px;
                 background-color: {bg_color};
                 color: {color};
+                font-size: 10px;
                 font-weight: bold;
             }}
         """)
+        
+        # 更新共享按钮状态（发送、断开按钮）
+        self.update_shared_buttons()
+    
+    def update_shared_buttons(self):
+        """更新共享的发送按钮状态
+        
+        规则:
+        - 如果蓝牙或串口任一连接，发送按钮可用
+        - 如果都未连接，发送按钮禁用
+        """
+        # 显式转换为 bool，避免 Bleak 的 _DeprecatedIsConnectedReturn 类型错误
+        bluetooth_connected = bool(self.client and self.client.is_connected)
+        serial_connected = bool(self.is_serial_connected and self.serial_port and self.serial_port.is_open)
+        
+        any_connected = bluetooth_connected or serial_connected
+        
+        self.send_button.setEnabled(any_connected)
+    
+    def update_bluetooth_status(self, status='断开', device_name=None, device_address=None):
+        """更新蓝牙连接状态显示（兼容旧接口）
+        
+        Args:
+            status: 状态文本 '断开'/'正在连接'/'已连接'
+            device_name: 设备名称（可选）
+            device_address: 设备MAC地址（可选）
+        """
+        # 映射状态文本到新的状态值
+        state_map = {
+            '断开': 'disconnected',
+            '正在连接': 'connecting',
+            '已连接': 'connected'
+        }
+        state = state_map.get(status, 'disconnected')
+        self.update_ui_state(state, device_name, device_address)
 
     def on_test_send_buttoned(self):
         """同步方法,用于测试"""
@@ -1309,29 +1543,56 @@ class BluetoothTool(QWidget):
             self.is_connecting = True
             asyncio.create_task(self._try_connect_after_scan())
 
-    async def connect_device(self):
-        """异步方法，连接蓝牙设备"""
+    async def connect_device(self, is_auto=False):
+        """异步方法，连接蓝牙设备
+        
+        Args:
+            is_auto: 是否为自动连接（True=自动连接，False=手动连接）
+        """
+        # ========== 1. 防止重复连接 ==========
+        if not self.connection_manager.acquire_connection_lock():
+            self.blue_write_log("⚠️ 正在连接中，请勿重复操作")
+            return
+        
+        # ========== 2. 检查是否已连接 ==========
+        if self.client and self.client.is_connected:
+            self.blue_write_log("✅ 设备已连接")
+            return
+        
+        # ========== 3. 获取目标设备信息 ==========
         selected_device = self.device_list.currentItem()
         if not selected_device:
-            QMessageBox.warning(self, '警告', '请先选择一个设备')
+            if not is_auto:  # 手动连接时提示
+                QMessageBox.warning(self, '警告', '请先选择一个设备')
             return
-        # 从显示文本中提取设备名
+        
         device_text = selected_device.text()
         device_name = device_text.split(' (RSSI:')[0]
-        # 通过设备名查找地址
         device_address = self.device_name_to_address.get(device_name)
+        
         if not device_address:
-            QMessageBox.warning(self, '警告', '无法找到设备地址，请重新扫描')
+            if not is_auto:
+                QMessageBox.warning(self, '警告', '无法找到设备地址，请重新扫描')
             return
+        
+        # ========== 4. 手动连接：停止自动连接 ==========
+        if not is_auto and self.auto_connect_enabled:
+            self.blue_write_log("ℹ️ 手动连接，停止自动连接...")
+            self.auto_connect_checkbox.setChecked(False)
+            # on_auto_connect_changed 会自动调用停止定时器和保存配置
+        
+        # ========== 5. 开始连接 ==========
         try:
             # 更新状态：正在连接
-            self.update_bluetooth_status('正在连接...', color='#ff8c00', bg_color='#fff3cd')
-            # 如果之前的客户端存在，先清理
+            self.update_bluetooth_status('正在连接')
+            self.blue_write_log(f"🔄 {'自动' if is_auto else '手动'}连接: {device_name} ({device_address})")
+            
+            # 清理旧连接
             if self.client:
                 try:
                     if self.client.is_connected:
                         await self.client.disconnect()
-                        await asyncio.sleep(0.5)  # 等待断开完成
+                        await asyncio.sleep(0.5)
                 except:
                     pass
                 self.client = None
@@ -1343,19 +1604,27 @@ class BluetoothTool(QWidget):
             # 等待服务发现完成
             await asyncio.sleep(1.0)
             
+            # 设置连接信息
             self.commu_type = "bluetooth"
+            self.device_name = device_name
+            self.device_address = device_address
+            
             # 更新状态：已连接
-            self.update_bluetooth_status('已连接', color='#28a745', bg_color='#d4edda')
-            # 创建消息框实例
-            connectMessage = QMessageBox(QMessageBox.Icon.Information, '连接成功', f'已连接到 {device_address}')
-            QTimer.singleShot(300, connectMessage.close)
-            connectMessage.exec()
-            # 启用断开按钮和发送按钮
-            self.disconnect_button.setEnabled(True)
-            self.send_button.setEnabled(True)
+            self.update_bluetooth_status('已连接', device_name=device_name, device_address=device_address)
+            
+            # 记录连接成功
+            log_prefix = "🤖" if is_auto else "👆"
+            self.blue_write_log(f"{log_prefix} 连接成功: {device_name} ({device_address})")
+            
+            # 手动连接时显示消息框
+            if not is_auto:
+                connectMessage = QMessageBox(QMessageBox.Icon.Information, '连接成功', 
+                                            f'已连接到\n{device_name}\n{device_address}')
+                QTimer.singleShot(300, connectMessage.close)
+                connectMessage.exec()
+            
             # 开始监听数据
             if self.client and self.client.is_connected:
-                self.device_name = device_name
                 try:
                     await self.client.start_notify("0000ffe1-0000-1000-8000-00805f9b34fb", self.on_data_received)
                 except Exception as notify_error:
@@ -1378,49 +1647,54 @@ class BluetoothTool(QWidget):
             
             QTimer.singleShot(1000, self.send_find_version_cmd)
         except asyncio.TimeoutError:
+            # 连接超时
             self.commu_type = "none"
             self.client = None
-            self.update_bluetooth_status('未连接', color='#666', bg_color='#f0f0f0')
-            self.blue_write_log("❌ 连接超时")
+            self.device_name = None
+            self.device_address = None
+            self.update_bluetooth_status('断开')
+            self.blue_write_log(f"❌ {'自动' if is_auto else '手动'}连接超时")
+            
         except Exception as e:
+            # 连接失败
             self.commu_type = "none"
             self.client = None
-            self.update_bluetooth_status('未连接', color='#666', bg_color='#f0f0f0')
-            self.blue_write_log(f"❌ 连接失败: {str(e)}")
+            self.device_name = None
+            self.device_address = None
+            self.update_bluetooth_status('断开')
+            self.blue_write_log(f"❌ {'自动' if is_auto else '手动'}连接失败: {str(e)}")
+            
+        finally:
+            # ========== 6. 清理连接标志 ==========
+            self.connection_manager.release_connection_lock()
 
     async def disconnect_device(self):
         """异步方法，断开蓝牙设备"""
         if self.client and self.client.is_connected:
             try:
                 await self.client.disconnect()
-                # 更新状态：未连接
-                self.update_bluetooth_status('未连接', color='#666', bg_color='#f0f0f0')
-                # 创建消息框
-                msg_box = QMessageBox(QMessageBox.Icon.Information, '断开成功', '设备已断开')
-                # 设置定时器自动关闭 (3秒后)
-                QTimer.singleShot(1000, msg_box.close)
-                # 显示消息框
-                msg_box.exec()
-                # 禁用断开按钮和发送按钮
-                self.disconnect_button.setEnabled(False)
-                self.send_button.setEnabled(False)
+                
+                # 清理连接状态
                 self.client = None
+                self.device_name = None
+                self.device_address = None
                 self.commu_type = "none"
+                
+                # 更新UI状态：断开（会自动设置按钮状态）
+                self.update_bluetooth_status('断开')
                 
                 # 主动断开时，取消自动连接勾选并停止定时器
                 if self.auto_connect_enabled:
                     self.auto_connect_checkbox.setChecked(False)
-                    self.auto_connect_enabled = False
-                    self.stop_auto_connect_timer()
-                    self.save_auto_connect_config()  # 保存配置
-                    self.blue_write_log("ℹ️ 主动断开连接，已自动取消自动连接")
+                    # on_auto_connect_changed 会自动调用停止定时器和保存配置
+                    self.blue_write_log("ℹ️ 主动断开蓝牙，已自动取消自动连接")
                 else:
-                    self.blue_write_log("ℹ️ 主动断开连接")
+                    self.blue_write_log("✅ 蓝牙已断开")
                 
             except Exception as e:
                 QMessageBox.critical(self, '断开失败', str(e))
         else:
-            QMessageBox.warning(self, '警告', '未连接到设备')
+            self.blue_write_log("⚠️ 蓝牙未连接")
 
     async def bluetooth_send_data(self, data:str):
         """异步方法，发送数据到蓝牙设备"""
@@ -1558,17 +1832,20 @@ class BluetoothTool(QWidget):
             raise Exception("发送失败")
 
     def on_bluetooth_disconnected(self, client):
-        """蓝牙断开连接回调函数"""
+        """蓝牙断开连接回调函数（从机主动断开）"""
         self.blue_write_log("⚠️ 蓝牙设备已断开连接（从机主动断开）", color='red')
         LogManager.get_instance().write_log(f"蓝牙断开: 设备={self.device_name}, 时间={datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         
-        # 更新状态：未连接
-        self.update_bluetooth_status('未连接', color='#666', bg_color='#f0f0f0')
-        # 禁用断开按钮和发送按钮
-        self.disconnect_button.setEnabled(False)
-        self.send_button.setEnabled(False)
+        # 清理连接状态
         self.client = None
+        self.device_name = None
+        self.device_address = None
         self.commu_type = "none"
+        self.connection_manager.release_connection_lock()  # 清理连接标志
+        self.connection_manager.set_bluetooth_state(ConnectionState.DISCONNECTED)
+        
+        # 更新UI状态：断开（会自动设置按钮状态）
+        self.update_bluetooth_status('断开')
         
         # 如果启用了自动连接，重启定时器持续尝试重连
         if self.auto_connect_enabled:
@@ -1750,9 +2027,12 @@ class BluetoothTool(QWidget):
         if filename:
             if self.hex_model.parse_hex_file(filename):
                 file_info = self.hex_model.get_file_info()
-                self.hex_file_label.setText(f'HEX文件：{file_info["filename"]}')
-                self.hex_info_label.setText(f'文件大小：{file_info["size"]} 字节')
+                # 显示文件名，支持自动换行
+                self.hex_file_label.setText(f'📄 {file_info["filename"]}')
+                self.hex_info_label.setText(f'大小: {file_info["size"]} 字节')
+                self.blue_write_log(f"已选择HEX文件: {file_info['filename']}")
             else:
+                self.hex_file_label.setText('❌ 文件解析失败')
                 QMessageBox.warning(self, '警告', 'HEX文件解析失败')
 
     def on_program_clicked(self):
@@ -2484,6 +2764,22 @@ class BluetoothTool(QWidget):
                 self.blue_write_log("正在切换到16串配置...")
                 self.hex_parser.set_struct_to_cell_16()
                 self.blue_write_log("已切换到16串配置（16电芯 + SBS:5温度 + KB:8温度）")
+            
+            # 同步到主界面（如果主界面存在）
+            try:
+                # 尝试找到主界面窗口
+                from PyQt6.QtWidgets import QApplication
+                for widget in QApplication.topLevelWidgets():
+                    if hasattr(widget, 'cell_32_checkbox') and widget != self:
+                        # 找到主界面，同步配置
+                        widget.cell_32_checkbox.blockSignals(True)
+                        widget.cell_32_checkbox.setChecked(state == Qt.CheckState.Checked.value)
+                        widget.cell_32_checkbox.blockSignals(False)
+                        break
+            except Exception as sync_error:
+                # 同步失败不影响主要功能
+                pass
+                
         except Exception as e:
             self.blue_write_log(f"切换配置失败: {str(e)}")
             traceback.print_exc()
@@ -2506,7 +2802,7 @@ class BluetoothTool(QWidget):
                 self.save_auto_connect_config()
                 
                 # 如果没有正在连接，立即触发一次扫描和连接
-                if not self.is_connecting:
+                if not self.connection_manager.is_connecting:
                     asyncio.create_task(self.auto_scan_and_connect())
                 else:
                     self.blue_write_log("⏳ 当前正在连接，等待连接完成...")
@@ -2652,12 +2948,11 @@ class BluetoothTool(QWidget):
     async def auto_scan_and_connect(self):
         """自动扫描并连接设备"""
         # 检查连接锁
-        if self.is_connecting:
+        if not self.connection_manager.acquire_connection_lock():
             self.blue_write_log("⏳ 已有连接任务在执行，跳过")
             return
         
         try:
-            self.is_connecting = True  # 设置连接锁
             self.is_auto_scanning = True  # 标记为自动扫描
             self.blue_write_log("🔍 开始自动扫描设备...")
             
@@ -2675,7 +2970,7 @@ class BluetoothTool(QWidget):
             self.blue_write_log(f"自动扫描连接失败: {str(e)}")
             traceback.print_exc()
         finally:
-            self.is_connecting = False  # 释放连接锁
+            self.connection_manager.release_connection_lock()  # 释放连接锁
             self.is_auto_scanning = False  # 清除自动扫描标志
 
     async def _try_connect_after_scan(self):
@@ -2683,7 +2978,7 @@ class BluetoothTool(QWidget):
         try:
             await self.try_auto_connect()
         finally:
-            self.is_connecting = False
+            self.connection_manager.release_connection_lock()
 
     async def try_auto_connect(self):
         """尝试自动连接匹配的设备"""
@@ -2730,12 +3025,11 @@ class BluetoothTool(QWidget):
                 
                 # 选中设备并连接
                 self.device_list.setCurrentRow(item_index)
-                self.blue_write_log(f"🔗 自动连接设备: {device_name} ({device_address})")
                 LogManager.get_instance().write_log(f"自动连接: 设备={device_name}, MAC={device_address}, 时间={datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
                 
                 # 连接前等待一下，避免快速重复连接
                 await asyncio.sleep(0.3)
-                await self.connect_device()
+                await self.connect_device(is_auto=True)  # 标记为自动连接
             else:
                 self.blue_write_log(f"❌ 未找到匹配的设备: {target_name}")
                 LogManager.get_instance().write_log(f"自动连接失败: 未找到设备 {target_name}")
@@ -2747,7 +3041,7 @@ class BluetoothTool(QWidget):
     async def auto_reconnect(self):
         """自动重连"""
         # 检查是否正在连接
-        if self.is_connecting:
+        if self.connection_manager.is_connecting:
             self.blue_write_log("⏳ 已有连接任务在执行，跳过重连")
             self.is_auto_reconnecting = False
             return
@@ -2808,7 +3102,7 @@ class BluetoothTool(QWidget):
                 return
             
             # 检查是否正在连接中
-            if self.is_connecting:
+            if self.connection_manager.is_connecting:
                 self.blue_write_log("⏳ 正在连接中，跳过本次尝试")
                 return
             
@@ -3349,13 +3643,9 @@ class SimplifiedBluetoothTool(QWidget):
         rssi_layout.addStretch()
         bluetooth_layout.addLayout(rssi_layout)
         
-        # 使用原窗口的连接/断开按钮
-        bt_btn_layout = QHBoxLayout()
-        self.connect_button = self.bluetooth_tool.connect_button
-        self.disconnect_button = self.bluetooth_tool.disconnect_button
-        bt_btn_layout.addWidget(self.connect_button)
-        bt_btn_layout.addWidget(self.disconnect_button)
-        bluetooth_layout.addLayout(bt_btn_layout)
+        # 使用原窗口的连接/断开按钮（现在是一个按钮）
+        self.bt_connect_button = self.bluetooth_tool.bt_connect_button
+        bluetooth_layout.addWidget(self.bt_connect_button)
         
         # 使用原窗口的蓝牙状态标签
         self.bluetooth_status_label = self.bluetooth_tool.bluetooth_status_label
