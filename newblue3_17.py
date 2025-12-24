@@ -129,6 +129,15 @@ class BluetoothTool(QWidget):
         # 连接receive_ok_signal到内部槽函数
         self.receive_ok_signal.connect(self._on_receive_response)
 
+        # 自动连接相关
+        self.auto_connect_enabled = False
+        self.auto_connect_device_name = ""
+        self.auto_connect_mac_address = ""
+        self.is_auto_reconnecting = False  # 防止重连循环
+        
+        # 加载自动连接配置
+        self.load_auto_connect_config()
+
         # 检测当前配置并设置checkbox状态（不触发信号）
         self.detect_and_set_cell_config()
     def initUI(self):
@@ -161,6 +170,49 @@ class BluetoothTool(QWidget):
         self.cell_32_checkbox.setToolTip('勾选：32电芯+15温度传感器\n不勾选：16电芯+SBS 5温度+KB 8温度')
         self.cell_32_checkbox.stateChanged.connect(self.on_cell_config_changed)
         left_layout.addWidget(self.cell_32_checkbox)
+
+        # 自动连接配置
+        auto_connect_layout = QVBoxLayout()
+        auto_connect_title = QLabel('自动连接配置')
+        auto_connect_title.setFont(QFont('Arial', 10, QFont.Weight.Bold))
+        auto_connect_layout.addWidget(auto_connect_title)
+        
+        # 自动连接勾选框
+        self.auto_connect_checkbox = QCheckBox('启用自动连接')
+        self.auto_connect_checkbox.setToolTip('勾选后将自动扫描并连接指定的蓝牙设备')
+        self.auto_connect_checkbox.stateChanged.connect(self.on_auto_connect_changed)
+        auto_connect_layout.addWidget(self.auto_connect_checkbox)
+        
+        # 设备名称输入
+        device_name_layout = QHBoxLayout()
+        device_name_layout.addWidget(QLabel('设备名称:'))
+        self.auto_connect_name_input = QLineEdit()
+        self.auto_connect_name_input.setPlaceholderText('输入蓝牙设备名称')
+        self.auto_connect_name_input.textChanged.connect(self.on_auto_connect_config_changed)
+        device_name_layout.addWidget(self.auto_connect_name_input)
+        auto_connect_layout.addLayout(device_name_layout)
+        
+        # MAC地址输入
+        mac_layout = QHBoxLayout()
+        mac_layout.addWidget(QLabel('MAC地址:'))
+        self.auto_connect_mac_input = QLineEdit()
+        self.auto_connect_mac_input.setPlaceholderText('输入MAC地址(可选)')
+        self.auto_connect_mac_input.textChanged.connect(self.on_auto_connect_config_changed)
+        mac_layout.addWidget(self.auto_connect_mac_input)
+        auto_connect_layout.addLayout(mac_layout)
+        
+        # 保存配置按钮（手动保存，带提示消息）
+        save_config_button = QPushButton('💾 手动保存配置')
+        save_config_button.clicked.connect(lambda: self.save_auto_connect_config(show_message=True))
+        save_config_button.setToolTip('配置会自动保存，此按钮用于手动确认保存')
+        auto_connect_layout.addWidget(save_config_button)
+        
+        # 提示标签
+        auto_save_hint = QLabel('💡 配置会自动保存')
+        auto_save_hint.setStyleSheet("QLabel { color: #666; font-size: 10px; }")
+        auto_connect_layout.addWidget(auto_save_hint)
+        
+        left_layout.addLayout(auto_connect_layout)
 
         # 创建水平分割的两个区域
         connection_layout = QHBoxLayout()
@@ -1193,6 +1245,11 @@ class BluetoothTool(QWidget):
                 # self.blue_write_log(device_info)
 
         self.label.setText('发现的蓝牙设备:')
+        
+        # 如果启用了自动连接，尝试自动连接
+        if self.auto_connect_enabled:
+            self.blue_write_log("🔄 扫描完成，尝试自动连接...")
+            asyncio.create_task(self.try_auto_connect())
 
     async def connect_device(self):
         """异步方法，连接蓝牙设备"""
@@ -1235,6 +1292,16 @@ class BluetoothTool(QWidget):
             if self.client and self.client.is_connected:
                 self.device_name = device_name
                 await self.client.start_notify("0000ffe1-0000-1000-8000-00805f9b34fb", self.on_data_received)
+            
+            # 连接成功后，自动保存该设备信息（如果配置为空或不同）
+            if not self.auto_connect_device_name or self.auto_connect_device_name != device_name:
+                self.blue_write_log(f"📝 自动保存设备信息: {device_name} ({device_address})")
+                self.auto_connect_name_input.setText(device_name)
+                self.auto_connect_mac_input.setText(device_address)
+                self.auto_connect_device_name = device_name
+                self.auto_connect_mac_address = device_address
+                self.save_auto_connect_config()
+            
             QTimer.singleShot(1000, self.send_find_version_cmd)
         except asyncio.TimeoutError:
             self.commu_type = "none"
@@ -1407,7 +1474,9 @@ class BluetoothTool(QWidget):
 
     def on_bluetooth_disconnected(self, client):
         """蓝牙断开连接回调函数"""
-        self.blue_write_log("蓝牙设备已断开连接（从机断开）")
+        self.blue_write_log("⚠️ 蓝牙设备已断开连接（从机主动断开）", color='red')
+        LogManager.get_instance().write_log(f"蓝牙断开: 设备={self.device_name}, 时间={datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        
         # 更新状态：未连接
         self.update_bluetooth_status('未连接', color='#666', bg_color='#f0f0f0')
         # 禁用断开按钮和发送按钮
@@ -1415,8 +1484,16 @@ class BluetoothTool(QWidget):
         self.send_button.setEnabled(False)
         self.client = None
         self.commu_type = "none"
-        # 弹出提示消息
-        QMessageBox.warning(self, '连接已断开', '蓝牙设备已断开连接')
+        
+        # 如果启用了自动连接且不在重连中，尝试重新连接
+        if self.auto_connect_enabled and not self.is_auto_reconnecting:
+            self.blue_write_log("🔄 检测到自动连接已启用，将尝试重新连接...")
+            self.is_auto_reconnecting = True
+            # 延迟3秒后尝试重连
+            QTimer.singleShot(3000, lambda: asyncio.create_task(self.auto_reconnect()))
+        else:
+            # 弹出提示消息
+            QMessageBox.warning(self, '连接已断开', '蓝牙设备已断开连接')
     
     def _on_receive_response(self, cmd_code, data):
         """内部槽函数：处理接收到的响应（用于test_send_data等功能）
@@ -2323,6 +2400,215 @@ class BluetoothTool(QWidget):
             self.blue_write_log(f"切换配置失败: {str(e)}")
             traceback.print_exc()
 
+    def on_auto_connect_changed(self, state):
+        """处理自动连接checkbox状态变化"""
+        try:
+            self.auto_connect_enabled = (state == Qt.CheckState.Checked.value)
+            
+            if self.auto_connect_enabled:
+                # 验证配置
+                if not self.auto_connect_name_input.text().strip():
+                    self.blue_write_log("⚠️ 请先配置设备名称")
+                    self.auto_connect_checkbox.setChecked(False)
+                    return
+                
+                self.blue_write_log(f"✅ 自动连接已启用: {self.auto_connect_name_input.text()}")
+                # 自动保存配置
+                self.save_auto_connect_config()
+                # 立即触发一次扫描和连接
+                asyncio.create_task(self.auto_scan_and_connect())
+            else:
+                self.blue_write_log("❌ 自动连接已禁用")
+                self.is_auto_reconnecting = False
+                # 自动保存配置
+                self.save_auto_connect_config()
+                
+        except Exception as e:
+            self.blue_write_log(f"自动连接状态切换失败: {str(e)}")
+            traceback.print_exc()
+
+    def on_auto_connect_config_changed(self):
+        """自动连接配置输入变化 - 自动保存"""
+        # 实时更新配置
+        self.auto_connect_device_name = self.auto_connect_name_input.text().strip()
+        self.auto_connect_mac_address = self.auto_connect_mac_input.text().strip()
+        
+        # 自动保存配置（延迟500ms，避免频繁保存）
+        if hasattr(self, '_save_timer'):
+            self._save_timer.stop()
+        else:
+            self._save_timer = QTimer()
+            self._save_timer.setSingleShot(True)
+            self._save_timer.timeout.connect(self.save_auto_connect_config)
+        
+        self._save_timer.start(500)  # 500ms后保存
+
+    def save_auto_connect_config(self, show_message=False):
+        """保存自动连接配置到JSON文件
+        
+        Args:
+            show_message: 是否显示保存成功的消息（手动保存时显示，自动保存时不显示）
+        """
+        try:
+            config = {
+                'enabled': self.auto_connect_enabled,
+                'device_name': self.auto_connect_name_input.text().strip(),
+                'mac_address': self.auto_connect_mac_input.text().strip()
+            }
+            
+            config_file = os.path.join(os.getcwd(), 'auto_connect_config.json')
+            with open(config_file, 'w', encoding='utf-8') as f:
+                json.dump(config, f, ensure_ascii=False, indent=4)
+            
+            if show_message:
+                self.blue_write_log(f"✅ 自动连接配置已保存: {config_file}")
+            
+            LogManager.get_instance().write_log(f"自动连接配置已保存: {config}")
+            
+        except Exception as e:
+            self.blue_write_log(f"保存配置失败: {str(e)}")
+            traceback.print_exc()
+
+    def load_auto_connect_config(self):
+        """从JSON文件加载自动连接配置"""
+        try:
+            config_file = os.path.join(os.getcwd(), 'auto_connect_config.json')
+            
+            if os.path.exists(config_file):
+                with open(config_file, 'r', encoding='utf-8') as f:
+                    config = json.load(f)
+                
+                self.auto_connect_enabled = config.get('enabled', False)
+                self.auto_connect_device_name = config.get('device_name', '')
+                self.auto_connect_mac_address = config.get('mac_address', '')
+                
+                # 延迟加载UI配置（等待UI初始化完成）
+                QTimer.singleShot(200, lambda: self._apply_loaded_config(config))
+                
+                LogManager.get_instance().write_log(f"已加载自动连接配置: {config}")
+            else:
+                LogManager.get_instance().write_log("未找到自动连接配置文件，使用默认配置")
+                
+        except Exception as e:
+            LogManager.get_instance().write_log(f"加载配置失败: {str(e)}")
+            traceback.print_exc()
+
+    def _apply_loaded_config(self, config):
+        """应用加载的配置到UI"""
+        try:
+            # 阻止信号触发
+            self.auto_connect_checkbox.blockSignals(True)
+            self.auto_connect_name_input.blockSignals(True)
+            self.auto_connect_mac_input.blockSignals(True)
+            
+            # 设置UI值
+            self.auto_connect_checkbox.setChecked(config.get('enabled', False))
+            self.auto_connect_name_input.setText(config.get('device_name', ''))
+            self.auto_connect_mac_input.setText(config.get('mac_address', ''))
+            
+            # 恢复信号
+            self.auto_connect_checkbox.blockSignals(False)
+            self.auto_connect_name_input.blockSignals(False)
+            self.auto_connect_mac_input.blockSignals(False)
+            
+            self.blue_write_log(f"📋 已加载自动连接配置: {config.get('device_name', '')}")
+            
+            # 如果启用了自动连接，触发自动扫描
+            if self.auto_connect_enabled and config.get('device_name'):
+                self.blue_write_log("🔄 自动连接已启用，将在扫描后自动连接...")
+                
+        except Exception as e:
+            self.blue_write_log(f"应用配置失败: {str(e)}")
+            traceback.print_exc()
+
+    async def auto_scan_and_connect(self):
+        """自动扫描并连接设备"""
+        try:
+            self.blue_write_log("🔍 开始自动扫描设备...")
+            
+            # 执行扫描
+            await self.scan_devices()
+            
+            # 等待扫描完成
+            await asyncio.sleep(0.5)
+            
+            # 尝试自动连接
+            if self.auto_connect_enabled:
+                await self.try_auto_connect()
+                
+        except Exception as e:
+            self.blue_write_log(f"自动扫描连接失败: {str(e)}")
+            traceback.print_exc()
+
+    async def try_auto_connect(self):
+        """尝试自动连接匹配的设备"""
+        try:
+            target_name = self.auto_connect_device_name
+            target_mac = self.auto_connect_mac_address
+            
+            if not target_name:
+                self.blue_write_log("⚠️ 未配置目标设备名称")
+                return
+            
+            self.blue_write_log(f"🔍 查找目标设备: 名称={target_name}, MAC={target_mac if target_mac else '任意'}")
+            
+            # 查找匹配的设备
+            matched_device = None
+            for i in range(self.device_list.count()):
+                item_text = self.device_list.item(i).text()
+                device_name = item_text.split(' (RSSI:')[0]
+                device_address = self.device_name_to_address.get(device_name)
+                
+                # 检查名称匹配
+                name_match = (device_name == target_name)
+                
+                # 检查MAC地址匹配（如果配置了MAC）
+                mac_match = True
+                if target_mac:
+                    mac_match = (device_address and device_address.upper() == target_mac.upper())
+                
+                if name_match and mac_match:
+                    matched_device = (device_name, device_address, i)
+                    self.blue_write_log(f"✅ 找到匹配设备: {device_name} ({device_address})")
+                    break
+                elif name_match and not mac_match:
+                    self.blue_write_log(f"⚠️ 发现同名设备但MAC不匹配: {device_name} ({device_address}) != {target_mac}")
+                    LogManager.get_instance().write_log(f"设备MAC不匹配: 扫描到={device_address}, 期望={target_mac}")
+            
+            if matched_device:
+                device_name, device_address, item_index = matched_device
+                
+                # 选中设备并连接
+                self.device_list.setCurrentRow(item_index)
+                self.blue_write_log(f"🔗 自动连接设备: {device_name} ({device_address})")
+                LogManager.get_instance().write_log(f"自动连接: 设备={device_name}, MAC={device_address}, 时间={datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+                
+                await self.connect_device()
+            else:
+                self.blue_write_log(f"❌ 未找到匹配的设备: {target_name}")
+                LogManager.get_instance().write_log(f"自动连接失败: 未找到设备 {target_name}")
+                
+        except Exception as e:
+            self.blue_write_log(f"自动连接失败: {str(e)}")
+            traceback.print_exc()
+
+    async def auto_reconnect(self):
+        """自动重连"""
+        try:
+            self.blue_write_log("🔄 开始自动重连...")
+            LogManager.get_instance().write_log(f"开始自动重连: 时间={datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+            
+            # 执行自动扫描和连接
+            await self.auto_scan_and_connect()
+            
+            # 重置重连标志
+            self.is_auto_reconnecting = False
+            
+        except Exception as e:
+            self.blue_write_log(f"自动重连失败: {str(e)}")
+            self.is_auto_reconnecting = False
+            traceback.print_exc()
+
 widgets = None
 
 # 修正后的函数 - 注意这是一个函数，不是类
@@ -2855,6 +3141,36 @@ class SimplifiedBluetoothTool(QWidget):
         self.bluetooth_status_label = self.bluetooth_tool.bluetooth_status_label
         bluetooth_layout.addWidget(self.bluetooth_status_label)
         
+        # 自动连接配置（复用原窗口的控件）
+        auto_layout = QVBoxLayout()
+        auto_title = QLabel('自动连接')
+        auto_title.setFont(QFont('Arial', 10, QFont.Weight.Bold))
+        auto_layout.addWidget(auto_title)
+        
+        self.auto_connect_checkbox = self.bluetooth_tool.auto_connect_checkbox
+        auto_layout.addWidget(self.auto_connect_checkbox)
+        
+        name_layout = QHBoxLayout()
+        name_layout.addWidget(QLabel('名称:'))
+        self.auto_connect_name_input = self.bluetooth_tool.auto_connect_name_input
+        self.auto_connect_name_input.setMaximumWidth(120)
+        name_layout.addWidget(self.auto_connect_name_input)
+        auto_layout.addLayout(name_layout)
+        
+        mac_layout_simple = QHBoxLayout()
+        mac_layout_simple.addWidget(QLabel('MAC:'))
+        self.auto_connect_mac_input = self.bluetooth_tool.auto_connect_mac_input
+        self.auto_connect_mac_input.setMaximumWidth(120)
+        mac_layout_simple.addWidget(self.auto_connect_mac_input)
+        auto_layout.addLayout(mac_layout_simple)
+        
+        # 提示标签
+        auto_save_hint_simple = QLabel('💡 自动保存')
+        auto_save_hint_simple.setStyleSheet("QLabel { color: #666; font-size: 9px; }")
+        auto_layout.addWidget(auto_save_hint_simple)
+        
+        bluetooth_layout.addLayout(auto_layout)
+        
         # ========== 右侧：串口 ==========
         serial_layout = QVBoxLayout()
         serial_title = QLabel('串口连接')
@@ -2993,7 +3309,7 @@ class SimplifiedBluetoothTool(QWidget):
         main_layout.addLayout(heating_layout)
         
         self.setLayout(main_layout)
-        self.setFixedSize(520, 520)
+        self.setFixedSize(520, 600)  # 增加高度以容纳自动连接配置
     
     def focusOutEvent(self, event):
         """失去焦点时隐藏（点击窗口外部）"""
