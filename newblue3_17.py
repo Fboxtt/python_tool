@@ -163,34 +163,6 @@ class BluetoothTool(QWidget):
         connection_layout.setSpacing(3)
         connection_layout.setContentsMargins(5, 5, 5, 5)
         
-        # HEX文件部分（紧凑）
-        hex_group = self._create_compact_group("HEX文件")
-        hex_layout = QVBoxLayout()
-        hex_layout.setSpacing(2)
-        
-        hex_file_row = QHBoxLayout()
-        self.hex_file_label = QLabel('未选择')
-        self.hex_file_label.setStyleSheet("font-size: 10px;")
-        self.hex_file_button = QPushButton('选择')
-        self.hex_file_button.setFixedHeight(22)
-        self.hex_file_button.clicked.connect(self.on_select_hex_file)
-        hex_file_row.addWidget(self.hex_file_label, 1)
-        hex_file_row.addWidget(self.hex_file_button)
-        hex_layout.addLayout(hex_file_row)
-        
-        self.hex_info_label = QLabel('大小: 0B')
-        self.hex_info_label.setStyleSheet("font-size: 9px; color: #666;")
-        hex_layout.addWidget(self.hex_info_label)
-        
-        self.cell_32_checkbox = QCheckBox('32电芯配置')
-        self.cell_32_checkbox.setStyleSheet("font-size: 10px;")
-        self.cell_32_checkbox.setToolTip('勾选：32电芯+15温度\n不勾选：16电芯+SBS 5温度+KB 8温度')
-        self.cell_32_checkbox.stateChanged.connect(self.on_cell_config_changed)
-        hex_layout.addWidget(self.cell_32_checkbox)
-        
-        hex_group.setLayout(hex_layout)
-        connection_layout.addWidget(hex_group)
-        
         # 自动连接配置（紧凑）
         auto_group = self._create_compact_group("自动连接")
         auto_layout = QVBoxLayout()
@@ -486,6 +458,34 @@ class BluetoothTool(QWidget):
         advanced_layout = QVBoxLayout(advanced_tab)
         advanced_layout.setSpacing(3)
         advanced_layout.setContentsMargins(5, 5, 5, 5)
+        
+        # HEX文件部分（紧凑）
+        hex_group = self._create_compact_group("HEX文件")
+        hex_layout = QVBoxLayout()
+        hex_layout.setSpacing(2)
+        
+        hex_file_row = QHBoxLayout()
+        self.hex_file_label = QLabel('未选择')
+        self.hex_file_label.setStyleSheet("font-size: 10px;")
+        self.hex_file_button = QPushButton('选择')
+        self.hex_file_button.setFixedHeight(22)
+        self.hex_file_button.clicked.connect(self.on_select_hex_file)
+        hex_file_row.addWidget(self.hex_file_label, 1)
+        hex_file_row.addWidget(self.hex_file_button)
+        hex_layout.addLayout(hex_file_row)
+        
+        self.hex_info_label = QLabel('大小: 0B')
+        self.hex_info_label.setStyleSheet("font-size: 9px; color: #666;")
+        hex_layout.addWidget(self.hex_info_label)
+        
+        self.cell_32_checkbox = QCheckBox('32电芯配置')
+        self.cell_32_checkbox.setStyleSheet("font-size: 10px;")
+        self.cell_32_checkbox.setToolTip('勾选：32电芯+15温度\n不勾选：16电芯+SBS 5温度+KB 8温度')
+        self.cell_32_checkbox.stateChanged.connect(self.on_cell_config_changed)
+        hex_layout.addWidget(self.cell_32_checkbox)
+        
+        hex_group.setLayout(hex_layout)
+        advanced_layout.addWidget(hex_group)
         
         # 密码管理
         password_group = self._create_compact_group("密码管理")

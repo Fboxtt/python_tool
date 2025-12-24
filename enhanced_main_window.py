@@ -344,6 +344,47 @@ class EnhancedMainWindow(QMainWindow):
             self.simplified_bluetooth_tool.activateWindow()
             self.simplified_bluetooth_tool.setFocus()
     
+    def _adjust_window_position(self, window, target_pos):
+        """调整窗口位置，确保不超出屏幕边界
+        
+        Args:
+            window: 要调整的窗口
+            target_pos: 目标位置（QPoint）
+        
+        Returns:
+            QPoint: 调整后的位置
+        """
+        # 获取窗口大小
+        window_size = window.size()
+        window_width = window_size.width()
+        window_height = window_size.height()
+        
+        # 获取屏幕几何信息
+        screen = QApplication.screenAt(target_pos)
+        if screen is None:
+            screen = QApplication.primaryScreen()
+        
+        screen_geometry = screen.availableGeometry()
+        screen_right = screen_geometry.x() + screen_geometry.width()
+        screen_bottom = screen_geometry.y() + screen_geometry.height()
+        
+        # 调整X坐标，确保窗口右边不超出屏幕
+        x = target_pos.x()
+        if x + window_width > screen_right:
+            x = screen_right - window_width
+        if x < screen_geometry.x():
+            x = screen_geometry.x()
+        
+        # 调整Y坐标，确保窗口底部不超出屏幕
+        y = target_pos.y()
+        if y + window_height > screen_bottom:
+            y = screen_bottom - window_height
+        if y < screen_geometry.y():
+            y = screen_geometry.y()
+        
+        from PyQt6.QtCore import QPoint
+        return QPoint(x, y)
+    
     def show_bluetooth_tool(self):
         """显示/隐藏蓝牙工具窗口（切换功能）"""
         cursor_pos = QCursor.pos()
@@ -366,7 +407,9 @@ class EnhancedMainWindow(QMainWindow):
                 self.simplified_bluetooth_tool.hide()
             else:
                 # print(f"[主窗口] 显示简化窗口在: {cursor_pos}")
-                self.simplified_bluetooth_tool.move(cursor_pos)
+                # 调整位置，确保不超出屏幕
+                adjusted_pos = self._adjust_window_position(self.simplified_bluetooth_tool, cursor_pos)
+                self.simplified_bluetooth_tool.move(adjusted_pos)
                 self.simplified_bluetooth_tool.show()
                 self.simplified_bluetooth_tool.raise_()
                 # 强制设置焦点
@@ -387,7 +430,9 @@ class EnhancedMainWindow(QMainWindow):
                 # print(f"[主窗口] 显示原窗口在: {cursor_pos}")
                 # 恢复device_list到原窗口
                 self.bluetooth_tool.restore_device_list()
-                self.bluetooth_tool.move(cursor_pos)
+                # 调整位置，确保不超出屏幕
+                adjusted_pos = self._adjust_window_position(self.bluetooth_tool, cursor_pos)
+                self.bluetooth_tool.move(adjusted_pos)
                 self.bluetooth_tool.show()
                 self.bluetooth_tool.raise_()
                 self.bluetooth_tool.activateWindow()
