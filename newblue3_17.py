@@ -11,7 +11,7 @@ from PyQt6.QtCore import QTimer  # 导入 QTimer
 from PyQt6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QPushButton, QListWidget, QLabel, QMessageBox, QTextEdit, QLineEdit, QHBoxLayout,
     QCheckBox, QFileDialog, QComboBox, QGridLayout, QMainWindow, QSplashScreen, QSizePolicy, QTableView, QHeaderView, QAbstractItemView,
-    QStyledItemDelegate, QStyle, QDoubleSpinBox
+    QStyledItemDelegate, QStyle, QDoubleSpinBox, QTabWidget, QGroupBox
 )
 from PyQt6.QtCore import Qt, QAbstractTableModel, QModelIndex
 from PyQt6.QtGui import QPixmap, QFont, QColor, QPainter
@@ -134,6 +134,13 @@ class BluetoothTool(QWidget):
         self.auto_connect_device_name = ""
         self.auto_connect_mac_address = ""
         self.is_auto_reconnecting = False  # 防止重连循环
+        self.is_connecting = False  # 连接锁，防止并发连接
+        self.is_auto_scanning = False  # 自动扫描标志
+        
+        # 自动连接定时器（定期尝试连接）
+        self.auto_connect_timer = QTimer()
+        self.auto_connect_timer.timeout.connect(self.on_auto_connect_timer)
+        self.auto_connect_retry_interval = 5000  # 5秒尝试一次
         
         # 加载自动连接配置
         self.load_auto_connect_config()
@@ -141,557 +148,586 @@ class BluetoothTool(QWidget):
         # 检测当前配置并设置checkbox状态（不触发信号）
         self.detect_and_set_cell_config()
     def initUI(self):
-        self.setWindowTitle('firstuse')
+        self.setWindowTitle('firstuse - 蓝牙调试工具')
 
-        # 创建主水平布局
+        # 创建主布局
         main_layout = QHBoxLayout()
-
-        # 创建左侧垂直布局（原有的所有控件）
-        left_layout = QVBoxLayout()
-
-        # 创建右侧垂直布局（接收数据显示）
-        right_layout = QVBoxLayout()
-
-        # HEX文件解析部分
-        self.hex_layout = QHBoxLayout()
-        self.hex_file_label = QLabel('HEX文件：未选择')
-        self.hex_file_button = QPushButton('选择HEX文件')
+        
+        # 创建左侧TabWidget（连接和控制）
+        left_tabs = QTabWidget()
+        left_tabs.setMaximumWidth(450)  # 限制左侧宽度
+        
+        # ==================== Tab 1: 连接设置 ====================
+        connection_tab = QWidget()
+        connection_layout = QVBoxLayout(connection_tab)
+        connection_layout.setSpacing(3)
+        connection_layout.setContentsMargins(5, 5, 5, 5)
+        
+        # HEX文件部分（紧凑）
+        hex_group = self._create_compact_group("HEX文件")
+        hex_layout = QVBoxLayout()
+        hex_layout.setSpacing(2)
+        
+        hex_file_row = QHBoxLayout()
+        self.hex_file_label = QLabel('未选择')
+        self.hex_file_label.setStyleSheet("font-size: 10px;")
+        self.hex_file_button = QPushButton('选择')
+        self.hex_file_button.setFixedHeight(22)
         self.hex_file_button.clicked.connect(self.on_select_hex_file)
-        self.hex_layout.addWidget(self.hex_file_label)
-        self.hex_layout.addWidget(self.hex_file_button)
-        left_layout.addLayout(self.hex_layout)
-
-        # HEX文件信息显示
-        self.hex_info_label = QLabel('文件大小：0 字节')
-        left_layout.addWidget(self.hex_info_label)
-
-        # 32电芯配置切换
+        hex_file_row.addWidget(self.hex_file_label, 1)
+        hex_file_row.addWidget(self.hex_file_button)
+        hex_layout.addLayout(hex_file_row)
+        
+        self.hex_info_label = QLabel('大小: 0B')
+        self.hex_info_label.setStyleSheet("font-size: 9px; color: #666;")
+        hex_layout.addWidget(self.hex_info_label)
+        
         self.cell_32_checkbox = QCheckBox('32电芯配置')
-        self.cell_32_checkbox.setToolTip('勾选：32电芯+15温度传感器\n不勾选：16电芯+SBS 5温度+KB 8温度')
+        self.cell_32_checkbox.setStyleSheet("font-size: 10px;")
+        self.cell_32_checkbox.setToolTip('勾选：32电芯+15温度\n不勾选：16电芯+SBS 5温度+KB 8温度')
         self.cell_32_checkbox.stateChanged.connect(self.on_cell_config_changed)
-        left_layout.addWidget(self.cell_32_checkbox)
-
-        # 自动连接配置
-        auto_connect_layout = QVBoxLayout()
-        auto_connect_title = QLabel('自动连接配置')
-        auto_connect_title.setFont(QFont('Arial', 10, QFont.Weight.Bold))
-        auto_connect_layout.addWidget(auto_connect_title)
+        hex_layout.addWidget(self.cell_32_checkbox)
         
-        # 自动连接勾选框
-        self.auto_connect_checkbox = QCheckBox('启用自动连接')
-        self.auto_connect_checkbox.setToolTip('勾选后将自动扫描并连接指定的蓝牙设备')
+        hex_group.setLayout(hex_layout)
+        connection_layout.addWidget(hex_group)
+        
+        # 自动连接配置（紧凑）
+        auto_group = self._create_compact_group("自动连接")
+        auto_layout = QVBoxLayout()
+        auto_layout.setSpacing(2)
+        
+        self.auto_connect_checkbox = QCheckBox('启用')
+        self.auto_connect_checkbox.setStyleSheet("font-size: 10px;")
         self.auto_connect_checkbox.stateChanged.connect(self.on_auto_connect_changed)
-        auto_connect_layout.addWidget(self.auto_connect_checkbox)
+        auto_layout.addWidget(self.auto_connect_checkbox)
         
-        # 设备名称输入
-        device_name_layout = QHBoxLayout()
-        device_name_layout.addWidget(QLabel('设备名称:'))
+        # 设备名称和MAC地址合并为一行
+        device_row1 = QHBoxLayout()
+        device_row1.addWidget(QLabel('名称:'))
         self.auto_connect_name_input = QLineEdit()
-        self.auto_connect_name_input.setPlaceholderText('输入蓝牙设备名称')
+        self.auto_connect_name_input.setPlaceholderText('设备名称')
+        self.auto_connect_name_input.setStyleSheet("font-size: 10px;")
         self.auto_connect_name_input.textChanged.connect(self.on_auto_connect_config_changed)
-        device_name_layout.addWidget(self.auto_connect_name_input)
-        auto_connect_layout.addLayout(device_name_layout)
+        device_row1.addWidget(self.auto_connect_name_input)
+        auto_layout.addLayout(device_row1)
         
-        # MAC地址输入
-        mac_layout = QHBoxLayout()
-        mac_layout.addWidget(QLabel('MAC地址:'))
+        device_row2 = QHBoxLayout()
+        device_row2.addWidget(QLabel('MAC:'))
         self.auto_connect_mac_input = QLineEdit()
-        self.auto_connect_mac_input.setPlaceholderText('输入MAC地址(可选)')
+        self.auto_connect_mac_input.setPlaceholderText('MAC地址(可选)')
+        self.auto_connect_mac_input.setStyleSheet("font-size: 10px;")
         self.auto_connect_mac_input.textChanged.connect(self.on_auto_connect_config_changed)
-        mac_layout.addWidget(self.auto_connect_mac_input)
-        auto_connect_layout.addLayout(mac_layout)
+        device_row2.addWidget(self.auto_connect_mac_input)
+        auto_layout.addLayout(device_row2)
         
-        # 保存配置按钮（手动保存，带提示消息）
-        save_config_button = QPushButton('💾 手动保存配置')
-        save_config_button.clicked.connect(lambda: self.save_auto_connect_config(show_message=True))
-        save_config_button.setToolTip('配置会自动保存，此按钮用于手动确认保存')
-        auto_connect_layout.addWidget(save_config_button)
+        interval_row = QHBoxLayout()
+        interval_row.addWidget(QLabel('间隔:'))
+        self.auto_connect_interval_spinbox = QDoubleSpinBox()
+        self.auto_connect_interval_spinbox.setMinimum(1.0)
+        self.auto_connect_interval_spinbox.setMaximum(60.0)
+        self.auto_connect_interval_spinbox.setValue(5.0)
+        self.auto_connect_interval_spinbox.setDecimals(0)
+        self.auto_connect_interval_spinbox.setStyleSheet("font-size: 10px;")
+        self.auto_connect_interval_spinbox.setFixedWidth(60)
+        self.auto_connect_interval_spinbox.valueChanged.connect(self.on_retry_interval_changed)
+        interval_row.addWidget(self.auto_connect_interval_spinbox)
+        interval_row.addWidget(QLabel('秒'))
+        interval_row.addStretch()
+        auto_layout.addLayout(interval_row)
         
-        # 提示标签
-        auto_save_hint = QLabel('💡 配置会自动保存')
-        auto_save_hint.setStyleSheet("QLabel { color: #666; font-size: 10px; }")
-        auto_connect_layout.addWidget(auto_save_hint)
+        auto_group.setLayout(auto_layout)
+        connection_layout.addWidget(auto_group)
         
-        left_layout.addLayout(auto_connect_layout)
-
-        # 创建水平分割的两个区域
-        connection_layout = QHBoxLayout()
-
-        # ========== 左侧：蓝牙连接部分 ==========
-        bluetooth_layout = QVBoxLayout()
-        bluetooth_frame = QWidget()
-        bluetooth_frame.setLayout(bluetooth_layout)
-
-        # 蓝牙标题
-        bluetooth_title = QLabel('蓝牙连接')
-        bluetooth_title.setFont(QFont('Arial', 12, QFont.Weight.Bold))
-        bluetooth_layout.addWidget(bluetooth_title)
-
-        # 设备扫描部分
-        self.label = QLabel('发现的蓝牙设备:')
+        # 蓝牙连接（紧凑）
+        bt_group = self._create_compact_group("蓝牙连接")
+        bt_layout = QVBoxLayout()
+        bt_layout.setSpacing(3)
+        
+        self.label = QLabel('设备列表:')
+        self.label.setStyleSheet("font-size: 10px;")
+        bt_layout.addWidget(self.label)
+        
         self.device_list = QListWidget()
-        # 添加双击连接功能
+        self.device_list.setMaximumHeight(100)
+        self.device_list.setStyleSheet("font-size: 10px;")
         self.device_list.itemDoubleClicked.connect(self.on_device_double_clicked)
-        bluetooth_layout.addWidget(self.label)
-        bluetooth_layout.addWidget(self.device_list)
+        bt_layout.addWidget(self.device_list)
         
-        # 保存布局引用，用于切换窗口时恢复控件
-        self.bluetooth_layout = bluetooth_layout
-        self.device_list_index = bluetooth_layout.count() - 1  # 记录device_list在布局中的位置
-
-        # 信号强度筛选部分
-        self.rssi_threshold_layout = QHBoxLayout()
-        self.rssi_threshold_label = QLabel('信号强度筛选 (RSSI >):')
+        # 保存布局引用
+        self.bluetooth_layout = bt_layout
+        self.device_list_index = bt_layout.count() - 1
+        
+        # RSSI筛选
+        rssi_row = QHBoxLayout()
+        rssi_row.addWidget(QLabel('RSSI >'))
         self.rssi_threshold_input = QLineEdit()
         self.rssi_threshold_input.setText("-100")
-        self.rssi_threshold_input.setPlaceholderText('例如: -70')
-        self.rssi_threshold_layout.addWidget(self.rssi_threshold_label)
-        self.rssi_threshold_layout.addWidget(self.rssi_threshold_input)
-        bluetooth_layout.addLayout(self.rssi_threshold_layout)
-
-        # 设备连接和断开部分
-        self.connect_layout = QHBoxLayout()
-        self.connect_button = QPushButton('连接蓝牙设备')
+        self.rssi_threshold_input.setFixedWidth(50)
+        self.rssi_threshold_input.setStyleSheet("font-size: 10px;")
+        rssi_row.addWidget(self.rssi_threshold_input)
+        rssi_row.addStretch()
+        bt_layout.addLayout(rssi_row)
+        self.rssi_threshold_layout = rssi_row
+        
+        # 连接按钮
+        bt_btn_layout = QHBoxLayout()
+        self.connect_button = self._create_compact_button('连接', '#27ae60')
         self.connect_button.clicked.connect(self.on_connect_device_clicked)
-        self.disconnect_button = QPushButton('断开蓝牙设备')
+        self.disconnect_button = self._create_compact_button('断开', '#e74c3c')
         self.disconnect_button.clicked.connect(self.on_disconnect_device_clicked)
-        self.disconnect_button.setEnabled(False)  # 初始状态下断开按钮不可用
-        self.connect_layout.addWidget(self.connect_button)
-        self.connect_layout.addWidget(self.disconnect_button)
-        bluetooth_layout.addLayout(self.connect_layout)
-
-        # 蓝牙连接状态显示
-        self.bluetooth_status_label = QLabel('蓝牙状态: 未连接')
+        self.disconnect_button.setEnabled(False)
+        bt_btn_layout.addWidget(self.connect_button)
+        bt_btn_layout.addWidget(self.disconnect_button)
+        bt_layout.addLayout(bt_btn_layout)
+        self.connect_layout = bt_btn_layout
+        
+        # 状态标签
+        self.bluetooth_status_label = QLabel('状态: 未连接')
         self.bluetooth_status_label.setStyleSheet("""
-            QLabel {
-                padding: 5px;
-                border: 1px solid #ccc;
-                border-radius: 3px;
-                background-color: #f0f0f0;
-                color: #666;
-            }
+            font-size: 9px;
+            padding: 2px;
+            border: 1px solid #ccc;
+            border-radius: 2px;
+            background-color: #f0f0f0;
+            color: #666;
         """)
-        bluetooth_layout.addWidget(self.bluetooth_status_label)
-
-        # ========== 右侧：串口连接部分 ==========
-        serial_layout = QVBoxLayout()
-        serial_frame = QWidget()
-        serial_frame.setLayout(serial_layout)
-
-        # 串口标题
-        serial_title = QLabel('串口连接')
-        serial_title.setFont(QFont('Arial', 12, QFont.Weight.Bold))
-        serial_layout.addWidget(serial_title)
-
-        # 串口参数设置
-        param_layout = QGridLayout()
-
-        # 串口选择
-        self.port_label = QLabel('串口:')
+        bt_layout.addWidget(self.bluetooth_status_label)
+        
+        bt_group.setLayout(bt_layout)
+        connection_layout.addWidget(bt_group)
+        
+        # 串口连接（紧凑）
+        serial_group = self._create_compact_group("串口连接")
+        serial_layout = QGridLayout()
+        serial_layout.setSpacing(2)
+        
         self.port_combo = QComboBox()
-        param_layout.addWidget(self.port_label, 0, 0)
-        param_layout.addWidget(self.port_combo, 0, 1)
-
-        # 波特率设置
-        self.baud_label = QLabel('波特率:')
+        self.port_combo.setStyleSheet("font-size: 10px;")
         self.baud_combo = QComboBox()
-        self.baud_combo.addItems(['9600', '13333','18000','18600', '19200', '38400', '57600', '115200'])
+        self.baud_combo.addItems(['9600', '13333', '18000', '18600', '19200', '38400', '57600', '115200'])
         self.baud_combo.setCurrentText('19200')
-        param_layout.addWidget(self.baud_label, 1, 0)
-        param_layout.addWidget(self.baud_combo, 1, 1)
-
-        # 数据位
-        self.data_bits_label = QLabel('数据位:')
+        self.baud_combo.setStyleSheet("font-size: 10px;")
         self.data_bits_combo = QComboBox()
         self.data_bits_combo.addItems(['5', '6', '7', '8'])
         self.data_bits_combo.setCurrentText('8')
-        param_layout.addWidget(self.data_bits_label, 2, 0)
-        param_layout.addWidget(self.data_bits_combo, 2, 1)
-
-        # 停止位
-        self.stop_bits_label = QLabel('停止位:')
+        self.data_bits_combo.setStyleSheet("font-size: 10px;")
         self.stop_bits_combo = QComboBox()
         self.stop_bits_combo.addItems(['1', '1.5', '2'])
         self.stop_bits_combo.setCurrentText('1')
-        param_layout.addWidget(self.stop_bits_label, 3, 0)
-        param_layout.addWidget(self.stop_bits_combo, 3, 1)
-
-        # 校验位
-        self.parity_label = QLabel('校验位:')
+        self.stop_bits_combo.setStyleSheet("font-size: 10px;")
         self.parity_combo = QComboBox()
         self.parity_combo.addItems(['无', '奇校验', '偶校验'])
-        param_layout.addWidget(self.parity_label, 4, 0)
-        param_layout.addWidget(self.parity_combo, 4, 1)
-
-        serial_layout.addLayout(param_layout)
-
-        # 串口连接按钮
-        self.serial_connect_button = QPushButton('连接串口')
-        self.serial_connect_button.clicked.connect(self.on_serial_connect_clicked)
-        serial_layout.addWidget(self.serial_connect_button)
+        self.parity_combo.setStyleSheet("font-size: 10px;")
         
-        # 监控间隔设置
-        interval_layout = QHBoxLayout()
-        interval_label = QLabel('监控间隔(秒):')
+        serial_layout.addWidget(QLabel('串口:'), 0, 0)
+        serial_layout.addWidget(self.port_combo, 0, 1)
+        serial_layout.addWidget(QLabel('波特率:'), 1, 0)
+        serial_layout.addWidget(self.baud_combo, 1, 1)
+        serial_layout.addWidget(QLabel('数据位:'), 2, 0)
+        serial_layout.addWidget(self.data_bits_combo, 2, 1)
+        serial_layout.addWidget(QLabel('停止位:'), 3, 0)
+        serial_layout.addWidget(self.stop_bits_combo, 3, 1)
+        serial_layout.addWidget(QLabel('校验位:'), 4, 0)
+        serial_layout.addWidget(self.parity_combo, 4, 1)
+        
+        self.serial_connect_button = self._create_compact_button('连接串口', '#3498db')
+        self.serial_connect_button.clicked.connect(self.on_serial_connect_clicked)
+        serial_layout.addWidget(self.serial_connect_button, 5, 0, 1, 2)
+        
+        # 监控间隔
+        monitor_row = QHBoxLayout()
+        monitor_row.addWidget(QLabel('监控间隔:'))
         self.monitor_interval_spinbox = QDoubleSpinBox()
         self.monitor_interval_spinbox.setMinimum(0.5)
         self.monitor_interval_spinbox.setMaximum(100.0)
-        self.monitor_interval_spinbox.setSingleStep(0.1)
         self.monitor_interval_spinbox.setValue(1.0)
         self.monitor_interval_spinbox.setDecimals(1)
-        self.monitor_interval_spinbox.setToolTip('设置监控指令发送间隔时间')
-        interval_layout.addWidget(interval_label)
-        interval_layout.addWidget(self.monitor_interval_spinbox)
-        serial_layout.addLayout(interval_layout)
-
-        serial_layout.addStretch(1)  # 添加弹性空间
-
-        # 将两个区域添加到水平布局
-        connection_layout.addWidget(bluetooth_frame, 1)  # 1是拉伸系数
-        connection_layout.addWidget(serial_frame, 1)
-
-        # 将连接区域添加到左侧布局
-        left_layout.addLayout(connection_layout)
+        self.monitor_interval_spinbox.setFixedWidth(60)
+        self.monitor_interval_spinbox.setStyleSheet("font-size: 10px;")
+        monitor_row.addWidget(self.monitor_interval_spinbox)
+        monitor_row.addWidget(QLabel('秒'))
+        monitor_row.addStretch()
+        serial_layout.addLayout(monitor_row, 6, 0, 1, 2)
         
-        # 添加共用的扫描按钮（在蓝牙和串口区域下方）
-        self.scan_button = QPushButton('🔍 扫描设备和刷新串口')
-        self.scan_button.clicked.connect(self.on_scan_all_clicked)
+        serial_group.setLayout(serial_layout)
+        connection_layout.addWidget(serial_group)
+        
+        # 扫描按钮
+        self.scan_button = QPushButton('🔍 扫描并刷新')
         self.scan_button.setStyleSheet("""
             QPushButton {
                 background-color: #27ae60;
                 color: white;
                 border: none;
-                padding: 8px;
-                border-radius: 4px;
+                padding: 4px;
+                border-radius: 3px;
                 font-weight: bold;
+                font-size: 10px;
             }
-            QPushButton:hover {
-                background-color: #229954;
-            }
-            QPushButton:pressed {
-                background-color: #1e8449;
-            }
+            QPushButton:hover { background-color: #229954; }
+            QPushButton:pressed { background-color: #1e8449; }
         """)
-        left_layout.addWidget(self.scan_button)
-
-        # 共用的数据收发部分
-        # 数据发送部分
-        self.send_layout = QHBoxLayout()
+        self.scan_button.setFixedHeight(26)
+        self.scan_button.clicked.connect(self.on_scan_all_clicked)
+        connection_layout.addWidget(self.scan_button)
+        
+        connection_layout.addStretch()
+        left_tabs.addTab(connection_tab, "连接")
+        
+        # ==================== Tab 2: 设备控制 ====================
+        control_tab = QWidget()
+        control_layout = QVBoxLayout(control_tab)
+        control_layout.setSpacing(3)
+        control_layout.setContentsMargins(5, 5, 5, 5)
+        
+        # 充放电控制
+        mos_group = self._create_compact_group("MOS控制")
+        mos_layout = QGridLayout()
+        mos_layout.setSpacing(2)
+        
+        self.open_charge_button = self._create_compact_button('充电开', '#27ae60')
+        self.open_charge_button.clicked.connect(self.on_open_charge_clicked)
+        self.close_charge_button = self._create_compact_button('充电关', '#e74c3c')
+        self.close_charge_button.clicked.connect(self.on_close_charge_clicked)
+        self.open_discharge_button = self._create_compact_button('放电开', '#27ae60')
+        self.open_discharge_button.clicked.connect(self.on_open_discharge_clicked)
+        self.close_discharge_button = self._create_compact_button('放电关', '#e74c3c')
+        self.close_discharge_button.clicked.connect(self.on_close_discharge_clicked)
+        
+        mos_layout.addWidget(self.open_charge_button, 0, 0)
+        mos_layout.addWidget(self.close_charge_button, 0, 1)
+        mos_layout.addWidget(self.open_discharge_button, 1, 0)
+        mos_layout.addWidget(self.close_discharge_button, 1, 1)
+        
+        mos_group.setLayout(mos_layout)
+        control_layout.addWidget(mos_group)
+        
+        # 保电控制
+        store_group = self._create_compact_group("保电控制")
+        store_layout = QHBoxLayout()
+        store_layout.setSpacing(2)
+        
+        self.open_store_power_button = self._create_compact_button('保电开', '#27ae60')
+        self.open_store_power_button.clicked.connect(self.on_open_store_power_clicked)
+        self.close_store_power_button = self._create_compact_button('保电关', '#e74c3c')
+        self.close_store_power_button.clicked.connect(self.on_close_store_power_clicked)
+        
+        store_layout.addWidget(self.open_store_power_button)
+        store_layout.addWidget(self.close_store_power_button)
+        
+        store_group.setLayout(store_layout)
+        control_layout.addWidget(store_group)
+        
+        # 加热模式
+        heating_group = self._create_compact_group("加热模式")
+        heating_layout = QHBoxLayout()
+        heating_layout.setSpacing(2)
+        
+        self.self_heating_button = self._create_compact_button('自加热', '#e74c3c')
+        self.self_heating_button.clicked.connect(self.on_self_heating_clicked)
+        self.charger_heating_button = self._create_compact_button('充电器加热', '#3498db')
+        self.charger_heating_button.clicked.connect(self.on_charger_heating_clicked)
+        
+        heating_layout.addWidget(self.self_heating_button)
+        heating_layout.addWidget(self.charger_heating_button)
+        
+        heating_group.setLayout(heating_layout)
+        control_layout.addWidget(heating_group)
+        
+        # RT控制
+        rt_group = self._create_compact_group("RT控制")
+        rt_layout = QGridLayout()
+        rt_layout.setSpacing(2)
+        
+        self.rt0_enable_button = self._create_compact_button('RT0开', '#27ae60')
+        self.rt0_enable_button.clicked.connect(self.on_rt0_enable_clicked)
+        self.rt1_enable_button = self._create_compact_button('RT1开', '#27ae60')
+        self.rt1_enable_button.clicked.connect(self.on_rt1_enable_clicked)
+        self.rt2_enable_button = self._create_compact_button('RT2开', '#27ae60')
+        self.rt2_enable_button.clicked.connect(self.on_rt2_enable_clicked)
+        self.rt0_disable_button = self._create_compact_button('RT0关', '#e74c3c')
+        self.rt0_disable_button.clicked.connect(self.on_rt0_disable_clicked)
+        self.rt1_disable_button = self._create_compact_button('RT1关', '#e74c3c')
+        self.rt1_disable_button.clicked.connect(self.on_rt1_disable_clicked)
+        self.rt2_disable_button = self._create_compact_button('RT2关', '#e74c3c')
+        self.rt2_disable_button.clicked.connect(self.on_rt2_disable_clicked)
+        
+        rt_layout.addWidget(self.rt0_enable_button, 0, 0)
+        rt_layout.addWidget(self.rt1_enable_button, 0, 1)
+        rt_layout.addWidget(self.rt2_enable_button, 0, 2)
+        rt_layout.addWidget(self.rt0_disable_button, 1, 0)
+        rt_layout.addWidget(self.rt1_disable_button, 1, 1)
+        rt_layout.addWidget(self.rt2_disable_button, 1, 2)
+        
+        rt_group.setLayout(rt_layout)
+        control_layout.addWidget(rt_group)
+        
+        # 其他控制
+        other_group = self._create_compact_group("其他控制")
+        other_layout = QVBoxLayout()
+        other_layout.setSpacing(2)
+        
+        self.shutdown_button = self._create_compact_button('🔌 设备关机', '#95a5a6')
+        self.shutdown_button.clicked.connect(self.on_shutdown_clicked)
+        other_layout.addWidget(self.shutdown_button)
+        
+        self.bt_name_button = self._create_compact_button('修改蓝牙名称', '#3498db')
+        self.bt_name_button.clicked.connect(self.on_change_bt_name_clicked)
+        other_layout.addWidget(self.bt_name_button)
+        
+        other_group.setLayout(other_layout)
+        control_layout.addWidget(other_group)
+        
+        control_layout.addStretch()
+        left_tabs.addTab(control_tab, "控制")
+        
+        # ==================== Tab 3: 密码&烧录 ====================
+        advanced_tab = QWidget()
+        advanced_layout = QVBoxLayout(advanced_tab)
+        advanced_layout.setSpacing(3)
+        advanced_layout.setContentsMargins(5, 5, 5, 5)
+        
+        # 密码管理
+        password_group = self._create_compact_group("密码管理")
+        password_layout = QVBoxLayout()
+        password_layout.setSpacing(2)
+        
+        pwd_input_row = QHBoxLayout()
+        pwd_input_row.addWidget(QLabel('密码:'))
+        self.password_input = QLineEdit()
+        self.password_input.setPlaceholderText('6位密码')
+        self.password_input.setMaxLength(6)
+        self.password_input.setStyleSheet("font-size: 10px;")
+        pwd_input_row.addWidget(self.password_input)
+        password_layout.addLayout(pwd_input_row)
+        
+        pwd_btn_layout = QGridLayout()
+        pwd_btn_layout.setSpacing(2)
+        
+        self.query_lock_button = self._create_compact_button('查询', '#3498db')
+        self.query_lock_button.clicked.connect(self.on_query_lock_clicked)
+        self.login_button = self._create_compact_button('验证', '#27ae60')
+        self.login_button.clicked.connect(self.on_login_clicked)
+        self.set_password_button = self._create_compact_button('设置', '#f39c12')
+        self.set_password_button.clicked.connect(self.on_set_password_clicked)
+        self.reset_password_button = self._create_compact_button('取消', '#e74c3c')
+        self.reset_password_button.clicked.connect(self.on_reset_password_clicked)
+        
+        pwd_btn_layout.addWidget(self.query_lock_button, 0, 0)
+        pwd_btn_layout.addWidget(self.login_button, 0, 1)
+        pwd_btn_layout.addWidget(self.set_password_button, 1, 0)
+        pwd_btn_layout.addWidget(self.reset_password_button, 1, 1)
+        password_layout.addLayout(pwd_btn_layout)
+        
+        password_group.setLayout(password_layout)
+        advanced_layout.addWidget(password_group)
+        
+        # 烧录控制
+        program_group = self._create_compact_group("烧录控制")
+        program_layout = QVBoxLayout()
+        program_layout.setSpacing(2)
+        
+        self.program_button = self._create_compact_button('开始烧录', '#e67e22')
+        self.program_button.clicked.connect(self.on_program_clicked)
+        program_layout.addWidget(self.program_button)
+        
+        self.packet_success_label = QLabel('包号: 0 / 0')
+        self.packet_success_label.setStyleSheet("font-size: 9px; color: #666;")
+        program_layout.addWidget(self.packet_success_label)
+        
+        self.batch_program_button = self._create_compact_button('批量烧录', '#d35400')
+        self.batch_program_button.clicked.connect(self.on_batch_program_clicked)
+        program_layout.addWidget(self.batch_program_button)
+        
+        self.batch_success_label = QLabel('成功: 0')
+        self.batch_success_label.setStyleSheet("font-size: 9px; color: #666;")
+        program_layout.addWidget(self.batch_success_label)
+        
+        program_group.setLayout(program_layout)
+        advanced_layout.addWidget(program_group)
+        
+        advanced_layout.addStretch()
+        left_tabs.addTab(advanced_tab, "高级")
+        
+        # ==================== Tab 4: 测试 ====================
+        test_tab = QWidget()
+        test_layout = QVBoxLayout(test_tab)
+        test_layout.setSpacing(3)
+        test_layout.setContentsMargins(5, 5, 5, 5)
+        
+        # 数据发送测试
+        send_test_group = self._create_compact_group("发送测试")
+        send_test_layout = QVBoxLayout()
+        send_test_layout.setSpacing(2)
+        
+        send_row1 = QHBoxLayout()
+        send_row1.addWidget(QLabel('输入:'))
         self.send_input = QLineEdit()
-        self.send_input.setPlaceholderText('输入要发送的数据')
-        self.hex_send_checkbox = QCheckBox('16进制发送')
+        self.send_input.setPlaceholderText('发送数据')
+        self.send_input.setStyleSheet("font-size: 10px;")
+        send_row1.addWidget(self.send_input)
+        send_test_layout.addLayout(send_row1)
+        
+        send_row2 = QHBoxLayout()
+        self.hex_send_checkbox = QCheckBox('HEX')
         self.hex_send_checkbox.setChecked(True)
-        self.crlf_send_checkbox = QCheckBox('\\r\\n发送')
-        self.crlf_send_checkbox.setChecked(False)
-        self.send_button = QPushButton('发送数据')
+        self.hex_send_checkbox.setStyleSheet("font-size: 10px;")
+        self.crlf_send_checkbox = QCheckBox('\\r\\n')
+        self.crlf_send_checkbox.setStyleSheet("font-size: 10px;")
+        send_row2.addWidget(self.hex_send_checkbox)
+        send_row2.addWidget(self.crlf_send_checkbox)
+        send_row2.addStretch()
+        send_test_layout.addLayout(send_row2)
+        
+        send_row3 = QHBoxLayout()
+        self.send_button = self._create_compact_button('发送', '#3498db')
+        self.send_button.setEnabled(False)
         self.send_button.clicked.connect(self.on_send_data_clicked)
-        self.send_button.setEnabled(False)  # 初始状态下发送按钮不可用
-        self.register_button = QPushButton('注册')
+        self.register_button = self._create_compact_button('注册', '#27ae60')
         self.register_button.clicked.connect(self.on_register_clicked)
-
-        # 新增状态指示灯
         self.status_indicator = QLabel()
-        self.update_registration_status(False)  # 初始状态为未注册
-
-        self.send_layout.addWidget(self.send_input)
-        self.send_layout.addWidget(self.hex_send_checkbox)
-        self.send_layout.addWidget(self.crlf_send_checkbox)
-        self.send_layout.addWidget(self.send_button)
-        self.send_layout.addWidget(self.register_button)
-        self.send_layout.addWidget(self.status_indicator)  # 添加状态指示灯
-        left_layout.addLayout(self.send_layout)
-
-        # 测试数据发送部分
-        self.test_layout = QHBoxLayout()
-        self.test_send_button = QPushButton('连续发送')
+        self.update_registration_status(False)
+        send_row3.addWidget(self.send_button)
+        send_row3.addWidget(self.register_button)
+        send_row3.addWidget(self.status_indicator)
+        send_row3.addStretch()
+        send_test_layout.addLayout(send_row3)
+        
+        send_test_group.setLayout(send_test_layout)
+        test_layout.addWidget(send_test_group)
+        
+        # 连续发送测试
+        continuous_group = self._create_compact_group("连续发送")
+        continuous_layout = QVBoxLayout()
+        continuous_layout.setSpacing(2)
+        
+        test_row1 = QHBoxLayout()
+        test_row1.addWidget(QLabel('间隔1:'))
         self.test128 = QLineEdit('0')
+        self.test128.setFixedWidth(50)
+        self.test128.setStyleSheet("font-size: 10px;")
+        test_row1.addWidget(self.test128)
+        test_row1.addWidget(QLabel('间隔2:'))
         self.test512 = QLineEdit('280')
-        self.test_layout.addWidget(self.test128)
-        self.test_layout.addWidget(self.test512)
-        self.test_layout.addWidget(self.test_send_button)
+        self.test512.setFixedWidth(50)
+        self.test512.setStyleSheet("font-size: 10px;")
+        test_row1.addWidget(self.test512)
+        test_row1.addStretch()
+        continuous_layout.addLayout(test_row1)
+        
+        self.test_send_button = self._create_compact_button('开始连续发送', '#9b59b6')
         self.test_send_button.clicked.connect(self.on_test_send_buttoned)
-        left_layout.addLayout(self.test_layout)
-
-        # 测试数据结果显示部分
-        self.success_couont_layout = QHBoxLayout()
+        continuous_layout.addWidget(self.test_send_button)
+        
         self.no_ack_label = QLabel('无回应=0')
+        self.no_ack_label.setStyleSheet("font-size: 9px; color: #666;")
         self.no_ack_count = 0
         self.err_ack_label = QLabel('ack错误=0')
+        self.err_ack_label.setStyleSheet("font-size: 9px; color: #666;")
         self.err_ack_count = 0
-        self.total_send_label = QLabel('发送总次数=0')
-        self.success_couont_layout.addWidget(self.no_ack_label)
-        self.success_couont_layout.addWidget(self.err_ack_label)
-        self.success_couont_layout.addWidget(self.total_send_label)
-        left_layout.addLayout(self.success_couont_layout)
-
-        # 烧录控制部分
-        self.program_layout = QHBoxLayout()
-        self.program_button = QPushButton('开始烧录')
-        self.program_button.clicked.connect(self.on_program_clicked)
-        self.program_layout.addWidget(self.program_button)
-
-        self.packet_success_label = QLabel('包号: 0 总包数 0')
-        self.program_layout.addWidget(self.packet_success_label)
-
-        # 新增：批量烧录按钮和成功数label
-        self.batch_program_button = QPushButton('批量烧录100次')
-        self.batch_program_button.clicked.connect(self.on_batch_program_clicked)
-        self.program_layout.addWidget(self.batch_program_button)
-
-        self.batch_success_label = QLabel('成功数: 0')
-        self.program_layout.addWidget(self.batch_success_label)
-
-        left_layout.addLayout(self.program_layout)
-
-        # 数据接收部分 - 移动到右侧布局
-        self.receive_label = QLabel('接收到的数据:')
+        self.total_send_label = QLabel('总次数=0')
+        self.total_send_label.setStyleSheet("font-size: 9px; color: #666;")
+        
+        continuous_layout.addWidget(self.no_ack_label)
+        continuous_layout.addWidget(self.err_ack_label)
+        continuous_layout.addWidget(self.total_send_label)
+        
+        continuous_group.setLayout(continuous_layout)
+        test_layout.addWidget(continuous_group)
+        
+        test_layout.addStretch()
+        left_tabs.addTab(test_tab, "测试")
+        
+        # ==================== 右侧：接收窗口 ====================
+        right_layout = QVBoxLayout()
+        right_layout.setSpacing(3)
+        right_layout.setContentsMargins(5, 5, 5, 5)
+        
+        self.receive_label = QLabel('接收数据:')
+        self.receive_label.setStyleSheet("font-size: 10px; font-weight: bold;")
         right_layout.addWidget(self.receive_label)
-
+        
         self.receive_output = QTextEdit()
         self.receive_output.setReadOnly(True)
-        # self.receive_output.setMinimumWidth(400)  # 设置最小宽度
+        self.receive_output.setStyleSheet("font-size: 9px; font-family: 'Consolas', 'Courier New';")
         right_layout.addWidget(self.receive_output)
-
-        # 16进制显示选项和清空按钮
-        hex_control_layout = QHBoxLayout()
-        self.hex_display_checkbox = QCheckBox('16进制显示')
-        self.hex_display_checkbox.setChecked(True)
-        self.hex_display_checkbox.stateChanged.connect(self.on_hex_display_changed)
-        hex_control_layout.addWidget(self.hex_display_checkbox)
-
-        # 清空接收窗口按钮
-        self.clear_receive_button = QPushButton('清空')
-        self.clear_receive_button.clicked.connect(lambda: self.receive_output.clear())
-        hex_control_layout.addWidget(self.clear_receive_button)
-
-        right_layout.addLayout(hex_control_layout)
-
-        # 添加放电控制部分
-        discharge_layout = QHBoxLayout()
-
-        # 打开放电按钮
-        self.open_discharge_button = QPushButton('打开放电')
-        self.open_discharge_button.clicked.connect(self.on_open_discharge_clicked)
-        discharge_layout.addWidget(self.open_discharge_button)
-
-        # 关闭放电按钮
-        self.close_discharge_button = QPushButton('关闭放电')
-        self.close_discharge_button.clicked.connect(self.on_close_discharge_clicked)
-        discharge_layout.addWidget(self.close_discharge_button)
-
-        # 将放电控制部分添加到左侧布局
-        left_layout.addLayout(discharge_layout)
-
-        # 添加充电控制部分
-        charge_layout = QHBoxLayout()
-
-        # 打开充电按钮
-        self.open_charge_button = QPushButton('打开充电')
-        self.open_charge_button.clicked.connect(self.on_open_charge_clicked)
-        charge_layout.addWidget(self.open_charge_button)
-
-        # 关闭充电按钮
-        self.close_charge_button = QPushButton('关闭充电')
-        self.close_charge_button.clicked.connect(self.on_close_charge_clicked)
-        charge_layout.addWidget(self.close_charge_button)
-
-        # 将充电控制部分添加到左侧布局
-        left_layout.addLayout(charge_layout)
-
-        # 添加保电控制部分
-        store_power_layout = QHBoxLayout()
-
-        # 打开保电按钮
-        self.open_store_power_button = QPushButton('打开保电')
-        self.open_store_power_button.clicked.connect(self.on_open_store_power_clicked)
-        store_power_layout.addWidget(self.open_store_power_button)
-
-        # 关闭保电按钮
-        self.close_store_power_button = QPushButton('关闭保电')
-        self.close_store_power_button.clicked.connect(self.on_close_store_power_clicked)
-        store_power_layout.addWidget(self.close_store_power_button)
-
-        # 将保电控制部分添加到左侧布局
-        left_layout.addLayout(store_power_layout)
-
-        # 添加关机控制部分
-        shutdown_layout = QHBoxLayout()
-
-        # 关机按钮
-        self.shutdown_button = QPushButton('🔌 设备关机')
-        self.shutdown_button.clicked.connect(self.on_shutdown_clicked)
-        shutdown_layout.addWidget(self.shutdown_button)
-
-        # 将关机控制部分添加到左侧布局
-        left_layout.addLayout(shutdown_layout)
-
-        # 添加加热模式控制部分
-        heating_layout = QVBoxLayout()
-
-        # 加热模式标题
-        heating_title = QLabel('加热模式控制')
-        heating_title.setFont(QFont('Arial', 12, QFont.Weight.Bold))
-        heating_layout.addWidget(heating_title)
-
-        # 加热模式按钮行
-        heating_buttons_layout = QHBoxLayout()
-
-        # 自加热模式按钮
-        self.self_heating_button = QPushButton('🔥 自加热模式')
-        self.self_heating_button.clicked.connect(self.on_self_heating_clicked)
-        self.self_heating_button.setStyleSheet("""
-            QPushButton {
-                background-color: #e74c3c;
-                color: white;
-                border: none;
-                padding: 8px;
-                border-radius: 4px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #c0392b;
-            }
-        """)
-        heating_buttons_layout.addWidget(self.self_heating_button)
-
-        # 充电器加热模式按钮
-        self.charger_heating_button = QPushButton('⚡ 充电器加热模式')
-        self.charger_heating_button.clicked.connect(self.on_charger_heating_clicked)
-        self.charger_heating_button.setStyleSheet("""
-            QPushButton {
-                background-color: #3498db;
-                color: white;
-                border: none;
-                padding: 8px;
-                border-radius: 4px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #2980b9;
-            }
-        """)
-        heating_buttons_layout.addWidget(self.charger_heating_button)
-
-        heating_layout.addLayout(heating_buttons_layout)
-
-        # 将加热模式控制部分添加到左侧布局
-        left_layout.addLayout(heating_layout)
-
-        # 添加RT控制部分
-        rt_layout = QVBoxLayout()
-
-        # RT控制标题
-        rt_title = QLabel('RT控制')
-        rt_title.setFont(QFont('Arial', 12, QFont.Weight.Bold))
-        rt_layout.addWidget(rt_title)
-
-        # RT使能按钮行
-        rt_enable_layout = QHBoxLayout()
-
-        # RT0使能按钮
-        self.rt0_enable_button = QPushButton('RT0使能')
-        self.rt0_enable_button.clicked.connect(self.on_rt0_enable_clicked)
-        rt_enable_layout.addWidget(self.rt0_enable_button)
-
-        # RT1使能按钮
-        self.rt1_enable_button = QPushButton('RT1使能')
-        self.rt1_enable_button.clicked.connect(self.on_rt1_enable_clicked)
-        rt_enable_layout.addWidget(self.rt1_enable_button)
-
-        # RT2使能按钮
-        self.rt2_enable_button = QPushButton('RT2使能')
-        self.rt2_enable_button.clicked.connect(self.on_rt2_enable_clicked)
-        rt_enable_layout.addWidget(self.rt2_enable_button)
-
-        rt_layout.addLayout(rt_enable_layout)
-
-        # RT关闭按钮行
-        rt_disable_layout = QHBoxLayout()
-
-        # RT0关闭按钮
-        self.rt0_disable_button = QPushButton('RT0关闭')
-        self.rt0_disable_button.clicked.connect(self.on_rt0_disable_clicked)
-        rt_disable_layout.addWidget(self.rt0_disable_button)
-
-        # RT1关闭按钮
-        self.rt1_disable_button = QPushButton('RT1关闭')
-        self.rt1_disable_button.clicked.connect(self.on_rt1_disable_clicked)
-        rt_disable_layout.addWidget(self.rt1_disable_button)
-
-        # RT2关闭按钮
-        self.rt2_disable_button = QPushButton('RT2关闭')
-        self.rt2_disable_button.clicked.connect(self.on_rt2_disable_clicked)
-        rt_disable_layout.addWidget(self.rt2_disable_button)
-
-        rt_layout.addLayout(rt_disable_layout)
-
-        # 将RT控制部分添加到左侧布局
-        left_layout.addLayout(rt_layout)
-
-        # 添加蓝牙名称修改按钮
-        bt_name_layout = QHBoxLayout()
-        self.bt_name_button = QPushButton('修改蓝牙名称')
-        self.bt_name_button.clicked.connect(self.on_change_bt_name_clicked)
-        bt_name_layout.addWidget(self.bt_name_button)
-        left_layout.addLayout(bt_name_layout)
-
-        # 添加密码管理部分
-        password_layout = QVBoxLayout()
-
-        # 密码管理标题
-        password_title = QLabel('密码管理')
-        password_title.setFont(QFont('Arial', 12, QFont.Weight.Bold))
-        password_layout.addWidget(password_title)
-
-        # 密码输入框
-        password_input_layout = QHBoxLayout()
-        self.password_label = QLabel('密码(6位):')
-        self.password_input = QLineEdit()
-        self.password_input.setPlaceholderText('请输入6位密码')
-        self.password_input.setMaxLength(6)
-        password_input_layout.addWidget(self.password_label)
-        password_input_layout.addWidget(self.password_input)
-        password_layout.addLayout(password_input_layout)
-
-        # 密码管理按钮
-        password_buttons_layout = QHBoxLayout()
-
-        # 查询加密状态按钮
-        self.query_lock_button = QPushButton('查询状态(扫描)')
-        self.query_lock_button.clicked.connect(self.on_query_lock_clicked)
-        password_buttons_layout.addWidget(self.query_lock_button)
-
-        # 验证密码按钮
-        self.login_button = QPushButton('验证密码')
-        self.login_button.clicked.connect(self.on_login_clicked)
-        password_buttons_layout.addWidget(self.login_button)
-
-        # 设置密码按钮
-        self.set_password_button = QPushButton('设置密码')
-        self.set_password_button.clicked.connect(self.on_set_password_clicked)
-        password_buttons_layout.addWidget(self.set_password_button)
-
-        # 取消密码按钮
-        self.reset_password_button = QPushButton('取消密码')
-        self.reset_password_button.clicked.connect(self.on_reset_password_clicked)
-        password_buttons_layout.addWidget(self.reset_password_button)
-
-        password_layout.addLayout(password_buttons_layout)
-
-        # 将密码管理部分添加到左侧布局
-        left_layout.addLayout(password_layout)
-
-        # 将左侧和右侧布局添加到主水平布局
-        main_layout.addLayout(left_layout, 2)  # 左侧占2/3
-        main_layout.addLayout(right_layout, 1)  # 右侧占1/3
-
-        self.setLayout(main_layout)
-
-        # 设置窗口默认大小（移除最小大小限制）
-        self.resize(600, 400)  # 设置更小的默认大小
         
-        # 初始化时自动扫描蓝牙设备和刷新串口（延迟100ms等待UI加载完成）
+        # 接收控制
+        rx_control_layout = QHBoxLayout()
+        self.hex_display_checkbox = QCheckBox('HEX显示')
+        self.hex_display_checkbox.setChecked(True)
+        self.hex_display_checkbox.setStyleSheet("font-size: 10px;")
+        self.hex_display_checkbox.stateChanged.connect(self.on_hex_display_changed)
+        self.clear_receive_button = self._create_compact_button('清空', '#95a5a6')
+        self.clear_receive_button.clicked.connect(lambda: self.receive_output.clear())
+        rx_control_layout.addWidget(self.hex_display_checkbox)
+        rx_control_layout.addWidget(self.clear_receive_button)
+        rx_control_layout.addStretch()
+        right_layout.addLayout(rx_control_layout)
+        
+        # 添加到主布局
+        main_layout.addWidget(left_tabs)
+        main_layout.addLayout(right_layout, 1)
+        
+        self.setLayout(main_layout)
+        self.resize(850, 550)  # 紧凑的窗口尺寸
+        
+        # 初始化时自动扫描
         QTimer.singleShot(100, self.on_scan_all_clicked)
+    
+    def _create_compact_group(self, title):
+        """创建紧凑的分组框"""
+        group = QGroupBox(title)
+        group.setStyleSheet("""
+            QGroupBox {
+                font-size: 10px;
+                font-weight: bold;
+                border: 1px solid #ccc;
+                border-radius: 3px;
+                margin-top: 6px;
+                padding-top: 6px;
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                left: 8px;
+                padding: 0 3px;
+            }
+        """)
+        return group
+    
+    def _create_compact_button(self, text, color='#3498db'):
+        """创建紧凑的按钮（按钮高度和padding减半）"""
+        button = QPushButton(text)
+        button.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {color};
+                color: white;
+                border: none;
+                padding: 3px 6px;
+                border-radius: 3px;
+                font-size: 10px;
+                min-height: 20px;
+                max-height: 22px;
+            }}
+            QPushButton:hover {{
+                background-color: {self._darken_color(color)};
+            }}
+            QPushButton:pressed {{
+                background-color: {self._darken_color(color, 0.8)};
+            }}
+            QPushButton:disabled {{
+                background-color: #bdc3c7;
+                color: #7f8c8d;
+            }}
+        """)
+        return button
+    
+    def _darken_color(self, hex_color, factor=0.9):
+        """使颜色变暗"""
+        hex_color = hex_color.lstrip('#')
+        r, g, b = tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
+        r, g, b = int(r * factor), int(g * factor), int(b * factor)
+        return f'#{r:02x}{g:02x}{b:02x}'
 
     def blue_write_log(self, text, color=None):
         """写入日志
@@ -818,6 +854,16 @@ class BluetoothTool(QWidget):
             self.serial_connect_button.setText('连接串口')
             self.disable_serial_settings(False)
             self.blue_write_log("串口已断开")
+            
+            # 主动断开串口时，取消自动连接勾选并停止定时器
+            if self.auto_connect_enabled:
+                self.auto_connect_checkbox.setChecked(False)
+                self.auto_connect_enabled = False
+                self.stop_auto_connect_timer()
+                self.save_auto_connect_config()  # 保存配置
+                self.blue_write_log("ℹ️ 主动断开串口，已自动取消自动连接")
+            else:
+                self.blue_write_log("ℹ️ 主动断开串口")
 
     async def connect_serial_async(self):
         """异步串口连接，避免UI阻塞"""
@@ -856,6 +902,11 @@ class BluetoothTool(QWidget):
                 # 启动接收任务
                 self.send_button.setEnabled(True)
                 self.serial_receive_task = asyncio.create_task(self.serial_receive_loop())
+                
+                # 串口连接成功后，停止自动连接定时器
+                if self.auto_connect_enabled:
+                    self.stop_auto_connect_timer()
+                    self.blue_write_log("✅ 串口连接成功，自动连接定时器已停止")
             else:
                 self.blue_write_log(f"串口 {port} 未能成功打开")
                 
@@ -888,6 +939,11 @@ class BluetoothTool(QWidget):
         self.send_button.setEnabled(False)
 
         self.blue_write_log("串口连接已断开")
+        
+        # 如果启用了自动连接，重启定时器
+        if self.auto_connect_enabled:
+            self.blue_write_log("🔄 串口断开，启动自动连接定时器...")
+            self.start_auto_connect_timer()
 
 
     def disable_serial_settings(self, disabled: bool):
@@ -1246,10 +1302,12 @@ class BluetoothTool(QWidget):
 
         self.label.setText('发现的蓝牙设备:')
         
-        # 如果启用了自动连接，尝试自动连接
-        if self.auto_connect_enabled:
-            self.blue_write_log("🔄 扫描完成，尝试自动连接...")
-            asyncio.create_task(self.try_auto_connect())
+        # 如果是手动扫描且启用了自动连接，尝试自动连接
+        if self.auto_connect_enabled and not self.is_auto_scanning and not self.is_connecting:
+            self.blue_write_log("🔄 手动扫描完成，尝试自动连接...")
+            # 设置连接锁
+            self.is_connecting = True
+            asyncio.create_task(self._try_connect_after_scan())
 
     async def connect_device(self):
         """异步方法，连接蓝牙设备"""
@@ -1273,11 +1331,18 @@ class BluetoothTool(QWidget):
                 try:
                     if self.client.is_connected:
                         await self.client.disconnect()
+                        await asyncio.sleep(0.5)  # 等待断开完成
                 except:
                     pass
                 self.client = None
+            
+            # 创建新客户端并连接
             self.client = BleakClient(device_address, disconnected_callback=self.on_bluetooth_disconnected, timeout=10.0)
             await asyncio.wait_for(self.client.connect(), timeout=10.0)
+            
+            # 等待服务发现完成
+            await asyncio.sleep(1.0)
+            
             self.commu_type = "bluetooth"
             # 更新状态：已连接
             self.update_bluetooth_status('已连接', color='#28a745', bg_color='#d4edda')
@@ -1291,7 +1356,16 @@ class BluetoothTool(QWidget):
             # 开始监听数据
             if self.client and self.client.is_connected:
                 self.device_name = device_name
-                await self.client.start_notify("0000ffe1-0000-1000-8000-00805f9b34fb", self.on_data_received)
+                try:
+                    await self.client.start_notify("0000ffe1-0000-1000-8000-00805f9b34fb", self.on_data_received)
+                except Exception as notify_error:
+                    self.blue_write_log(f"⚠️ 启动通知失败: {str(notify_error)}")
+                    # 通知失败不影响连接，继续执行
+            
+            # 连接成功后，停止自动连接定时器
+            if self.auto_connect_enabled:
+                self.stop_auto_connect_timer()
+                self.blue_write_log("✅ 连接成功，自动连接定时器已停止")
             
             # 连接成功后，自动保存该设备信息（如果配置为空或不同）
             if not self.auto_connect_device_name or self.auto_connect_device_name != device_name:
@@ -1307,12 +1381,12 @@ class BluetoothTool(QWidget):
             self.commu_type = "none"
             self.client = None
             self.update_bluetooth_status('未连接', color='#666', bg_color='#f0f0f0')
-            QMessageBox.critical(self, '连接失败', '连接超时，设备可能已断电或不在范围内')
+            self.blue_write_log("❌ 连接超时")
         except Exception as e:
             self.commu_type = "none"
             self.client = None
             self.update_bluetooth_status('未连接', color='#666', bg_color='#f0f0f0')
-            QMessageBox.critical(self, '连接失败', str(e))
+            self.blue_write_log(f"❌ 连接失败: {str(e)}")
 
     async def disconnect_device(self):
         """异步方法，断开蓝牙设备"""
@@ -1332,6 +1406,17 @@ class BluetoothTool(QWidget):
                 self.send_button.setEnabled(False)
                 self.client = None
                 self.commu_type = "none"
+                
+                # 主动断开时，取消自动连接勾选并停止定时器
+                if self.auto_connect_enabled:
+                    self.auto_connect_checkbox.setChecked(False)
+                    self.auto_connect_enabled = False
+                    self.stop_auto_connect_timer()
+                    self.save_auto_connect_config()  # 保存配置
+                    self.blue_write_log("ℹ️ 主动断开连接，已自动取消自动连接")
+                else:
+                    self.blue_write_log("ℹ️ 主动断开连接")
+                
             except Exception as e:
                 QMessageBox.critical(self, '断开失败', str(e))
         else:
@@ -1485,12 +1570,15 @@ class BluetoothTool(QWidget):
         self.client = None
         self.commu_type = "none"
         
-        # 如果启用了自动连接且不在重连中，尝试重新连接
-        if self.auto_connect_enabled and not self.is_auto_reconnecting:
-            self.blue_write_log("🔄 检测到自动连接已启用，将尝试重新连接...")
-            self.is_auto_reconnecting = True
-            # 延迟3秒后尝试重连
-            QTimer.singleShot(3000, lambda: asyncio.create_task(self.auto_reconnect()))
+        # 如果启用了自动连接，重启定时器持续尝试重连
+        if self.auto_connect_enabled:
+            self.blue_write_log("🔄 检测到自动连接已启用，启动定时器持续尝试重连...")
+            # 延迟3秒后立即尝试一次重连
+            if not self.is_auto_reconnecting:
+                self.is_auto_reconnecting = True
+                QTimer.singleShot(3000, lambda: asyncio.create_task(self.auto_reconnect()))
+            # 启动定时器持续尝试
+            self.start_auto_connect_timer()
         else:
             # 弹出提示消息
             QMessageBox.warning(self, '连接已断开', '蓝牙设备已断开连接')
@@ -2413,13 +2501,23 @@ class BluetoothTool(QWidget):
                     return
                 
                 self.blue_write_log(f"✅ 自动连接已启用: {self.auto_connect_name_input.text()}")
+                self.blue_write_log(f"🔄 将每{self.auto_connect_retry_interval/1000}秒尝试连接一次...")
                 # 自动保存配置
                 self.save_auto_connect_config()
-                # 立即触发一次扫描和连接
-                asyncio.create_task(self.auto_scan_and_connect())
+                
+                # 如果没有正在连接，立即触发一次扫描和连接
+                if not self.is_connecting:
+                    asyncio.create_task(self.auto_scan_and_connect())
+                else:
+                    self.blue_write_log("⏳ 当前正在连接，等待连接完成...")
+                
+                # 启动定时器，持续尝试连接
+                self.start_auto_connect_timer()
             else:
                 self.blue_write_log("❌ 自动连接已禁用")
                 self.is_auto_reconnecting = False
+                # 停止定时器
+                self.stop_auto_connect_timer()
                 # 自动保存配置
                 self.save_auto_connect_config()
                 
@@ -2443,6 +2541,26 @@ class BluetoothTool(QWidget):
         
         self._save_timer.start(500)  # 500ms后保存
 
+    def on_retry_interval_changed(self, value):
+        """重试间隔变化"""
+        try:
+            # 更新间隔（转换为毫秒）
+            new_interval = int(value * 1000)
+            self.auto_connect_retry_interval = new_interval
+            
+            # 如果定时器正在运行，重启以应用新间隔
+            if self.auto_connect_timer.isActive():
+                self.auto_connect_timer.stop()
+                self.auto_connect_timer.start(self.auto_connect_retry_interval)
+                self.blue_write_log(f"⏰ 重试间隔已更新: {value}秒")
+            
+            # 自动保存配置
+            self.save_auto_connect_config()
+            
+        except Exception as e:
+            self.blue_write_log(f"更新重试间隔失败: {str(e)}")
+            traceback.print_exc()
+
     def save_auto_connect_config(self, show_message=False):
         """保存自动连接配置到JSON文件
         
@@ -2453,7 +2571,8 @@ class BluetoothTool(QWidget):
             config = {
                 'enabled': self.auto_connect_enabled,
                 'device_name': self.auto_connect_name_input.text().strip(),
-                'mac_address': self.auto_connect_mac_input.text().strip()
+                'mac_address': self.auto_connect_mac_input.text().strip(),
+                'retry_interval': self.auto_connect_retry_interval / 1000  # 保存为秒
             }
             
             config_file = os.path.join(os.getcwd(), 'auto_connect_config.json')
@@ -2482,6 +2601,10 @@ class BluetoothTool(QWidget):
                 self.auto_connect_device_name = config.get('device_name', '')
                 self.auto_connect_mac_address = config.get('mac_address', '')
                 
+                # 加载重试间隔（转换为毫秒）
+                retry_interval_sec = config.get('retry_interval', 5.0)
+                self.auto_connect_retry_interval = int(retry_interval_sec * 1000)
+                
                 # 延迟加载UI配置（等待UI初始化完成）
                 QTimer.singleShot(200, lambda: self._apply_loaded_config(config))
                 
@@ -2500,22 +2623,27 @@ class BluetoothTool(QWidget):
             self.auto_connect_checkbox.blockSignals(True)
             self.auto_connect_name_input.blockSignals(True)
             self.auto_connect_mac_input.blockSignals(True)
+            self.auto_connect_interval_spinbox.blockSignals(True)
             
             # 设置UI值
             self.auto_connect_checkbox.setChecked(config.get('enabled', False))
             self.auto_connect_name_input.setText(config.get('device_name', ''))
             self.auto_connect_mac_input.setText(config.get('mac_address', ''))
+            self.auto_connect_interval_spinbox.setValue(config.get('retry_interval', 5.0))
             
             # 恢复信号
             self.auto_connect_checkbox.blockSignals(False)
             self.auto_connect_name_input.blockSignals(False)
             self.auto_connect_mac_input.blockSignals(False)
+            self.auto_connect_interval_spinbox.blockSignals(False)
             
-            self.blue_write_log(f"📋 已加载自动连接配置: {config.get('device_name', '')}")
+            self.blue_write_log(f"📋 已加载自动连接配置: {config.get('device_name', '')} (间隔: {config.get('retry_interval', 5.0)}秒)")
             
-            # 如果启用了自动连接，触发自动扫描
+            # 如果启用了自动连接，启动定时器（不立即连接，让初始化完成）
             if self.auto_connect_enabled and config.get('device_name'):
-                self.blue_write_log("🔄 自动连接已启用，将在扫描后自动连接...")
+                self.blue_write_log(f"🔄 自动连接已启用，将在扫描后自动连接...")
+                # 延迟启动定时器，避免与初始扫描冲突
+                QTimer.singleShot(2000, self.start_auto_connect_timer)
                 
         except Exception as e:
             self.blue_write_log(f"应用配置失败: {str(e)}")
@@ -2523,7 +2651,14 @@ class BluetoothTool(QWidget):
 
     async def auto_scan_and_connect(self):
         """自动扫描并连接设备"""
+        # 检查连接锁
+        if self.is_connecting:
+            self.blue_write_log("⏳ 已有连接任务在执行，跳过")
+            return
+        
         try:
+            self.is_connecting = True  # 设置连接锁
+            self.is_auto_scanning = True  # 标记为自动扫描
             self.blue_write_log("🔍 开始自动扫描设备...")
             
             # 执行扫描
@@ -2539,6 +2674,16 @@ class BluetoothTool(QWidget):
         except Exception as e:
             self.blue_write_log(f"自动扫描连接失败: {str(e)}")
             traceback.print_exc()
+        finally:
+            self.is_connecting = False  # 释放连接锁
+            self.is_auto_scanning = False  # 清除自动扫描标志
+
+    async def _try_connect_after_scan(self):
+        """扫描后尝试连接（带连接锁管理）"""
+        try:
+            await self.try_auto_connect()
+        finally:
+            self.is_connecting = False
 
     async def try_auto_connect(self):
         """尝试自动连接匹配的设备"""
@@ -2578,11 +2723,18 @@ class BluetoothTool(QWidget):
             if matched_device:
                 device_name, device_address, item_index = matched_device
                 
+                # 检查是否已经连接到该设备
+                if self.client and self.client.is_connected:
+                    self.blue_write_log(f"✅ 已连接到设备，跳过重复连接")
+                    return
+                
                 # 选中设备并连接
                 self.device_list.setCurrentRow(item_index)
                 self.blue_write_log(f"🔗 自动连接设备: {device_name} ({device_address})")
                 LogManager.get_instance().write_log(f"自动连接: 设备={device_name}, MAC={device_address}, 时间={datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
                 
+                # 连接前等待一下，避免快速重复连接
+                await asyncio.sleep(0.3)
                 await self.connect_device()
             else:
                 self.blue_write_log(f"❌ 未找到匹配的设备: {target_name}")
@@ -2594,6 +2746,12 @@ class BluetoothTool(QWidget):
 
     async def auto_reconnect(self):
         """自动重连"""
+        # 检查是否正在连接
+        if self.is_connecting:
+            self.blue_write_log("⏳ 已有连接任务在执行，跳过重连")
+            self.is_auto_reconnecting = False
+            return
+            
         try:
             self.blue_write_log("🔄 开始自动重连...")
             LogManager.get_instance().write_log(f"开始自动重连: 时间={datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
@@ -2607,6 +2765,60 @@ class BluetoothTool(QWidget):
         except Exception as e:
             self.blue_write_log(f"自动重连失败: {str(e)}")
             self.is_auto_reconnecting = False
+            traceback.print_exc()
+
+    def start_auto_connect_timer(self):
+        """启动自动连接定时器"""
+        try:
+            if not self.auto_connect_timer.isActive():
+                self.auto_connect_timer.start(self.auto_connect_retry_interval)
+                self.blue_write_log(f"⏰ 自动连接定时器已启动 (间隔: {self.auto_connect_retry_interval/1000}秒)")
+        except Exception as e:
+            self.blue_write_log(f"启动定时器失败: {str(e)}")
+            traceback.print_exc()
+
+    def stop_auto_connect_timer(self):
+        """停止自动连接定时器"""
+        try:
+            if self.auto_connect_timer.isActive():
+                self.auto_connect_timer.stop()
+                self.blue_write_log("⏹️ 自动连接定时器已停止")
+        except Exception as e:
+            self.blue_write_log(f"停止定时器失败: {str(e)}")
+            traceback.print_exc()
+
+    def on_auto_connect_timer(self):
+        """定时器触发 - 尝试自动连接"""
+        try:
+            # 检查是否已经连接
+            if self.client and self.client.is_connected:
+                self.blue_write_log("✅ 设备已连接，停止自动连接定时器")
+                self.stop_auto_connect_timer()
+                return
+            
+            # 检查串口是否已连接
+            if self.serial_port and self.serial_port.is_open:
+                self.blue_write_log("✅ 串口已连接，停止自动连接定时器")
+                self.stop_auto_connect_timer()
+                return
+            
+            # 检查是否启用自动连接
+            if not self.auto_connect_enabled:
+                self.stop_auto_connect_timer()
+                return
+            
+            # 检查是否正在连接中
+            if self.is_connecting:
+                self.blue_write_log("⏳ 正在连接中，跳过本次尝试")
+                return
+            
+            # 触发扫描和连接
+            current_time = datetime.now().strftime("%H:%M:%S")
+            self.blue_write_log(f"🔍 [{current_time}] 定时器触发 - 尝试自动连接...")
+            asyncio.create_task(self.auto_scan_and_connect())
+            
+        except Exception as e:
+            self.blue_write_log(f"定时器回调失败: {str(e)}")
             traceback.print_exc()
 
 widgets = None
@@ -2744,6 +2956,14 @@ class load_ui_dynamically(QMainWindow):
             self.start_scan_task() # 停止监控
 
         self.bluetooth_tool.on_disconnect_device_clicked()
+        
+        # 主窗口断开时也取消自动连接勾选
+        if self.bluetooth_tool.auto_connect_enabled:
+            self.bluetooth_tool.auto_connect_checkbox.setChecked(False)
+            self.bluetooth_tool.auto_connect_enabled = False
+            self.bluetooth_tool.stop_auto_connect_timer()
+            self.bluetooth_tool.save_auto_connect_config()  # 保存配置
+            self.bluetooth_tool.blue_write_log("ℹ️ 主窗口断开，已自动取消自动连接")
 
 
 
@@ -3164,6 +3384,14 @@ class SimplifiedBluetoothTool(QWidget):
         mac_layout_simple.addWidget(self.auto_connect_mac_input)
         auto_layout.addLayout(mac_layout_simple)
         
+        # 重试间隔设置
+        interval_layout_simple = QHBoxLayout()
+        interval_layout_simple.addWidget(QLabel('间隔(秒):'))
+        self.auto_connect_interval_spinbox = self.bluetooth_tool.auto_connect_interval_spinbox
+        self.auto_connect_interval_spinbox.setMaximumWidth(60)
+        interval_layout_simple.addWidget(self.auto_connect_interval_spinbox)
+        auto_layout.addLayout(interval_layout_simple)
+        
         # 提示标签
         auto_save_hint_simple = QLabel('💡 自动保存')
         auto_save_hint_simple.setStyleSheet("QLabel { color: #666; font-size: 9px; }")
@@ -3309,7 +3537,7 @@ class SimplifiedBluetoothTool(QWidget):
         main_layout.addLayout(heating_layout)
         
         self.setLayout(main_layout)
-        self.setFixedSize(520, 600)  # 增加高度以容纳自动连接配置
+        self.setFixedSize(520, 630)  # 增加高度以容纳自动连接配置和重试间隔
     
     def focusOutEvent(self, event):
         """失去焦点时隐藏（点击窗口外部）"""
