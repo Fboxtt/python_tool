@@ -526,6 +526,16 @@ class BluetoothTool(QWidget):
         self.shutdown_button.clicked.connect(self.on_shutdown_clicked)
         other_layout.addWidget(self.shutdown_button)
         
+        # 蓝牙名称修改
+        bt_name_row = QHBoxLayout()
+        bt_name_row.addWidget(QLabel('名称:'))
+        self.bt_name_input = QLineEdit()
+        self.bt_name_input.setPlaceholderText('输入新蓝牙名称')
+        self.bt_name_input.setMaxLength(20)  # 限制20个字符
+        self.bt_name_input.setStyleSheet("font-size: 10px;")
+        bt_name_row.addWidget(self.bt_name_input)
+        other_layout.addLayout(bt_name_row)
+        
         self.bt_name_button = self._create_compact_button('修改蓝牙名称', '#3498db')
         self.bt_name_button.clicked.connect(self.on_change_bt_name_clicked)
         other_layout.addWidget(self.bt_name_button)
@@ -2300,9 +2310,9 @@ class BluetoothTool(QWidget):
 
     def on_change_bt_name_clicked(self):
         """处理修改蓝牙名称按钮点击事件"""
-        new_name = self.send_input.text().strip()
+        new_name = self.bt_name_input.text().strip()
         if not new_name:
-            QMessageBox.warning(self, '警告', '请在输入框中输入新的蓝牙名称')
+            QMessageBox.warning(self, '警告', '请输入新的蓝牙名称')
             return
         
         # 弹出确认窗口
