@@ -163,8 +163,8 @@ STATUS_BIT_NAMES = {
     'INFO': {
         INFO_HEAETER_CONFIG: '加热模式',
         INFO_HEATER_ON: '加热开启',
-        INFO_CHG_FULL_T: '临时满充',
-        INFO_BATT_FULL: '真正满充',
+        INFO_CHG_FULL_T: '将满充',
+        INFO_BATT_FULL: '满充',
         INFO_CHG_LIMITED_ON: '充电限流开',
         INFO_DIS_LIMITED_ON: '放电限流开',
         INFO_CHG_MOS_OFF: '充MOS关',
