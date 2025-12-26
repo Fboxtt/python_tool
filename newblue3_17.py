@@ -1891,7 +1891,7 @@ class BluetoothTool(QWidget):
         except (IndexError, Exception):
             pass  # 数据不完整或异常，忽略
         # 重启定时器
-        self.data_timer.start(40)  # 20ms - 减少延迟，更快处理数据包
+        self.data_timer.start(120)  # 20ms - 减少延迟，更快处理数据包
 
     def is_ota_command(self, data):
         """判断是否为OTA编程命令
