@@ -995,7 +995,6 @@ class EnhancedMainWindow(QMainWindow):
             
             # 遍历dict_data，找到对应的状态位字段并转换为整数
             # 变量名就是翻译后的名称，直接精确匹配
-            self.logger.write_log(f"[DEBUG] Looking for keys: alarm={alarm_key}, protect={protect_key}, battery={battery_key}")
             all_names = []
             for category, items in dict_data.items():
                 for item in items:
@@ -1007,21 +1006,18 @@ class EnhancedMainWindow(QMainWindow):
                         if name == alarm_key:
                             try:
                                 sbs_data_dict[alarm_key] = int(value_str, 16) if isinstance(value_str, str) and value_str.startswith('0x') else int(value_str)
-                                self.logger.write_log(f"[DEBUG] Matched alarm: {name} = {sbs_data_dict[alarm_key]}")
-                            except (ValueError, TypeError) as e:
-                                self.logger.write_log(f"[DEBUG] Failed to convert alarm value: {value_str}, error: {e}")
+                            except (ValueError, TypeError):
+                                pass
                         elif name == protect_key:
                             try:
                                 sbs_data_dict[protect_key] = int(value_str, 16) if isinstance(value_str, str) and value_str.startswith('0x') else int(value_str)
-                                self.logger.write_log(f"[DEBUG] Matched protect: {name} = {sbs_data_dict[protect_key]}")
-                            except (ValueError, TypeError) as e:
-                                self.logger.write_log(f"[DEBUG] Failed to convert protect value: {value_str}, error: {e}")
+                            except (ValueError, TypeError):
+                                pass
                         elif name == fault_key:
                             try:
                                 sbs_data_dict[fault_key] = int(value_str, 16) if isinstance(value_str, str) and value_str.startswith('0x') else int(value_str)
-                                self.logger.write_log(f"[DEBUG] Matched fault: {name} = {sbs_data_dict[fault_key]}")
-                            except (ValueError, TypeError) as e:
-                                self.logger.write_log(f"[DEBUG] Failed to convert fault value: {value_str}, error: {e}")
+                            except (ValueError, TypeError):
+                                pass
                         elif name == other_info_key:
                             try:
                                 sbs_data_dict[other_info_key] = int(value_str, 16) if isinstance(value_str, str) and value_str.startswith('0x') else int(value_str)
@@ -1030,75 +1026,42 @@ class EnhancedMainWindow(QMainWindow):
                         elif name == balance_key:
                             try:
                                 sbs_data_dict[balance_key] = int(value_str, 16) if isinstance(value_str, str) and value_str.startswith('0x') else int(value_str)
-                                self.logger.write_log(f"[DEBUG] Matched balance: {name} = {sbs_data_dict[balance_key]}")
-                            except (ValueError, TypeError) as e:
-                                self.logger.write_log(f"[DEBUG] Failed to convert balance value: {value_str}, error: {e}")
+                            except (ValueError, TypeError):
+                                pass
                         elif name == battery_key:
                             try:
                                 sbs_data_dict[battery_key] = int(value_str, 16) if isinstance(value_str, str) and value_str.startswith('0x') else int(value_str)
-                                self.logger.write_log(f"[DEBUG] Matched battery: {name} = {sbs_data_dict[battery_key]}")
-                            except (ValueError, TypeError) as e:
-                                self.logger.write_log(f"[DEBUG] Failed to convert battery value: {value_str}, error: {e}")
-            
-            # 调试：打印所有变量名，看看是否有类似的
-            status_related_names = [n for n in all_names if 'alarm' in n.lower() or 'protect' in n.lower() or 'battery' in n.lower() or '告警' in n or '保护' in n or '电池' in n]
-            if status_related_names:
-                self.logger.write_log(f"[DEBUG] Found status-related names: {status_related_names}")
+                            except (ValueError, TypeError):
+                                pass
             
             # 更新告警-保护信息窗口
             if sbs_data_dict:
-                # 调试：检查数据匹配情况
-                self.logger.write_log(f"[DEBUG] sbs_data_dict keys: {list(sbs_data_dict.keys())}")
-                
                 # 更新告警-保护信息窗口
                 alarm_protect_data = get_alarm_protect_display_data(sbs_data_dict)
-                self.logger.write_log(f"[DEBUG] alarm_protect_data: {len(alarm_protect_data) if alarm_protect_data else 0} rows, type: {type(alarm_protect_data)}")
-                if alarm_protect_data:
-                    self.logger.write_log(f"[DEBUG] alarm_protect_data 前3行: {alarm_protect_data[:3] if len(alarm_protect_data) >= 3 else alarm_protect_data}")
-                    if len(alarm_protect_data) > 0:
-                        self.logger.write_log(f"[DEBUG] alarm_protect_data 第一行: {alarm_protect_data[0]}, 类型: {type(alarm_protect_data[0])}, 长度: {len(alarm_protect_data[0]) if hasattr(alarm_protect_data[0], '__len__') else 'N/A'}")
                 if alarm_protect_data and 'ALARM_PROTECT' in self.multi_window_manager.windows:
                     self.multi_window_manager.update_window_data('ALARM_PROTECT', alarm_protect_data)
-                    self.logger.write_log(f"[DEBUG] ALARM_PROTECT window updated")
-                else:
-                    if not alarm_protect_data:
-                        self.logger.write_log(f"[DEBUG] ALARM_PROTECT: data is empty")
-                    if 'ALARM_PROTECT' not in self.multi_window_manager.windows:
-                        self.logger.write_log(f"[DEBUG] ALARM_PROTECT: window not found")
+                elif not alarm_protect_data:
+                    self.bluetooth_tool.blue_write_log("警告: ALARM_PROTECT 数据为空")
+                elif 'ALARM_PROTECT' not in self.multi_window_manager.windows:
+                    self.bluetooth_tool.blue_write_log("警告: ALARM_PROTECT 窗口未创建")
                 
                 # 更新其他状态信息窗口
                 other_status_data = get_other_status_display_data(sbs_data_dict)
-                self.logger.write_log(f"[DEBUG] other_status_data: {len(other_status_data) if other_status_data else 0} rows, type: {type(other_status_data)}")
-                if other_status_data:
-                    self.logger.write_log(f"[DEBUG] other_status_data 前3行: {other_status_data[:3] if len(other_status_data) >= 3 else other_status_data}")
-                    if len(other_status_data) > 0:
-                        self.logger.write_log(f"[DEBUG] other_status_data 第一行: {other_status_data[0]}, 长度: {len(other_status_data[0]) if hasattr(other_status_data[0], '__len__') else 'N/A'}")
                 if other_status_data and 'OTHER_STATUS' in self.multi_window_manager.windows:
                     self.multi_window_manager.update_window_data('OTHER_STATUS', other_status_data)
-                    self.logger.write_log(f"[DEBUG] OTHER_STATUS window updated")
-                else:
-                    if not other_status_data:
-                        self.logger.write_log(f"[DEBUG] OTHER_STATUS: data is empty")
-                    if 'OTHER_STATUS' not in self.multi_window_manager.windows:
-                        self.logger.write_log(f"[DEBUG] OTHER_STATUS: window not found")
+                elif not other_status_data:
+                    self.bluetooth_tool.blue_write_log("警告: OTHER_STATUS 数据为空")
+                elif 'OTHER_STATUS' not in self.multi_window_manager.windows:
+                    self.bluetooth_tool.blue_write_log("警告: OTHER_STATUS 窗口未创建")
                 
                 # 更新电池状态窗口
                 battery_status_data = get_battery_status_display_data(sbs_data_dict)
-                self.logger.write_log(f"[DEBUG] battery_status_data: {len(battery_status_data) if battery_status_data else 0} rows, type: {type(battery_status_data)}")
-                if battery_status_data:
-                    self.logger.write_log(f"[DEBUG] battery_status_data 全部数据: {battery_status_data}")
-                    if len(battery_status_data) > 0:
-                        self.logger.write_log(f"[DEBUG] battery_status_data 第一行: {battery_status_data[0]}, 类型: {type(battery_status_data[0])}, 长度: {len(battery_status_data[0]) if hasattr(battery_status_data[0], '__len__') else 'N/A'}")
                 if battery_status_data and 'BATTERY_STATUS' in self.multi_window_manager.windows:
                     self.multi_window_manager.update_window_data('BATTERY_STATUS', battery_status_data)
-                    self.logger.write_log(f"[DEBUG] BATTERY_STATUS window updated")
-                else:
-                    if not battery_status_data:
-                        self.logger.write_log(f"[DEBUG] BATTERY_STATUS: data is empty")
-                    if 'BATTERY_STATUS' not in self.multi_window_manager.windows:
-                        self.logger.write_log(f"[DEBUG] BATTERY_STATUS: window not found")
-            else:
-                self.logger.write_log(f"[DEBUG] sbs_data_dict is empty")
+                elif not battery_status_data:
+                    self.bluetooth_tool.blue_write_log("警告: BATTERY_STATUS 数据为空")
+                elif 'BATTERY_STATUS' not in self.multi_window_manager.windows:
+                    self.bluetooth_tool.blue_write_log("警告: BATTERY_STATUS 窗口未创建")
                 
         except Exception as e:
             self.logger.write_log(t('ui.log_update_bit_flags_failed', str(e)))

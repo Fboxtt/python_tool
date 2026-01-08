@@ -918,14 +918,6 @@ class BitFlagsTableModel(QAbstractTableModel):
             data: 多列模式: 列表，每项是包含多列数据的元组/列表
                   2列模式: 列表，每项格式为 {'name': str, 'value': int} 或 (name, value) 元组
         """
-        # 调试日志：记录更新前的状态
-        debug_log = None
-        if hasattr(self, '_debug_logger') and self._debug_logger:
-            debug_log = self._debug_logger
-            debug_log(f"[DEBUG] BitFlagsTableModel.update_data: _num_columns={self._num_columns}, data_len={len(data) if data else 0}")
-            if data and len(data) > 0:
-                debug_log(f"[DEBUG] BitFlagsTableModel 第一行数据: {data[0]}, 类型: {type(data[0])}, 长度: {len(data[0]) if hasattr(data[0], '__len__') else 'N/A'}")
-        
         if not data:
             old_row_count = self.rowCount()
             self._row_data = []
@@ -933,8 +925,6 @@ class BitFlagsTableModel(QAbstractTableModel):
             if old_row_count > 0:
                 self.beginResetModel()
                 self.endResetModel()
-            if debug_log:
-                debug_log(f"[DEBUG] BitFlagsTableModel 数据为空，清空模型")
             return
         
         current_time = time.time()
@@ -944,21 +934,10 @@ class BitFlagsTableModel(QAbstractTableModel):
         if self._num_columns > 2:
             self._row_data = []
             self._status_bits = []
-            valid_rows = 0
-            invalid_rows = 0
             for idx, row_data in enumerate(data):
                 if len(row_data) >= self._num_columns:
                     self._row_data.append([str(row_data[i]) for i in range(self._num_columns)])
                     self._status_bits.append({'last_update': current_time})
-                    valid_rows += 1
-                else:
-                    invalid_rows += 1
-                    if debug_log and idx < 3:  # 只记录前3个无效行
-                        debug_log(f"[DEBUG] BitFlagsTableModel 行{idx}数据无效: len={len(row_data) if hasattr(row_data, '__len__') else 'N/A'}, 需要{self._num_columns}列, 数据={row_data}")
-            if debug_log:
-                debug_log(f"[DEBUG] BitFlagsTableModel 多列模式处理完成: 有效行={valid_rows}, 无效行={invalid_rows}, _row_data行数={len(self._row_data)}")
-                if len(self._row_data) > 0:
-                    debug_log(f"[DEBUG] BitFlagsTableModel 第一行_row_data: {self._row_data[0]}")
         else:
             # 2列模式（保持原逻辑）
             self._status_bits = []
@@ -973,25 +952,14 @@ class BitFlagsTableModel(QAbstractTableModel):
                     'value': value,
                     'last_update': current_time
                 })
-            if debug_log:
-                debug_log(f"[DEBUG] BitFlagsTableModel 2列模式处理完成: _status_bits行数={len(self._status_bits)}")
-                if len(self._status_bits) > 0:
-                    debug_log(f"[DEBUG] BitFlagsTableModel 第一个状态位: {self._status_bits[0]}")
         
         new_row_count = self.rowCount()
-        if debug_log:
-            debug_log(f"[DEBUG] BitFlagsTableModel 行数变化: 旧={old_row_count}, 新={new_row_count}")
-        
         if new_row_count != old_row_count:
             self.beginResetModel()
             self.endResetModel()
-            if debug_log:
-                debug_log(f"[DEBUG] BitFlagsTableModel 模型已重置")
         else:
             if new_row_count > 0:
                 self.dataChanged.emit(self.index(0, 0), self.index(new_row_count - 1, self.columnCount() - 1))
-                if debug_log:
-                    debug_log(f"[DEBUG] BitFlagsTableModel 发出dataChanged信号")
         
         self._cached_time = current_time
     

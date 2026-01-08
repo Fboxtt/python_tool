@@ -740,15 +740,9 @@ class DataDisplayWindow(QWidget):
                 headers=headers, 
                 value_columns=[1, 3]
             )
-            # 设置调试日志回调
-            if hasattr(self, 'logger') and self.logger:
-                self.table_model._debug_logger = lambda msg: self.logger.write_log(msg)
             self.table_view.setModel(self.table_model)
             for col, width in enumerate(self.col_widths):
                 self.table_view.setColumnWidth(col, width)
-            # 调试日志
-            if hasattr(self, 'logger') and self.logger:
-                self.logger.write_log(f"[DEBUG] ALARM_PROTECT窗口创建: window_type={self.window_type}, num_columns=4, headers={headers}, col_widths={self.col_widths}")
         elif self.window_type == 'other_status':
             headers = [t('ui.table_header_fault'), t('ui.table_header_value'), t('ui.table_header_info'), t('ui.table_header_value'), t('ui.table_header_balance'), t('ui.table_header_value')]
             self.table_model = BitFlagsTableModel(
@@ -756,15 +750,9 @@ class DataDisplayWindow(QWidget):
                 headers=headers, 
                 value_columns=[1, 3, 5]
             )
-            # 设置调试日志回调
-            if hasattr(self, 'logger') and self.logger:
-                self.table_model._debug_logger = lambda msg: self.logger.write_log(msg)
             self.table_view.setModel(self.table_model)
             for col, width in enumerate(self.col_widths):
                 self.table_view.setColumnWidth(col, width)
-            # 调试日志
-            if hasattr(self, 'logger') and self.logger:
-                self.logger.write_log(f"[DEBUG] OTHER_STATUS窗口创建: window_type={self.window_type}, num_columns=6, headers={headers}, col_widths={self.col_widths}")
         elif self.window_type == 'battery_status':
             headers = [t('ui.table_header_param_name'), t('ui.table_header_status_value')]
             self.table_model = BitFlagsTableModel(
@@ -772,15 +760,9 @@ class DataDisplayWindow(QWidget):
                 headers=headers, 
                 value_columns=[]
             )
-            # 设置调试日志回调
-            if hasattr(self, 'logger') and self.logger:
-                self.table_model._debug_logger = lambda msg: self.logger.write_log(msg)
             self.table_view.setModel(self.table_model)
             for col, width in enumerate(self.col_widths):
                 self.table_view.setColumnWidth(col, width)
-            # 调试日志
-            if hasattr(self, 'logger') and self.logger:
-                self.logger.write_log(f"[DEBUG] BATTERY_STATUS窗口创建: window_type={self.window_type}, num_columns=2, headers={headers}, col_widths={self.col_widths}")
         elif self.window_id == 'PC_GET_SERIALNUM':
             # 序列号窗口：使用竖向表格模型（节省纵向空间）
             self.table_model = VerticalTableModel(column_mode=self.column_mode)
@@ -876,36 +858,8 @@ class DataDisplayWindow(QWidget):
                 2列: [(name, value), ...]
                 3列: [(name, hex_value, dec_value), ...]
         """
-        # 调试日志：记录窗口类型和数据信息
-        if self.window_type in ['alarm_protect', 'other_status', 'battery_status']:
-            if hasattr(self, 'logger') and self.logger:
-                data_preview = f"data_len={len(data) if data else 0}"
-                if data and len(data) > 0:
-                    data_preview += f", first_row={data[0]}, first_row_type={type(data[0])}"
-                    if len(data) > 1:
-                        data_preview += f", second_row={data[1]}"
-                self.logger.write_log(f"[DEBUG] {self.window_id} update_data: window_type={self.window_type}, {data_preview}")
-                if hasattr(self.table_model, '_num_columns'):
-                    self.logger.write_log(f"[DEBUG] {self.window_id} table_model: _num_columns={self.table_model._num_columns}, _headers={getattr(self.table_model, '_headers', 'N/A')}")
-        
         if self.table_model:
             self.table_model.update_data(data)
-            
-            # 调试日志：记录更新后的模型状态
-            if self.window_type in ['alarm_protect', 'other_status', 'battery_status']:
-                if hasattr(self, 'logger') and self.logger:
-                    if hasattr(self.table_model, '_row_data'):
-                        row_count = len(self.table_model._row_data) if self.table_model._row_data else 0
-                        self.logger.write_log(f"[DEBUG] {self.window_id} 更新后: _row_data行数={row_count}")
-                        if self.table_model._row_data and len(self.table_model._row_data) > 0:
-                            self.logger.write_log(f"[DEBUG] {self.window_id} 第一行数据: {self.table_model._row_data[0]}")
-                    if hasattr(self.table_model, '_status_bits'):
-                        status_count = len(self.table_model._status_bits) if self.table_model._status_bits else 0
-                        self.logger.write_log(f"[DEBUG] {self.window_id} 更新后: _status_bits行数={status_count}")
-                        if self.table_model._status_bits and len(self.table_model._status_bits) > 0:
-                            self.logger.write_log(f"[DEBUG] {self.window_id} 第一个状态位: {self.table_model._status_bits[0]}")
-                    # 记录表格视图的行数和列数
-                    self.logger.write_log(f"[DEBUG] {self.window_id} 表格视图: rowCount={self.table_view.model().rowCount()}, columnCount={self.table_view.model().columnCount()}")
             
             # 如果是竖向模式，更新列宽
             if isinstance(self.table_model, VerticalTableModel):
@@ -1588,23 +1542,13 @@ class MultiWindowManager(QWidget):
     def create_window(self, window_id, title, column_mode, expected_row_count=10, window_type='data'):
         """创建显示窗口（数据窗口或位标志窗口）"""
         if window_id in self.windows:
-            if self.logger:
-                self.logger.write_log(f"[DEBUG] create_window: {window_id} 已存在，跳过创建")
             return  # 窗口已存在
-        
-        # 调试日志：记录创建参数
-        if self.logger and window_id in ['ALARM_PROTECT', 'BATTERY_STATUS', 'OTHER_STATUS']:
-            self.logger.write_log(f"[DEBUG] create_window调用: window_id={window_id}, title={title}, column_mode={column_mode}, expected_row_count={expected_row_count}, window_type={window_type}")
         
         # 根据窗口类型创建不同的窗口
         if window_type == 'bitflags':
             window = BitFlagsDisplayWindow(window_id, title, expected_row_count, parent=self.window_container)
         else:
             window = DataDisplayWindow(window_id, title, column_mode, expected_row_count, window_type, parent=self.window_container)
-            
-            # 设置logger以便窗口内部使用
-            if hasattr(window, 'logger'):
-                window.logger = self.logger
             
             # 只有普通数据窗口才连接读取/写入按钮
             if hasattr(window, 'read_button'):
@@ -1631,12 +1575,11 @@ class MultiWindowManager(QWidget):
             else:
                 window_type_name = f"数据窗口({column_mode}列)"
             self.logger.write_log(f"创建{window_type_name}: {title}")
-            
-            # 额外调试信息
-            if window_id in ['ALARM_PROTECT', 'BATTERY_STATUS', 'OTHER_STATUS']:
-                if hasattr(window, 'table_model'):
-                    if hasattr(window.table_model, '_num_columns'):
-                        self.logger.write_log(f"[DEBUG] {window_id} 创建完成: table_model._num_columns={window.table_model._num_columns}, _headers={getattr(window.table_model, '_headers', 'N/A')}")
+        
+        # 使用bluetooth_tool的日志记录窗口创建（特殊窗口）
+        if window_id in ['ALARM_PROTECT', 'BATTERY_STATUS', 'OTHER_STATUS']:
+            if hasattr(self, 'bluetooth_tool') and self.bluetooth_tool:
+                self.bluetooth_tool.blue_write_log(f"创建{window_id}窗口: {title} (类型: {window_type}, 列数: {column_mode})")
             
     def remove_window(self, window_id):
         """移除数据显示窗口"""
@@ -1869,17 +1812,6 @@ class MultiWindowManager(QWidget):
                     
     def update_window_data(self, window_id, data):
         """更新指定窗口的数据"""
-        # 调试日志
-        if self.logger and window_id in ['ALARM_PROTECT', 'BATTERY_STATUS', 'OTHER_STATUS']:
-            self.logger.write_log(f"[DEBUG] update_window_data调用: window_id={window_id}, data_len={len(data) if data else 0}, window_exists={window_id in self.windows}")
-            if window_id in self.windows:
-                window = self.windows[window_id]
-                if hasattr(window, 'window_type'):
-                    self.logger.write_log(f"[DEBUG] {window_id} 窗口类型: {window.window_type}")
-                if hasattr(window, 'table_model'):
-                    if hasattr(window.table_model, '_num_columns'):
-                        self.logger.write_log(f"[DEBUG] {window_id} 模型列数: {window.table_model._num_columns}")
-        
         if window_id in self.windows:
             self.windows[window_id].update_data(data)
         else:

@@ -282,79 +282,74 @@ def parse_all_status_from_sbs(sbs_data_dict):
     balance_key = t('var_templates.balance_status')
     battery_key = t('var_templates.battery_status_label')
 
-    # 调试：打印接收到的键
-    import logging
-    logger = LogManager.get_instance()
-    logger.write_log(f"[DEBUG parse_all_status_from_sbs] Input keys: {list(sbs_data_dict.keys())}")
-    logger.write_log(f"[DEBUG parse_all_status_from_sbs] Looking for: alarm={alarm_key}, protect={protect_key}, battery={battery_key}")
-
     # 解析告警状态（同时检查中英文键名，兼容性）
-    alarm_value_direct = sbs_data_dict.get(alarm_key)
-    alarm_value_cn = sbs_data_dict.get('告警状态')
-    alarm_value = alarm_value_direct if alarm_value_direct is not None else alarm_value_cn
-    logger.write_log(f"[DEBUG parse_all_status_from_sbs] Alarm lookup: key='{alarm_key}', direct={alarm_value_direct}, cn={alarm_value_cn}, final={alarm_value}")
+    alarm_value = sbs_data_dict.get(alarm_key) or sbs_data_dict.get('告警状态')
     if alarm_value is not None:
-        logger.write_log(f"[DEBUG parse_all_status_from_sbs] Found alarm: {alarm_value} (type: {type(alarm_value)})")
         result['alarm'] = parse_status_bits(alarm_value, 'ALARM')
-        logger.write_log(f"[DEBUG parse_all_status_from_sbs] Parsed alarm bits: {len(result['alarm'])}")
     else:
-        logger.write_log(f"[DEBUG parse_all_status_from_sbs] Alarm not found in sbs_data_dict")
+        # 只在找不到键时记录日志
+        if alarm_key not in sbs_data_dict and '告警状态' not in sbs_data_dict:
+            logger = LogManager.get_instance()
+            logger.write_log(f"警告: 未找到告警状态键 (查找: {alarm_key} 或 '告警状态')")
 
-    # 解析保护状态
-    protect_value_direct = sbs_data_dict.get(protect_key)
-    protect_value_cn = sbs_data_dict.get('保护状态')
-    protect_value = protect_value_direct if protect_value_direct is not None else protect_value_cn
-    logger.write_log(f"[DEBUG parse_all_status_from_sbs] Protect lookup: key='{protect_key}', direct={protect_value_direct}, cn={protect_value_cn}, final={protect_value}")
+    # 解析保护状态（避免值为0时被or运算符误判）
+    protect_value = sbs_data_dict.get(protect_key)
+    if protect_value is None:
+        protect_value = sbs_data_dict.get('保护状态')
     if protect_value is not None:
-        logger.write_log(f"[DEBUG parse_all_status_from_sbs] Found protect: {protect_value} (type: {type(protect_value)})")
         result['protect'] = parse_status_bits(protect_value, 'PROTECT')
-        logger.write_log(f"[DEBUG parse_all_status_from_sbs] Parsed protect bits: {len(result['protect'])}")
+        # logger = LogManager.get_instance()
+        # logger.write_log(f"解析保护状态: 键='{protect_key}', 值={protect_value}, 解析出{len(result['protect'])}个状态位")
     else:
-        logger.write_log(f"[DEBUG parse_all_status_from_sbs] Protect not found in sbs_data_dict")
+        if protect_key not in sbs_data_dict and '保护状态' not in sbs_data_dict:
+            logger = LogManager.get_instance()
+            logger.write_log(f"警告: 未找到保护状态键 (查找: {protect_key} 或 '保护状态')")
 
-    # 解析失效状态
-    fault_value_direct = sbs_data_dict.get(fault_key)
-    fault_value_cn = sbs_data_dict.get('失效状态')
-    fault_value = fault_value_direct if fault_value_direct is not None else fault_value_cn
-    logger.write_log(f"[DEBUG parse_all_status_from_sbs] Fault lookup: key='{fault_key}', direct={fault_value_direct}, cn={fault_value_cn}, final={fault_value}")
+    # 解析失效状态（避免值为0时被or运算符误判）
+    fault_value = sbs_data_dict.get(fault_key)
+    if fault_value is None:
+        fault_value = sbs_data_dict.get('失效状态')
     if fault_value is not None:
-        logger.write_log(f"[DEBUG parse_all_status_from_sbs] Found fault: {fault_value} (type: {type(fault_value)})")
         result['fault'] = parse_status_bits(fault_value, 'FAULT')
-        logger.write_log(f"[DEBUG parse_all_status_from_sbs] Parsed fault bits: {len(result['fault'])}")
+        # logger = LogManager.get_instance()
+        # logger.write_log(f"解析失效状态: 键='{fault_key}', 值={fault_value}, 解析出{len(result['fault'])}个状态位")
     else:
-        logger.write_log(f"[DEBUG parse_all_status_from_sbs] Fault not found in sbs_data_dict")
+        if fault_key not in sbs_data_dict and '失效状态' not in sbs_data_dict:
+            logger = LogManager.get_instance()
+            logger.write_log(f"警告: 未找到失效状态键 (查找: {fault_key} 或 '失效状态')")
 
     # 解析其他信息
     info_value = sbs_data_dict.get(other_info_key) or sbs_data_dict.get('其他信息')
     if info_value is not None:
         result['info'] = parse_status_bits(info_value, 'INFO')
 
-    # 解析均衡状态
-    balance_value_direct = sbs_data_dict.get(balance_key)
-    balance_value_cn = sbs_data_dict.get('均衡状态')
-    balance_value = balance_value_direct if balance_value_direct is not None else balance_value_cn
-    logger.write_log(f"[DEBUG parse_all_status_from_sbs] Balance lookup: key='{balance_key}', direct={balance_value_direct}, cn={balance_value_cn}, final={balance_value}")
+    # 解析均衡状态（避免值为0时被or运算符误判）
+    balance_value = sbs_data_dict.get(balance_key)
+    if balance_value is None:
+        balance_value = sbs_data_dict.get('均衡状态')
     if balance_value is not None:
-        logger.write_log(f"[DEBUG parse_all_status_from_sbs] Found balance: {balance_value} (type: {type(balance_value)})")
         result['balance'] = parse_status_bits(balance_value, 'BALANCE')
-        logger.write_log(f"[DEBUG parse_all_status_from_sbs] Parsed balance bits: {len(result['balance'])}")
+        # logger = LogManager.get_instance()
+        # logger.write_log(f"解析均衡状态: 键='{balance_key}', 值={balance_value}, 解析出{len(result['balance'])}个状态位")
     else:
-        logger.write_log(f"[DEBUG parse_all_status_from_sbs] Balance not found in sbs_data_dict")
+        if balance_key not in sbs_data_dict and '均衡状态' not in sbs_data_dict:
+            logger = LogManager.get_instance()
+            logger.write_log(f"警告: 未找到均衡状态键 (查找: {balance_key} 或 '均衡状态')")
 
     # 解析电池状态
-    battery_value_direct = sbs_data_dict.get(battery_key)
-    battery_value_cn = sbs_data_dict.get('电池状态')
-    battery_value = battery_value_direct if battery_value_direct is not None else battery_value_cn
-    logger.write_log(f"[DEBUG parse_all_status_from_sbs] Battery lookup: key='{battery_key}', direct={battery_value_direct}, cn={battery_value_cn}, final={battery_value}")
+    # 注意：使用 get() 方法，避免值为0时被 or 运算符误判
+    battery_value = sbs_data_dict.get(battery_key)
+    if battery_value is None:
+        battery_value = sbs_data_dict.get('电池状态')
+    
+    # 值为0也是有效值（IDLE状态），所以需要明确检查 None
     if battery_value is not None:
-        logger.write_log(f"[DEBUG parse_all_status_from_sbs] Found battery: {battery_value} (type: {type(battery_value)})")
         batt_status = battery_value
         result['battery_status'] = BATTERY_STATUS_NAMES.get(batt_status, f'未知({batt_status})')
-        logger.write_log(f"[DEBUG parse_all_status_from_sbs] Parsed battery_status: {result['battery_status']}")
     else:
-        logger.write_log(f"[DEBUG parse_all_status_from_sbs] Battery not found in sbs_data_dict")
+        logger = LogManager.get_instance()
+        logger.write_log(f"警告: 未找到电池状态键 (查找: {battery_key} 或 '电池状态'), sbs_data_dict keys: {list(sbs_data_dict.keys())}")
 
-    logger.write_log(f"[DEBUG parse_all_status_from_sbs] Result keys: {list(result.keys())}")
     return result
 
 
@@ -406,12 +401,7 @@ def get_alarm_protect_display_data(sbs_data_dict):
     Returns:
         list: 数据列表，每项格式 (告警名称, 告警值, 保护名称, 保护值)
     """
-    import logging
-    logger = LogManager.get_instance()
-    
     all_status = parse_all_status_from_sbs(sbs_data_dict)
-    logger.write_log(f"[DEBUG get_alarm_protect_display_data] all_status keys: {list(all_status.keys())}")
-    logger.write_log(f"[DEBUG get_alarm_protect_display_data] alarm count: {len(all_status.get('alarm', []))}, protect count: {len(all_status.get('protect', []))}")
     
     # 创建告警和保护的位索引映射
     alarm_by_bit = {}
@@ -423,7 +413,6 @@ def get_alarm_protect_display_data(sbs_data_dict):
                 'name': bit_info['name'],
                 'value': bit_info['value']
             }
-        logger.write_log(f"[DEBUG get_alarm_protect_display_data] alarm_by_bit keys: {list(alarm_by_bit.keys())[:5]}... (total: {len(alarm_by_bit)})")
     
     if 'protect' in all_status and all_status['protect']:
         for bit_info in all_status['protect']:
@@ -431,15 +420,12 @@ def get_alarm_protect_display_data(sbs_data_dict):
                 'name': bit_info['name'],
                 'value': bit_info['value']
             }
-        logger.write_log(f"[DEBUG get_alarm_protect_display_data] protect_by_bit keys: {list(protect_by_bit.keys())[:5]}... (total: {len(protect_by_bit)})")
     
     # 获取所有位索引的并集
     all_bits = sorted(set(alarm_by_bit.keys()) | set(protect_by_bit.keys()))
-    logger.write_log(f"[DEBUG get_alarm_protect_display_data] all_bits count: {len(all_bits)}")
     
     # 如果没有数据，返回空列表
     if not all_bits:
-        logger.write_log(f"[DEBUG get_alarm_protect_display_data] No bits found, returning empty list")
         return []
     
     # 构建显示数据
@@ -455,7 +441,6 @@ def get_alarm_protect_display_data(sbs_data_dict):
             str(protect_data['value'])
         ))
     
-    logger.write_log(f"[DEBUG get_alarm_protect_display_data] Returning {len(result)} rows, first row: {result[0] if result else 'N/A'}")
     return result
 
 
@@ -463,58 +448,61 @@ def get_other_status_display_data(sbs_data_dict):
     """
     获取其他状态信息窗口的显示数据
     错误、信息、均衡每个单独一列
-    
+
     Args:
         sbs_data_dict: PC_GET_SBS 解析后的字典
-        
+
     Returns:
         list: 数据列表，每项格式 (错误名称, 错误值, 信息名称, 信息值, 均衡名称, 均衡值)
     """
-    import logging
-    logger = LogManager.get_instance()
-    
     all_status = parse_all_status_from_sbs(sbs_data_dict)
-    logger.write_log(f"[DEBUG get_other_status_display_data] all_status keys: {list(all_status.keys())}")
-    
+
+    # logger = LogManager.get_instance()
+    # logger.write_log(f"get_other_status_display_data: all_status keys: {list(all_status.keys())}")
+
     fault_list = []
     info_list = []
     balance_list = []
-    
+
     if 'fault' in all_status:
-        logger.write_log(f"[DEBUG get_other_status_display_data] fault count: {len(all_status['fault'])}")
+        # logger.write_log(f"fault状态位数量: {len(all_status['fault'])}")
         for bit_info in all_status['fault']:
             fault_list.append({
                 'name': bit_info['name'],
                 'value': bit_info['value']
             })
-    else:
-        logger.write_log(f"[DEBUG get_other_status_display_data] fault not in all_status")
-    
+    # else:
+    #     logger.write_log("警告: all_status中没有'fault'")
+
     if 'info' in all_status:
-        logger.write_log(f"[DEBUG get_other_status_display_data] info count: {len(all_status['info'])}")
+        # logger.write_log(f"info状态位数量: {len(all_status['info'])}")
         for bit_info in all_status['info']:
             info_list.append({
                 'name': bit_info['name'],
                 'value': bit_info['value']
             })
-    else:
-        logger.write_log(f"[DEBUG get_other_status_display_data] info not in all_status")
-    
+    # else:
+    #     logger.write_log("警告: all_status中没有'info'")
+
     if 'balance' in all_status:
-        logger.write_log(f"[DEBUG get_other_status_display_data] balance count: {len(all_status['balance'])}")
+        # logger.write_log(f"balance状态位数量: {len(all_status['balance'])}")
         for bit_info in all_status['balance']:
             balance_list.append({
                 'name': bit_info['name'],
                 'value': bit_info['value']
             })
-    else:
-        logger.write_log(f"[DEBUG get_other_status_display_data] balance not in all_status")
-    
-    logger.write_log(f"[DEBUG get_other_status_display_data] fault_list={len(fault_list)}, info_list={len(info_list)}, balance_list={len(balance_list)}")
-    
+    # else:
+    #     logger.write_log("警告: all_status中没有'balance'")
+
+    # logger.write_log(f"fault_list={len(fault_list)}, info_list={len(info_list)}, balance_list={len(balance_list)}")
+
     # 找到最大行数
-    max_len = max(len(fault_list), len(info_list), len(balance_list))
-    logger.write_log(f"[DEBUG get_other_status_display_data] max_len={max_len}")
+    max_len = max(len(fault_list), len(info_list), len(balance_list)) if (fault_list or info_list or balance_list) else 0
+
+    # 如果没有数据，返回空列表
+    if max_len == 0:
+        # logger.write_log("警告: get_other_status_display_data 所有列表都为空")
+        return []
     
     # 构建显示数据
     result = []
@@ -545,23 +533,22 @@ def get_battery_status_display_data(sbs_data_dict):
     Returns:
         list: 数据列表，每项格式 (name, value) 元组（2列数据）
     """
-    import logging
-    logger = LogManager.get_instance()
-    
     all_status = parse_all_status_from_sbs(sbs_data_dict)
-    logger.write_log(f"[DEBUG get_battery_status_display_data] all_status keys: {list(all_status.keys())}")
-    logger.write_log(f"[DEBUG get_battery_status_display_data] battery_status in all_status: {'battery_status' in all_status}")
     
     result = []
     
     # 添加电池状态（使用2列格式，返回元组而不是列表）
     if 'battery_status' in all_status:
         result.append((t('var_templates.battery_status_label'), all_status['battery_status']))
-        logger.write_log(f"[DEBUG get_battery_status_display_data] Added battery_status: {all_status['battery_status']}")
     else:
-        logger.write_log(f"[DEBUG get_battery_status_display_data] battery_status not found in all_status")
+        # 如果 all_status 中没有 battery_status，尝试直接从 sbs_data_dict 获取
+        battery_key = t('var_templates.battery_status_label')
+        battery_value = sbs_data_dict.get(battery_key) or sbs_data_dict.get('电池状态')
+        if battery_value is not None:
+            # 直接使用 BATTERY_STATUS_NAMES 转换（BATTERY_STATUS_NAMES 在同一文件中定义）
+            batt_status_str = BATTERY_STATUS_NAMES.get(battery_value, f'未知({battery_value})')
+            result.append((t('var_templates.battery_status_label'), batt_status_str))
     
-    logger.write_log(f"[DEBUG get_battery_status_display_data] Returning {len(result)} rows")
     return result
 
 
