@@ -950,7 +950,7 @@ def get_all_writable_commands():
 def get_all_display_windows():
     """
     获取所有可显示的窗口配置（自动生成）
-    
+
     Returns:
         list: 窗口配置列表，每项格式：
             {
@@ -962,6 +962,15 @@ def get_all_display_windows():
                 'expected_row_count': int # 预期数据行数
             }
     """
+    import os
+    app_mode = os.environ.get('APP_MODE', 'factoryApp')
+
+    # 英文用户版只允许的窗口列表
+    if app_mode == 'userApp':
+        allowed_windows = ['PC_GET_SBS', 'PC_GET_VER', 'ALARM_PROTECT', 'OTHER_STATUS', 'BATTERY_STATUS']
+    else:
+        allowed_windows = None  # 工厂版允许所有窗口
+
     windows = []
     
     # 遍历所有有格式定义的结构体
@@ -969,14 +978,18 @@ def get_all_display_windows():
         # 只为 PC_GET_* 命令生成窗口
         if not struct_name.startswith('PC_GET_'):
             continue
-        
+
+        # 英文用户版过滤：只允许指定的窗口
+        if allowed_windows and struct_name not in allowed_windows:
+            continue
+
         # 判断是否可写（在 READ_WRITE_COMMAND_MAPPING 中）
         is_writable = struct_name in READ_WRITE_COMMAND_MAPPING
         column_mode = 3 if is_writable else 2
-        
+
         # 自动生成标题（去掉 PC_GET_ 前缀）
         display_name = struct_name.replace('PC_GET_', '')
-        
+
         # 根据名称添加图标和国际化描述
         title_map = {
             'SBS': t('windows.sbs'),
@@ -992,18 +1005,22 @@ def get_all_display_windows():
             'FUSESTATE': t('windows.fuse'),
             'CLUSTER_SBS': t('windows.cluster'),
         }
-        
+
         title = title_map.get(display_name, f'📄 {display_name}')
-        
+
         # 获取命令码
         cmd_code = STRUCT_COMMANDS.get(struct_name, 0)
-        
+
         # 默认显示规则：电芯容量、SBS数据、版本信息默认显示
-        default_visible = struct_name in ['PC_GET_KB', 'PC_GET_SBS', 'PC_GET_VER']
-        
+        # 英文用户版：只显示允许的窗口
+        if app_mode == 'userApp':
+            default_visible = struct_name in allowed_windows
+        else:
+            default_visible = struct_name in ['PC_GET_KB', 'PC_GET_SBS', 'PC_GET_VER']
+
         # 获取预期的数据行数（从 STRUCT_VARIABLES 中获取变量数量）
         expected_row_count = len(STRUCT_VARIABLES.get(struct_name, []))
-        
+
         windows.append({
             'window_id': struct_name,
             'title': title,
@@ -1015,38 +1032,41 @@ def get_all_display_windows():
     
     # 添加告警-保护信息窗口
     # 告警和保护最多各32位，按位对应，所以最多32行
-    windows.append({
-        'window_id': 'ALARM_PROTECT',
-        'title': t('windows.alarm_protect'),
-        'column_mode': 2,
-        'default_visible': True,
-        'cmd_code': 0,
-        'expected_row_count': 32,
-        'window_type': 'alarm_protect'
-    })
-    
+    if not allowed_windows or 'ALARM_PROTECT' in allowed_windows:
+        windows.append({
+            'window_id': 'ALARM_PROTECT',
+            'title': t('windows.alarm_protect'),
+            'column_mode': 2,
+            'default_visible': True,
+            'cmd_code': 0,
+            'expected_row_count': 32,
+            'window_type': 'alarm_protect'
+        })
+
     # 添加其他状态信息窗口
     # 错误、信息、均衡各一列，找最大行数
-    windows.append({
-        'window_id': 'OTHER_STATUS',
-        'title': t('windows.other_status'),
-        'column_mode': 2,
-        'default_visible': True,
-        'cmd_code': 0,
-        'expected_row_count': 21,  # info有21个状态位，是最多的
-        'window_type': 'other_status'
-    })
-    
+    if not allowed_windows or 'OTHER_STATUS' in allowed_windows:
+        windows.append({
+            'window_id': 'OTHER_STATUS',
+            'title': t('windows.other_status'),
+            'column_mode': 2,
+            'default_visible': True,
+            'cmd_code': 0,
+            'expected_row_count': 21,  # info有21个状态位，是最多的
+            'window_type': 'other_status'
+        })
+
     # 添加电池状态窗口
-    windows.append({
-        'window_id': 'BATTERY_STATUS',
-        'title': t('windows.battery_status'),
-        'column_mode': 2,
-        'default_visible': True,
-        'cmd_code': 0,
-        'expected_row_count': 1,
-        'window_type': 'battery_status'
-    })
+    if not allowed_windows or 'BATTERY_STATUS' in allowed_windows:
+        windows.append({
+            'window_id': 'BATTERY_STATUS',
+            'title': t('windows.battery_status'),
+            'column_mode': 2,
+            'default_visible': True,
+            'cmd_code': 0,
+            'expected_row_count': 1,
+            'window_type': 'battery_status'
+        })
     
     return windows
 

@@ -241,6 +241,12 @@ class EnhancedMainWindow(QMainWindow):
         self.cell_32_checkbox = QCheckBox(t('ui.cell_32_config'))
         self.cell_32_checkbox.setToolTip(t('ui.cell_32_tooltip'))
         self.cell_32_checkbox.stateChanged.connect(self.on_cell_config_changed)
+
+        # 英文用户版：禁用32-cell配置选项
+        if app_mode == 'userApp':
+            self.cell_32_checkbox.setChecked(False)
+            self.cell_32_checkbox.setEnabled(False)
+
         layout.addWidget(self.cell_32_checkbox)
         
         # 连接控制
@@ -570,11 +576,25 @@ class EnhancedMainWindow(QMainWindow):
     def on_factory_mode_changed(self, state):
         """工厂模式checkbox状态改变"""
         is_factory_mode = (state == Qt.CheckState.Checked.value)
+        is_user_mode = not is_factory_mode  # 用户模式 = 非工厂模式
+
         mode_name = t('ui.mode_factory') if is_factory_mode else t('ui.mode_user')
         self.logger.write_log(t('ui.log_mode_switched', mode_name))
-        
+
         # 更新所有数据窗口的写入功能状态
         self.multi_window_manager.set_write_enabled(is_factory_mode)
+
+        # 更新32-cell配置checkbox状态
+        if is_user_mode:
+            # 用户模式：禁用32-cell配置
+            self.cell_32_checkbox.setChecked(False)
+            self.cell_32_checkbox.setEnabled(False)
+        else:
+            # 工厂模式：启用32-cell配置
+            self.cell_32_checkbox.setEnabled(True)
+
+        # 更新数据窗口选择限制
+        self.multi_window_manager.set_user_mode_restrictions(is_user_mode)
         
     def on_cell_config_changed(self, state):
         """32电芯配置checkbox状态改变"""

@@ -818,7 +818,7 @@ class DataDisplayWindow(QWidget):
             button_layout.setSpacing(3)
             button_layout.setContentsMargins(0, 0, 0, 0)
             
-            self.read_button = QPushButton('🔄 读取')
+            self.read_button = QPushButton(t('ui.read'))
             self.read_button.setMinimumWidth(60)
             self.read_button.setMaximumWidth(60)
             self.read_button.setMinimumHeight(24)
@@ -830,7 +830,7 @@ class DataDisplayWindow(QWidget):
             
             # 3列模式额外添加写入按钮
             if self.column_mode == 3:
-                self.write_button = QPushButton('✏️ 写入')
+                self.write_button = QPushButton(t('ui.write'))
                 self.write_button.setMinimumWidth(60)
                 self.write_button.setMaximumWidth(60)
                 self.write_button.setMinimumHeight(24)
@@ -1386,7 +1386,12 @@ class MultiWindowManager(QWidget):
         
         # 写入功能启用状态（默认启用）
         self._write_enabled = True
-        
+
+        # 用户模式状态（默认工厂模式）
+        self._is_user_mode = False
+        # 用户模式允许的窗口列表
+        self._user_allowed_windows = {'PC_GET_SBS', 'PC_GET_VER', 'ALARM_PROTECT', 'OTHER_STATUS', 'BATTERY_STATUS'}
+
         # 初始化蓝牙队列发送器
         self.queue_sender = BluetoothQueueSender(bluetooth_tool, logger)
         
@@ -1406,7 +1411,7 @@ class MultiWindowManager(QWidget):
         left_layout.setContentsMargins(5, 5, 5, 5)
         
         # 标题
-        title_label = QLabel('数据窗口控制')
+        title_label = QLabel(t('ui.window_control_title'))
         font = title_label.font()
         font.setBold(True)
         font.setPointSize(12)
@@ -1429,15 +1434,15 @@ class MultiWindowManager(QWidget):
         # 控制按钮
         button_layout = QVBoxLayout()
         
-        self.select_all_btn = QPushButton('全选')
+        self.select_all_btn = QPushButton(t('ui.select_all'))
         self.select_all_btn.clicked.connect(self.select_all_windows)
         button_layout.addWidget(self.select_all_btn)
-        
-        self.deselect_all_btn = QPushButton('全不选')
+
+        self.deselect_all_btn = QPushButton(t('ui.deselect_all'))
         self.deselect_all_btn.clicked.connect(self.deselect_all_windows)
         button_layout.addWidget(self.deselect_all_btn)
-        
-        self.read_all_btn = QPushButton('📖 读取所有')
+
+        self.read_all_btn = QPushButton(t('ui.read_all'))
         self.read_all_btn.clicked.connect(self.read_all_checked_windows)
         font = self.read_all_btn.font()
         font.setBold(True)
@@ -1468,7 +1473,7 @@ class MultiWindowManager(QWidget):
         right_layout.setContentsMargins(2, 2, 2, 2)
         
         # 窗口显示区域标题
-        display_title = QLabel('数据显示窗口')
+        display_title = QLabel(t('ui.data_display_title'))
         font = display_title.font()
         font.setBold(True)
         font.setPointSize(12)
@@ -1751,14 +1756,28 @@ class MultiWindowManager(QWidget):
             self.remove_window(window_id)
             
     def select_all_windows(self):
-        """全选所有窗口"""
-        for checkbox in self.checkboxes.values():
-            checkbox.setChecked(True)
+        """全选窗口"""
+        if self._is_user_mode:
+            # 用户模式：只选中允许的窗口
+            for window_id, checkbox in self.checkboxes.items():
+                if window_id in self._user_allowed_windows:
+                    checkbox.setChecked(True)
+        else:
+            # 工厂模式：选中所有窗口
+            for checkbox in self.checkboxes.values():
+                checkbox.setChecked(True)
             
     def deselect_all_windows(self):
-        """全不选所有窗口"""
-        for checkbox in self.checkboxes.values():
-            checkbox.setChecked(False)
+        """全不选窗口"""
+        if self._is_user_mode:
+            # 用户模式：只取消选中允许的窗口
+            for window_id, checkbox in self.checkboxes.items():
+                if window_id in self._user_allowed_windows:
+                    checkbox.setChecked(False)
+        else:
+            # 工厂模式：取消选中所有窗口
+            for checkbox in self.checkboxes.values():
+                checkbox.setChecked(False)
             
     def read_all_checked_windows(self):
         """读取所有已勾选的窗口数据"""
@@ -1857,7 +1876,42 @@ class MultiWindowManager(QWidget):
         
         if self.logger:
             self.logger.write_log(f"{'启用' if enabled else '禁用'}所有窗口写入功能")
-        
+
+    def set_user_mode_restrictions(self, is_user_mode):
+        """设置用户模式限制
+
+        Args:
+            is_user_mode: True=用户模式，限制窗口选择；False=工厂模式，允许所有窗口
+        """
+        self._is_user_mode = is_user_mode
+
+        if is_user_mode:
+            # 用户模式：只允许特定的窗口
+            allowed_windows = {'PC_GET_SBS', 'PC_GET_VER', 'ALARM_PROTECT', 'OTHER_STATUS', 'BATTERY_STATUS'}
+
+            # 取消勾选不允许的窗口
+            for window_id, checkbox in self.checkboxes.items():
+                if window_id not in allowed_windows:
+                    if checkbox.isChecked():
+                        checkbox.blockSignals(True)
+                        checkbox.setChecked(False)
+                        checkbox.blockSignals(False)
+                        # 隐藏对应的窗口
+                        if window_id in self.windows:
+                            self.windows[window_id].hide()
+                            self.windows.pop(window_id, None)
+
+            # 禁用不允许的checkbox
+            for window_id, checkbox in self.checkboxes.items():
+                if window_id not in allowed_windows:
+                    checkbox.setEnabled(False)
+                else:
+                    checkbox.setEnabled(True)
+        else:
+            # 工厂模式：允许所有窗口
+            for checkbox in self.checkboxes.values():
+                checkbox.setEnabled(True)
+
     def clear_window_write_values(self, window_id):
         """清空指定窗口的写入值"""
         if window_id in self.windows:
