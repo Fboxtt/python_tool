@@ -343,7 +343,26 @@ class BluetoothTool(QWidget):
         self.bt_connect_button = self._create_compact_button('连接', '#27ae60')
         self.bt_connect_button.clicked.connect(self.on_bt_connect_clicked)
         bt_layout.addWidget(self.bt_connect_button)
-        
+
+        # 扫描按钮
+        self.scan_button = QPushButton('🔍 扫描并刷新')
+        self.scan_button.setStyleSheet("""
+            QPushButton {
+                background-color: #27ae60;
+                color: white;
+                border: none;
+                padding: 4px;
+                border-radius: 3px;
+                font-weight: bold;
+                font-size: 10px;
+            }
+            QPushButton:hover { background-color: #229954; }
+            QPushButton:pressed { background-color: #1e8449; }
+        """)
+        self.scan_button.setFixedHeight(26)
+        self.scan_button.clicked.connect(self.on_scan_all_clicked)
+        bt_layout.addWidget(self.scan_button)
+
         # 状态标签
         self.bluetooth_status_label = QLabel()
         bt_layout.addWidget(self.bluetooth_status_label)
@@ -406,26 +425,7 @@ class BluetoothTool(QWidget):
         
         serial_group.setLayout(serial_layout)
         connection_layout.addWidget(serial_group)
-        
-        # 扫描按钮
-        self.scan_button = QPushButton('🔍 扫描并刷新')
-        self.scan_button.setStyleSheet("""
-            QPushButton {
-                background-color: #27ae60;
-                color: white;
-                border: none;
-                padding: 4px;
-                border-radius: 3px;
-                font-weight: bold;
-                font-size: 10px;
-            }
-            QPushButton:hover { background-color: #229954; }
-            QPushButton:pressed { background-color: #1e8449; }
-        """)
-        self.scan_button.setFixedHeight(26)
-        self.scan_button.clicked.connect(self.on_scan_all_clicked)
-        connection_layout.addWidget(self.scan_button)
-        
+
         connection_layout.addStretch()
         left_tabs.addTab(connection_tab, "连接")
         
