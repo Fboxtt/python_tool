@@ -88,12 +88,12 @@ class EnhancedMainWindow(QMainWindow):
                     self.setWindowTitle(window_title)
                     
                     # 打印公司信息到日志
-                    self.logger.write_log("="*60)
-                    self.logger.write_log(company_info)
-                    self.logger.write_log(f"版本号: v{version}")
-                    self.logger.write_log("="*60)
+                    self.bluetooth_tool.blue_write_log("="*60)
+                    self.bluetooth_tool.blue_write_log(company_info)
+                    self.bluetooth_tool.blue_write_log(f"版本号: v{version}")
+                    self.bluetooth_tool.blue_write_log("="*60)
                 except Exception as e:
-                    self.logger.write_log(f"读取版本信息出错: {e}")
+                    self.bluetooth_tool.blue_write_log(f"读取版本信息出错: {e}")
                     self.setWindowTitle('安培电池系统软件')
             else:
                 self.setWindowTitle('安培电池系统软件')
@@ -107,17 +107,17 @@ class EnhancedMainWindow(QMainWindow):
                     
                     # 打印详细信息到日志
                     detailed_info = build_version_info.get_detailed_info()
-                    self.logger.write_log("="*60)
-                    self.logger.write_log("版本信息:")
-                    self.logger.write_log(f"  打包日期: {detailed_info['build_date']}")
-                    self.logger.write_log(f"  Git分支: {detailed_info['git_branch']}")
-                    self.logger.write_log(f"  Commit: {detailed_info['git_commit_hash']}")
-                    self.logger.write_log(f"  提交信息: {detailed_info['git_commit_message']}")
-                    self.logger.write_log(f"  提交作者: {detailed_info['git_commit_author']}")
-                    self.logger.write_log(f"  提交时间: {detailed_info['git_commit_date']}")
-                    self.logger.write_log("="*60)
+                    self.bluetooth_tool.blue_write_log("="*60)
+                    self.bluetooth_tool.blue_write_log("版本信息:")
+                    self.bluetooth_tool.blue_write_log(f"  打包日期: {detailed_info['build_date']}")
+                    self.bluetooth_tool.blue_write_log(f"  Git分支: {detailed_info['git_branch']}")
+                    self.bluetooth_tool.blue_write_log(f"  Commit: {detailed_info['git_commit_hash']}")
+                    self.bluetooth_tool.blue_write_log(f"  提交信息: {detailed_info['git_commit_message']}")
+                    self.bluetooth_tool.blue_write_log(f"  提交作者: {detailed_info['git_commit_author']}")
+                    self.bluetooth_tool.blue_write_log(f"  提交时间: {detailed_info['git_commit_date']}")
+                    self.bluetooth_tool.blue_write_log("="*60)
                 except Exception as e:
-                    self.logger.write_log(f"读取版本信息出错: {e}")
+                    self.bluetooth_tool.blue_write_log(f"读取版本信息出错: {e}")
                     self.setWindowTitle(base_title)
             else:
                 self.setWindowTitle(base_title)
@@ -333,7 +333,7 @@ class EnhancedMainWindow(QMainWindow):
                 window_type=window_type
             )
         
-        self.logger.write_log(f"✅ 已自动配置 {len(window_configs)} 个显示窗口")
+        self.bluetooth_tool.blue_write_log(f"✅ 已自动配置 {len(window_configs)} 个显示窗口")
         
         # 初始化写入功能状态（根据工厂模式checkbox的初始状态）
         QTimer.singleShot(100, lambda: self.multi_window_manager.set_write_enabled(
@@ -500,13 +500,13 @@ class EnhancedMainWindow(QMainWindow):
         if self.monitor_btn.text() == '▶️ 开始监控':
             self.monitor_btn.setText('⏸️ 停止监控')
             self.scan_task = asyncio.create_task(self.monitoring_loop())
-            self.logger.write_log("开始监控")
+            self.bluetooth_tool.blue_write_log("开始监控")
         else:
             self.monitor_btn.setText('▶️ 开始监控')
             if self.scan_task:
                 self.scan_task.cancel()
                 self.scan_task = None
-            self.logger.write_log("停止监控")
+            self.bluetooth_tool.blue_write_log("停止监控")
             
     async def monitoring_loop(self):
         """监控循环 - 定期查询数据"""
@@ -527,7 +527,7 @@ class EnhancedMainWindow(QMainWindow):
         except asyncio.CancelledError:
             pass
         except Exception as e:
-            self.logger.write_log(f"监控循环错误: {str(e)}")
+            self.bluetooth_tool.blue_write_log(f"监控循环错误: {str(e)}")
         finally:
             self.monitor_btn.setText('▶️ 开始监控')
             self.scan_task = None
@@ -548,12 +548,12 @@ class EnhancedMainWindow(QMainWindow):
                 self.current_data_source = struct_name
                 
         except Exception as e:
-            self.logger.write_log(f"发送命令失败: {str(e)}")
+            self.bluetooth_tool.blue_write_log(f"发送命令失败: {str(e)}")
             
     def on_factory_mode_changed(self, state):
         """工厂模式checkbox状态改变"""
         is_factory_mode = (state == Qt.CheckState.Checked.value)
-        self.logger.write_log(f"切换到{'工厂' if is_factory_mode else '用户'}模式")
+        self.bluetooth_tool.blue_write_log(f"切换到{'工厂' if is_factory_mode else '用户'}模式")
         
         # 更新所有数据窗口的写入功能状态
         self.multi_window_manager.set_write_enabled(is_factory_mode)
@@ -562,7 +562,7 @@ class EnhancedMainWindow(QMainWindow):
         """32电芯配置checkbox状态改变"""
         is_32_cell = (state == Qt.CheckState.Checked.value)
         config_name = "32电芯+15温度" if is_32_cell else "16电芯+SBS 5温度+KB 8温度"
-        self.logger.write_log(f"切换电芯配置: {config_name}")
+        self.bluetooth_tool.blue_write_log(f"切换电芯配置: {config_name}")
         
         # 同步到bluetooth_tool的配置
         if hasattr(self, 'bluetooth_tool') and self.bluetooth_tool:
@@ -587,9 +587,9 @@ class EnhancedMainWindow(QMainWindow):
                 self.cell_32_checkbox.blockSignals(False)
                 
                 config_name = "32电芯+15温度" if is_32_cell else "16电芯+SBS 5温度+KB 8温度"
-                self.logger.write_log(f"已加载电芯配置: {config_name}")
+                self.bluetooth_tool.blue_write_log(f"已加载电芯配置: {config_name}")
             except Exception as e:
-                self.logger.write_log(f"同步电芯配置失败: {str(e)}")
+                self.bluetooth_tool.blue_write_log(f"同步电芯配置失败: {str(e)}")
         
     def query_version(self):
         """查询版本"""
@@ -598,7 +598,7 @@ class EnhancedMainWindow(QMainWindow):
     def clear_send_queue(self):
         """清空发送队列"""
         self.multi_window_manager.clear_send_queue()
-        self.logger.write_log("已清空发送队列")
+        self.bluetooth_tool.blue_write_log("已清空发送队列")
         
     def update_status_display(self):
         """更新状态显示"""
@@ -611,7 +611,7 @@ class EnhancedMainWindow(QMainWindow):
         
     def on_window_read(self, window_id):
         """处理窗口读取请求（手动点击，优先发送）"""
-        self.logger.write_log(f"🖱️ 收到手动读取请求: {window_id}")
+        self.bluetooth_tool.blue_write_log(f"🖱️ 收到手动读取请求: {window_id}")
         
         # 根据window_id获取对应的命令码（直接从STRUCT_COMMANDS获取）
         from struct_model import STRUCT_COMMANDS
@@ -621,11 +621,11 @@ class EnhancedMainWindow(QMainWindow):
             # 手动点击的读取指令，使用优先发送
             asyncio.create_task(self.queue_send_command(cmd_code, window_id, priority=True))
         else:
-            self.logger.write_log(f"未找到窗口 {window_id} 对应的读取命令")
+            self.bluetooth_tool.blue_write_log(f"未找到窗口 {window_id} 对应的读取命令")
             
     def on_window_write(self, window_id, modified_data):
         """处理窗口写入请求"""
-        self.logger.write_log(f"收到写入请求: {window_id}, 修改项数: {len(modified_data)}")
+        self.bluetooth_tool.blue_write_log(f"收到写入请求: {window_id}, 修改项数: {len(modified_data)}")
         asyncio.create_task(self.process_write_request(window_id, modified_data))
         
     async def process_write_request(self, window_id, modified_data):
@@ -637,13 +637,13 @@ class EnhancedMainWindow(QMainWindow):
             
             cmd_code = get_write_command_code(window_id)
             if not cmd_code:
-                self.logger.write_log(f"窗口 {window_id} 不支持写入")
+                self.bluetooth_tool.blue_write_log(f"窗口 {window_id} 不支持写入")
                 return
             
             # 获取当前窗口的所有数据
             window = self.multi_window_manager.windows.get(window_id)
             if not window or not window.table_model:
-                self.logger.write_log(f"无法获取窗口数据")
+                self.bluetooth_tool.blue_write_log(f"无法获取窗口数据")
                 return
             
             original_data = window.table_model._original_data
@@ -694,12 +694,12 @@ class EnhancedMainWindow(QMainWindow):
                             value = int(value_str)
                         write_values.append(value)
                     except (ValueError, TypeError):
-                        self.logger.write_log(f"行{row_idx}值转换失败: {value_str}")
+                        self.bluetooth_tool.blue_write_log(f"行{row_idx}值转换失败: {value_str}")
                         write_values.append(0)
             
             # 根据结构体格式打包
             if window_id not in STRUCT_FORMATS:
-                self.logger.write_log(f"未找到结构体格式: {window_id}")
+                self.bluetooth_tool.blue_write_log(f"未找到结构体格式: {window_id}")
                 return
             
             fmt = STRUCT_FORMATS[window_id]
@@ -707,26 +707,26 @@ class EnhancedMainWindow(QMainWindow):
             try:
                 packed_data = struct.pack(fmt, *write_values)
             except struct.error as e:
-                self.logger.write_log(f"数据打包失败: {str(e)}")
+                self.bluetooth_tool.blue_write_log(f"数据打包失败: {str(e)}")
                 return
             
             # 构造完整命令
             try:
                 full_command = self.bluetooth_tool.text_decode.send_hex_fill(cmd_code, packed_data)
             except Exception as e:
-                self.logger.write_log(f"命令构造失败: {str(e)}")
+                self.bluetooth_tool.blue_write_log(f"命令构造失败: {str(e)}")
                 traceback.print_exc()
                 return
             
             # 通过队列发送
             await self.multi_window_manager.queue_send(full_command, priority=True)
-            self.logger.write_log(f"✅ 写入命令已发送: {window_id}")
+            self.bluetooth_tool.blue_write_log(f"✅ 写入命令已发送: {window_id}")
             
             # 不清空写入值，保留用户输入
             # self.multi_window_manager.clear_window_write_values(window_id)
             
         except Exception as e:
-            self.logger.write_log(f"处理写入请求失败: {str(e)}")
+            self.bluetooth_tool.blue_write_log(f"处理写入请求失败: {str(e)}")
             traceback.print_exc()
             
     def custom_process_complete_data(self):
@@ -806,7 +806,7 @@ class EnhancedMainWindow(QMainWindow):
                     # data_display_mgr未初始化，仍然发射信号
                     if response_cmd_code is not None:
                         self.bluetooth_tool.receive_ok_signal.emit(response_cmd_code, data_buffer)
-                    self.logger.write_log("错误：data_display_mgr未初始化")
+                    self.bluetooth_tool.blue_write_log("错误：data_display_mgr未初始化")
             
             # 显示接收到的数据（原始逻辑）
             self.bluetooth_tool.display_received_data(data_buffer)
@@ -815,7 +815,7 @@ class EnhancedMainWindow(QMainWindow):
             self.bluetooth_tool.received_data_buffer.clear()
                         
         except Exception as e:
-            self.logger.write_log(f"custom_process_complete_data错误: {str(e)}")
+            self.bluetooth_tool.blue_write_log(f"custom_process_complete_data错误: {str(e)}")
             traceback.print_exc()
     
     def update_window_data_from_parsed_result(self, struct_name, dict_data):
@@ -839,7 +839,7 @@ class EnhancedMainWindow(QMainWindow):
                 self.multi_window_manager.update_window_data(struct_name, formatted_data)
                 
         except Exception as e:
-            self.logger.write_log(f"更新窗口数据失败: {str(e)}")
+            self.bluetooth_tool.blue_write_log(f"更新窗口数据失败: {str(e)}")
             traceback.print_exc()
     
     def update_bit_flags_window(self, dict_data):
@@ -888,7 +888,7 @@ class EnhancedMainWindow(QMainWindow):
                 self.multi_window_manager.update_window_data('BATTERY_STATUS', battery_status_data)
                 
         except Exception as e:
-            self.logger.write_log(f"更新状态位窗口失败: {str(e)}")
+            self.bluetooth_tool.blue_write_log(f"更新状态位窗口失败: {str(e)}")
             traceback.print_exc()
             
     def focusInEvent(self, event):
@@ -925,7 +925,7 @@ class EnhancedMainWindow(QMainWindow):
             if hasattr(self, 'bluetooth_tool'):
                 self.bluetooth_tool.close()
         except Exception as e:
-            self.logger.write_log(f"关闭蓝牙窗口时出错: {str(e)}")
+            self.bluetooth_tool.blue_write_log(f"关闭蓝牙窗口时出错: {str(e)}")
             
         event.accept()
 

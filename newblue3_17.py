@@ -1151,7 +1151,7 @@ class BluetoothTool(QWidget):
             if self.hex_send_checkbox.isChecked():
                 # 16进制发送
                 try:
-                    print(f"send data type = {type(input_data)}")
+                    self.blue_write_log(f"send data type = {type(input_data)}")
                     # 只保留数字和字母（0-9, A-F, a-f），移除所有其他字符
                     import re
                     hex_data = re.sub(r'[^0-9A-Fa-f]', '', input_data)
@@ -1860,8 +1860,8 @@ class BluetoothTool(QWidget):
     def on_bluetooth_disconnected(self, client):
         """蓝牙断开连接回调函数（从机主动断开）"""
         self.blue_write_log("⚠️ 蓝牙设备已断开连接（从机主动断开）", color='red')
-        LogManager.get_instance().write_log(f"蓝牙断开: 设备={self.device_name}, 时间={datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-        
+        self.blue_write_log(f"蓝牙断开: 设备={self.device_name}, 时间={datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+
         # 清理连接状态
         self.client = None
         self.device_name = None
@@ -2917,8 +2917,8 @@ class BluetoothTool(QWidget):
             
             if show_message:
                 self.blue_write_log(f"✅ 自动连接配置已保存: {config_file}")
-            
-            LogManager.get_instance().write_log(f"自动连接配置已保存: {config}")
+
+            self.blue_write_log(f"自动连接配置已保存: {config}")
             
         except Exception as e:
             self.blue_write_log(f"保存配置失败: {str(e)}")
@@ -2932,24 +2932,24 @@ class BluetoothTool(QWidget):
             if os.path.exists(config_file):
                 with open(config_file, 'r', encoding='utf-8') as f:
                     config = json.load(f)
-                
+
                 self.auto_connect_enabled = config.get('enabled', False)
                 self.auto_connect_device_name = config.get('device_name', '')
                 self.auto_connect_mac_address = config.get('mac_address', '')
-                
+
                 # 加载重试间隔（转换为毫秒）
                 retry_interval_sec = config.get('retry_interval', 5.0)
                 self.auto_connect_retry_interval = int(retry_interval_sec * 1000)
-                
+
                 # 延迟加载UI配置（等待UI初始化完成）
                 QTimer.singleShot(200, lambda: self._apply_loaded_config(config))
-                
-                LogManager.get_instance().write_log(f"已加载自动连接配置: {config}")
+
+                self.blue_write_log(f"已加载自动连接配置: {config}")
             else:
-                LogManager.get_instance().write_log("未找到自动连接配置文件，使用默认配置")
+                self.blue_write_log("未找到自动连接配置文件，使用默认配置")
                 
         except Exception as e:
-            LogManager.get_instance().write_log(f"加载配置失败: {str(e)}")
+            self.blue_write_log(f"加载配置失败: {str(e)}")
             traceback.print_exc()
 
     def _apply_loaded_config(self, config):
@@ -3053,7 +3053,7 @@ class BluetoothTool(QWidget):
                     break
                 elif name_match and not mac_match:
                     self.blue_write_log(f"⚠️ 发现同名设备但MAC不匹配: {device_name} ({device_address}) != {target_mac}")
-                    LogManager.get_instance().write_log(f"设备MAC不匹配: 扫描到={device_address}, 期望={target_mac}")
+                    self.blue_write_log(f"设备MAC不匹配: 扫描到={device_address}, 期望={target_mac}")
             
             if matched_device:
                 device_name, device_address, item_index = matched_device
@@ -3065,14 +3065,14 @@ class BluetoothTool(QWidget):
                 
                 # 选中设备并连接
                 self.device_list.setCurrentRow(item_index)
-                LogManager.get_instance().write_log(f"自动连接: 设备={device_name}, MAC={device_address}, 时间={datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-                
+                self.blue_write_log(f"自动连接: 设备={device_name}, MAC={device_address}, 时间={datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+
                 # 连接前等待一下，避免快速重复连接
                 await asyncio.sleep(0.3)
                 await self.connect_device(is_auto=True)  # 标记为自动连接
             else:
                 self.blue_write_log(f"❌ 未找到匹配的设备: {target_name}")
-                LogManager.get_instance().write_log(f"自动连接失败: 未找到设备 {target_name}")
+                self.blue_write_log(f"自动连接失败: 未找到设备 {target_name}")
                 
         except Exception as e:
             self.blue_write_log(f"自动连接失败: {str(e)}")
@@ -3088,8 +3088,8 @@ class BluetoothTool(QWidget):
             
         try:
             self.blue_write_log("🔄 开始自动重连...")
-            LogManager.get_instance().write_log(f"开始自动重连: 时间={datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-            
+            self.blue_write_log(f"开始自动重连: 时间={datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+
             # 执行自动扫描和连接
             await self.auto_scan_and_connect()
             
@@ -3230,7 +3230,7 @@ class load_ui_dynamically(QMainWindow):
             # ⭐ 将data_display_mgr传递给bluetooth_tool，使其能使用统一的解析功能
             if hasattr(self, 'bluetooth_tool'):
                 self.bluetooth_tool.data_display_mgr = self.data_display_mgr
-                self.logger.write_log("✅ 已将data_display_mgr传递给bluetooth_tool")
+                self.bluetooth_tool.blue_write_log("✅ 已将data_display_mgr传递给bluetooth_tool")
 
             # 创建所有显示窗口
             self.data_display_mgr.create_windows(parent_widget=self)
@@ -3259,10 +3259,10 @@ class load_ui_dynamically(QMainWindow):
             self.key_label_list = []
             self.value_label_list = []
 
-            self.logger.write_log("✅ 数据显示管理器初始化成功（battery_window + bit_window + 数据解析）")
+            self.bluetooth_tool.blue_write_log("✅ 数据显示管理器初始化成功（battery_window + bit_window + 数据解析）")
 
         except Exception as e:
-            self.logger.write_log(f"加载UI文件失败: {e}")
+            self.bluetooth_tool.blue_write_log(f"加载UI文件失败: {e}")
             traceback.print_exc()
             # return None
 
@@ -3344,7 +3344,7 @@ class load_ui_dynamically(QMainWindow):
 
         if hasattr(self.bluetooth_tool, 'log_file') and self.bluetooth_tool.log_file :
             try:
-                self.bluetooth_tool.write_log("程序关闭")
+                self.bluetooth_tool.blue_write_log("程序关闭")
                 self.bluetooth_tool.log_file.close()
                 self.bluetooth_tool.blue_write_log("日志文件已关闭")
             except Exception as e:
@@ -3431,7 +3431,7 @@ class load_ui_dynamically(QMainWindow):
 
             if not modified_data:
                 self.bluetooth_tool.blue_write_log("没有需要发送的修改值")
-                self.logger.write_log("没有需要发送的修改值")
+                self.bluetooth_tool.blue_write_log("没有需要发送的修改值")
                 return []
 
             self.bluetooth_tool.blue_write_log(f"检测到 {len(modified_data)} 个修改值")
@@ -3439,7 +3439,7 @@ class load_ui_dynamically(QMainWindow):
             # 检查当前数据来源
             if not self.current_data_source:
                 self.bluetooth_tool.blue_write_log("错误：无法确定当前数据来源")
-                self.logger.write_log("错误：无法确定当前数据来源")
+                self.bluetooth_tool.blue_write_log("错误：无法确定当前数据来源")
                 return []
 
             self.bluetooth_tool.blue_write_log(f"当前数据来源: {self.current_data_source}")
@@ -3447,7 +3447,7 @@ class load_ui_dynamically(QMainWindow):
             # 检查是否可以写入
             if not can_command_be_written(self.current_data_source):
                 self.bluetooth_tool.blue_write_log(f"错误：命令 {self.current_data_source} 不支持写入")
-                self.logger.write_log(f"错误：命令 {self.current_data_source} 不支持写入")
+                self.bluetooth_tool.blue_write_log(f"错误：命令 {self.current_data_source} 不支持写入")
                 return []
 
             # 获取写入命令名称和代码
@@ -3455,7 +3455,7 @@ class load_ui_dynamically(QMainWindow):
             write_cmd_code = get_write_command_code(self.current_data_source)
             if write_cmd_code is None:
                 self.bluetooth_tool.blue_write_log(f"错误：无法获取 {self.current_data_source} 的写入命令代码")
-                self.logger.write_log(f"错误：无法获取 {self.current_data_source} 的写入命令代码")
+                self.bluetooth_tool.blue_write_log(f"错误：无法获取 {self.current_data_source} 的写入命令代码")
                 return []
 
             self.bluetooth_tool.blue_write_log(f"读取命令: {self.current_data_source}")
@@ -3473,7 +3473,7 @@ class load_ui_dynamically(QMainWindow):
 
             if not format_string or not variables:
                 self.bluetooth_tool.blue_write_log(f"错误：无法获取 {self.current_data_source} 的格式信息")
-                self.logger.write_log(f"错误：无法获取 {self.current_data_source} 的格式信息")
+                self.bluetooth_tool.blue_write_log(f"错误：无法获取 {self.current_data_source} 的格式信息")
                 return []
 
             self.bluetooth_tool.blue_write_log(f"数据格式: {format_string}")
@@ -3499,10 +3499,10 @@ class load_ui_dynamically(QMainWindow):
                         int_value = self.parse_hex_or_decimal_value(modified_value)
                         values.append(int_value)
                         self.bluetooth_tool.blue_write_log(f"  {var_name}: {current_hex_value} -> {modified_value} (0x{int_value:X})")
-                        self.logger.write_log(f"  {var_name}: {current_hex_value} -> {modified_value} (0x{int_value:X})")
+                        self.bluetooth_tool.blue_write_log(f"  {var_name}: {current_hex_value} -> {modified_value} (0x{int_value:X})")
                     except ValueError as e:
                         self.bluetooth_tool.blue_write_log(f"  警告：无法解析 {var_name} 的值 '{modified_value}' ({e})，使用当前值")
-                        self.logger.write_log(f"  警告：无法解析 {var_name} 的值 '{modified_value}' ({e})，使用当前值")
+                        self.bluetooth_tool.blue_write_log(f"  警告：无法解析 {var_name} 的值 '{modified_value}' ({e})，使用当前值")
                         # 使用当前值
                         try:
                             int_value = self.parse_hex_or_decimal_value(current_hex_value)
@@ -3528,12 +3528,12 @@ class load_ui_dynamically(QMainWindow):
                 packed_binary_data = struct.pack(format_string, *values)
                 self.bluetooth_tool.blue_write_log(f"数据打包成功，共 {len(packed_binary_data)} 字节")
                 self.bluetooth_tool.blue_write_log(f"打包后的原始数据: {packed_binary_data.hex()}")
-                self.logger.write_log(f"数据打包成功，共 {len(packed_binary_data)} 字节")
+                self.bluetooth_tool.blue_write_log(f"数据打包成功，共 {len(packed_binary_data)} 字节")
 
                 # 使用 send_hex_fill 发送数据
                 send_data = self.bluetooth_tool.text_decode.send_hex_fill(write_cmd_code, packed_binary_data)
                 self.bluetooth_tool.blue_write_log(f"构造发送数据包: {send_data.hex()}")
-                self.logger.write_log(f"发送数据: {send_data.hex()}")
+                self.bluetooth_tool.blue_write_log(f"发送数据: {send_data.hex()}")
 
                 # 异步发送数据
                 async def send_data_async():
@@ -3542,7 +3542,7 @@ class load_ui_dynamically(QMainWindow):
                         await self.bluetooth_tool.byte_send(send_data)
                         self.bluetooth_tool.display_send_data(send_data)
                         self.bluetooth_tool.blue_write_log("数据发送成功")
-                        self.logger.write_log("数据发送成功")
+                        self.bluetooth_tool.blue_write_log("数据发送成功")
 
                         # 更新BitWindow显示发送成功
                         self.command_info_label.setText(f"发送成功: {self.current_data_source} → {write_cmd_name}")
@@ -3553,7 +3553,7 @@ class load_ui_dynamically(QMainWindow):
 
                     except Exception as e:
                         self.bluetooth_tool.blue_write_log(f"数据发送失败: {e}")
-                        self.logger.write_log(f"数据发送失败: {e}")
+                        self.bluetooth_tool.blue_write_log(f"数据发送失败: {e}")
                         traceback.print_exc()
 
                         # 更新BitWindow显示发送失败
@@ -3567,7 +3567,7 @@ class load_ui_dynamically(QMainWindow):
 
             except struct.error as e:
                 self.bluetooth_tool.blue_write_log(f"数据打包失败: {e}")
-                self.logger.write_log(f"数据打包失败: {e}")
+                self.bluetooth_tool.blue_write_log(f"数据打包失败: {e}")
 
                 # 更新BitWindow显示打包失败
                 if hasattr(self, 'command_info_label') and self.command_info_label:
@@ -3577,7 +3577,7 @@ class load_ui_dynamically(QMainWindow):
 
         except Exception as e:
             self.bluetooth_tool.blue_write_log(f"发送修改值失败: {e}")
-            self.logger.write_log(f"发送修改值失败: {e}")
+            self.bluetooth_tool.blue_write_log(f"发送修改值失败: {e}")
             traceback.print_exc()
 
             # 更新BitWindow显示流程失败
@@ -3592,13 +3592,13 @@ class load_ui_dynamically(QMainWindow):
             # ⭐ 使用管理器的统一接口清空修改值
             if hasattr(self, 'data_display_mgr'):
                 self.data_display_mgr.clear_bit_write_values()
-                self.logger.write_log("✅ 已清空所有修改值（通过管理器）")
+                self.bluetooth_tool.blue_write_log("✅ 已清空所有修改值（通过管理器）")
             elif hasattr(self, 'battery_table_model'):
                 # 兼容性：如果管理器不可用，直接使用模型
                 self.battery_table_model.clear_write_values()
-                self.logger.write_log("已清空所有修改值")
+                self.bluetooth_tool.blue_write_log("已清空所有修改值")
         except Exception as e:
-            self.logger.write_log(f"清空修改值失败: {e}")
+            self.bluetooth_tool.blue_write_log(f"清空修改值失败: {e}")
             traceback.print_exc()
 
     def set_write_value_by_name(self, param_name, value):
@@ -3608,10 +3608,10 @@ class load_ui_dynamically(QMainWindow):
             if row >= 0:
                 return self.battery_table_model.set_write_value(row, value)
             else:
-                self.logger.write_log(f"未找到参数: {param_name}")
+                self.bluetooth_tool.blue_write_log(f"未找到参数: {param_name}")
                 return False
         except Exception as e:
-            self.logger.write_log(f"设置写入值失败: {e}")
+            self.bluetooth_tool.blue_write_log(f"设置写入值失败: {e}")
             return False
 
 
