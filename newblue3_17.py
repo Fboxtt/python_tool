@@ -473,6 +473,22 @@ class BluetoothTool(QWidget):
         store_group.setLayout(store_layout)
         control_layout.addWidget(store_group)
         
+        # 限流控制（仅工厂模式下显示）
+        chglimit_group = self._create_compact_group("限流控制")
+        chglimit_layout = QHBoxLayout()
+        chglimit_layout.setSpacing(2)
+
+        self.open_chglimit_button = self._create_compact_button('限流开', '#27ae60')
+        self.open_chglimit_button.clicked.connect(self.on_open_chglimit_clicked)
+        self.close_chglimit_button = self._create_compact_button('限流关', '#e74c3c')
+        self.close_chglimit_button.clicked.connect(self.on_close_chglimit_clicked)
+
+        chglimit_layout.addWidget(self.open_chglimit_button)
+        chglimit_layout.addWidget(self.close_chglimit_button)
+
+        chglimit_group.setLayout(chglimit_layout)
+        control_layout.addWidget(chglimit_group)
+
         # 加热模式
         heating_group = self._create_compact_group("加热模式")
         heating_layout = QHBoxLayout()
@@ -2257,6 +2273,20 @@ class BluetoothTool(QWidget):
         # 发送关闭充电的指令数据
         bytedata = bytes([0x00,0x00,0x04,0x01,0x0B,0x55,0xaa,0x0F])
         self.send_command(bytedata)
+
+    def on_open_chglimit_clicked(self):
+        """处理开启限流按钮点击事件"""
+        # 发送开启充电限流的指令 (0x27)
+        data = self.text_decode.send_hex_fill(0x27)
+        self.send_command(data)
+        self.blue_write_log("发送开启充电限流指令")
+
+    def on_close_chglimit_clicked(self):
+        """处理关闭限流按钮点击事件"""
+        # 发送关闭充电限流的指令 (0x28)
+        data = self.text_decode.send_hex_fill(0x28)
+        self.send_command(data)
+        self.blue_write_log("发送关闭充电限流指令")
 
     def on_open_store_power_clicked(self):
         """处理打开保电按钮点击事件"""
