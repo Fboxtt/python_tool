@@ -735,78 +735,88 @@ class EnhancedMainWindow(QMainWindow):
             # 获取接收到的数据
             if not hasattr(self.bluetooth_tool, 'received_data_buffer'):
                 return
-                
+
             data_buffer = bytes(self.bluetooth_tool.received_data_buffer)
-            
+
             if len(data_buffer) == 0:
                 return
             
             # 检查是否是密码响应（原始方法的逻辑）
             if self.bluetooth_tool.check_new_password_response(data_buffer):
                 self.bluetooth_tool.handle_new_password_response(data_buffer)
-            # 🔥 检查是否是OTA指令
-            elif self.bluetooth_tool.is_ota_command(data_buffer):
-                # OTA指令：使用 text_decode 解析
-                self.bluetooth_tool.text_decode.split_data(bytearray(data_buffer))
-            # 🔥 特殊处理：PRINT 指令（0x14/0x94）- 不校验，直接转ASCII
-            elif self.bluetooth_tool.process_print_command(data_buffer):
-                pass  # 已在 process_print_command 中处理完毕
-            else:
-                # 提取响应命令码（用于发射信号）
-                response_cmd_code = None
-                if len(data_buffer) >= 5:
-                    response_cmd_code = data_buffer[4] & 0x7F  # 去掉0x80标志，获取原始命令码
-                
-                # 普通数据指令：使用data_display_mgr解析
-                if hasattr(self.bluetooth_tool, 'data_display_mgr') and self.bluetooth_tool.data_display_mgr:
-                    success, result = self.bluetooth_tool.data_display_mgr.parse_and_update_displays(data_buffer)
-                    
-                    if success:
-                        struct_name = result['struct_name']
-                        dict_data = result['data']
-                        
-                        # ⭐ 特殊处理：PC_A_PRINT 和 MCU_A_PRINT - 打印 ASCII 字符串到终端
-                        if struct_name in ['PC_A_PRINT', 'MCU_A_PRINT']:
-                            # 提取 ASCII 字符串（第一个字段）
-                            ascii_string = ""
-                            for items in dict_data.values():
-                                if items and len(items) > 0 and len(items[0]) >= 3:
-                                    ascii_string = items[0][2]  # 第一个字段的值
-                                    break
-                            
-                            # 额外打印一行彩色的 ASCII 字符串（便于阅读）
-                            if ascii_string:
-                                self.bluetooth_tool.blue_write_log(
-                                    f"[ASCII] {ascii_string}",
-                                    color='#00CED1'  # 深青色 (DarkTurquoise)
-                                )
-                        
-                        # 更新多窗口管理器
-                        self.update_window_data_from_parsed_result(struct_name, dict_data)
-                        
-                        # 更新位标志窗口（如果有SBS数据）
-                        if struct_name == 'PC_GET_SBS':
-                            self.update_bit_flags_window(dict_data)
-                        
-                        # 记录CSV
-                        from log_controller import ComunManager
-                        header = f"RX->,{self.bluetooth_tool.commu_type},{self.bluetooth_tool.device_name},{struct_name}"
-                        csv_data = ",".join([item[2] for items in dict_data.values() for item in items if len(item) >= 3])
-                        ComunManager.get_instance().write_csv(f"{header},{csv_data}")
-                        
-                        # 🔥 发射信号通知队列管理器和其他监听者：数据接收成功
-                        from struct_model import STRUCT_COMMANDS
-                        cmd_code = STRUCT_COMMANDS.get(struct_name, 0)
-                        self.bluetooth_tool.receive_ok_signal.emit(cmd_code, data_buffer)
-                    else:
-                        # 解析失败，但仍然发射信号（用于写入命令的简单确认响应）
-                        if response_cmd_code is not None:
-                            self.bluetooth_tool.receive_ok_signal.emit(response_cmd_code, data_buffer)
+                return
+
+            # 检查是否是OTA指令
+            if self.bluetooth_tool.is_ota_command(data_buffer):
+                # 特殊处理：71指令（PC_GET_INF）即使是OTA命令，也应该走普通数据解析
+                cmd_code = data_buffer[4] & 0x7F if len(data_buffer) >= 5 else 0
+                if cmd_code == 0x71:  # PC_GET_INF
+                    # 继续下面的普通数据处理
+                    pass
                 else:
-                    # data_display_mgr未初始化，仍然发射信号
+                    # 其他OTA指令正常处理
+                    self.bluetooth_tool.text_decode.split_data(bytearray(data_buffer))
+                    return
+
+            # 特殊处理：PRINT 指令（0x14/0x94）- 不校验，直接转ASCII
+            if self.bluetooth_tool.process_print_command(data_buffer):
+                pass  # 已在 process_print_command 中处理完毕
+
+            # 提取响应命令码（用于发射信号）
+            response_cmd_code = None
+            if len(data_buffer) >= 5:
+                response_cmd_code = data_buffer[4] & 0x7F  # 去掉0x80标志，获取原始命令码
+
+            # 普通数据指令：使用data_display_mgr解析
+            if hasattr(self.bluetooth_tool, 'data_display_mgr') and self.bluetooth_tool.data_display_mgr:
+                success, result = self.bluetooth_tool.data_display_mgr.parse_and_update_displays(data_buffer)
+
+                if success:
+                    struct_name = result['struct_name']
+                    dict_data = result['data']
+
+                    # ⭐ 特殊处理：PC_A_PRINT 和 MCU_A_PRINT - 打印 ASCII 字符串到终端
+                    if struct_name in ['PC_A_PRINT', 'MCU_A_PRINT']:
+                        # 提取 ASCII 字符串（第一个字段）
+                        ascii_string = ""
+                        for items in dict_data.values():
+                            if items and len(items) > 0 and len(items[0]) >= 3:
+                                ascii_string = items[0][2]  # 第一个字段的值
+                                break
+
+                        # 额外打印一行彩色的 ASCII 字符串（便于阅读）
+                        if ascii_string:
+                            self.bluetooth_tool.blue_write_log(
+                                f"[ASCII] {ascii_string}",
+                                color='#00CED1'  # 深青色 (DarkTurquoise)
+                            )
+
+                    # 更新多窗口管理器
+                    self.update_window_data_from_parsed_result(struct_name, dict_data)
+
+                    # 更新位标志窗口（如果有SBS数据）
+                    if struct_name == 'PC_GET_SBS':
+                        self.update_bit_flags_window(dict_data)
+
+                    # 记录CSV
+                    from log_controller import ComunManager
+                    header = f"RX->,{self.bluetooth_tool.commu_type},{self.bluetooth_tool.device_name},{struct_name}"
+                    csv_data = ",".join([item[2] for items in dict_data.values() for item in items if len(item) >= 3])
+                    ComunManager.get_instance().write_csv(f"{header},{csv_data}")
+
+                    # 🔥 发射信号通知队列管理器和其他监听者：数据接收成功
+                    from struct_model import STRUCT_COMMANDS
+                    cmd_code = STRUCT_COMMANDS.get(struct_name, 0)
+                    self.bluetooth_tool.receive_ok_signal.emit(cmd_code, data_buffer)
+                else:
+                    # 解析失败，但仍然发射信号（用于写入命令的简单确认响应）
                     if response_cmd_code is not None:
                         self.bluetooth_tool.receive_ok_signal.emit(response_cmd_code, data_buffer)
-                    self.bluetooth_tool.blue_write_log("错误：data_display_mgr未初始化")
+            else:
+                # data_display_mgr未初始化，仍然发射信号
+                if response_cmd_code is not None:
+                    self.bluetooth_tool.receive_ok_signal.emit(response_cmd_code, data_buffer)
+                self.bluetooth_tool.blue_write_log("错误：data_display_mgr未初始化")
             
             # 显示接收到的数据（原始逻辑）
             self.bluetooth_tool.display_received_data(data_buffer)
@@ -820,7 +830,7 @@ class EnhancedMainWindow(QMainWindow):
     
     def update_window_data_from_parsed_result(self, struct_name, dict_data):
         """根据解析结果更新窗口数据
-        
+
         Args:
             struct_name: 结构体名称
             dict_data: 解析后的字典数据
@@ -833,7 +843,7 @@ class EnhancedMainWindow(QMainWindow):
                     if len(item) >= 3:
                         name, unit, value = item[0], item[1], item[2]
                         formatted_data.append((name, value, value))
-            
+
             # 更新对应的窗口
             if formatted_data:
                 self.multi_window_manager.update_window_data(struct_name, formatted_data)
