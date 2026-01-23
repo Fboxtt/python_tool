@@ -740,10 +740,12 @@ class EnhancedMainWindow(QMainWindow):
 
             if len(data_buffer) == 0:
                 return
+            self.bluetooth_tool.display_received_data(data_buffer)
             
             # 检查是否是密码响应（原始方法的逻辑）
             if self.bluetooth_tool.check_new_password_response(data_buffer):
                 self.bluetooth_tool.handle_new_password_response(data_buffer)
+                self.bluetooth_tool.received_data_buffer.clear()
                 return
 
             # 检查是否是OTA指令
@@ -756,6 +758,7 @@ class EnhancedMainWindow(QMainWindow):
                 else:
                     # 其他OTA指令正常处理
                     self.bluetooth_tool.text_decode.split_data(bytearray(data_buffer))
+                    self.bluetooth_tool.received_data_buffer.clear()
                     return
 
             # 特殊处理：PRINT 指令（0x14/0x94）- 不校验，直接转ASCII
@@ -819,12 +822,13 @@ class EnhancedMainWindow(QMainWindow):
                 self.bluetooth_tool.blue_write_log("错误：data_display_mgr未初始化")
             
             # 显示接收到的数据（原始逻辑）
-            self.bluetooth_tool.display_received_data(data_buffer)
+            # self.bluetooth_tool.display_received_data(data_buffer)
             
             # 清空缓冲区
             self.bluetooth_tool.received_data_buffer.clear()
                         
         except Exception as e:
+            self.bluetooth_tool.received_data_buffer.clear()
             self.bluetooth_tool.blue_write_log(f"custom_process_complete_data错误: {str(e)}")
             traceback.print_exc()
     
