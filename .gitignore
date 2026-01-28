@@ -51,3 +51,6 @@ Scripts
 # Build version tracking
 build_version_info.py
 *.pdf
+*.md
+*.json
+*.spec

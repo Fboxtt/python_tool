@@ -886,27 +886,21 @@ class BluetoothTool(QWidget):
         # 如果指定了颜色，使用 QTextCursor 精确控制
         if color:
             from PyQt6.QtGui import QTextCursor, QTextCharFormat, QColor
-            
+            scrollbar = self.receive_output.verticalScrollBar()
+            old_value = scrollbar.value()
+            was_at_bottom = (old_value == scrollbar.maximum())
             cursor = self.receive_output.textCursor()
             cursor.movePosition(QTextCursor.MoveOperation.End)
-            
-            # 保存原始默认格式（自适应系统颜色）
             default_fmt = QTextCharFormat()
             default_fmt.setForeground(self.receive_output.palette().color(self.receive_output.palette().ColorRole.Text))
-            
-            # 设置文本格式（颜色）
             fmt = QTextCharFormat()
             fmt.setForeground(QColor(color))
             cursor.setCharFormat(fmt)
-            
-            # 插入带颜色的文本
             cursor.insertText(text + '\n')
-            
-            # 恢复为系统默认颜色（自适应深色/浅色主题）
             cursor.setCharFormat(default_fmt)
-            
-            # 更新光标位置
             self.receive_output.setTextCursor(cursor)
+            if not was_at_bottom:
+                scrollbar.setValue(old_value)
         else:
             self.receive_output.append(text)
         
