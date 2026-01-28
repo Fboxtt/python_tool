@@ -866,7 +866,8 @@ class EnhancedMainWindow(QMainWindow):
             from struct_model import (
                 get_alarm_protect_display_data,
                 get_other_status_display_data,
-                get_battery_status_display_data
+                get_battery_status_display_data,
+                get_voltage_params_display_data
             )
             
             # 将dict_data转换为flat_dict（需要转换为整数）
@@ -900,6 +901,11 @@ class EnhancedMainWindow(QMainWindow):
             battery_status_data = get_battery_status_display_data(flat_dict)
             if battery_status_data and 'BATTERY_STATUS' in self.multi_window_manager.windows:
                 self.multi_window_manager.update_window_data('BATTERY_STATUS', battery_status_data)
+                
+            # 更新电压参数窗口
+            voltage_params_data = get_voltage_params_display_data(flat_dict)
+            if voltage_params_data and 'VOLTAGE_PARAMS' in self.multi_window_manager.windows:
+                self.multi_window_manager.update_window_data('VOLTAGE_PARAMS', voltage_params_data)
                 
         except Exception as e:
             self.bluetooth_tool.blue_write_log(f"更新状态位窗口失败: {str(e)}")

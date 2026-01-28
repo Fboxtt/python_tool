@@ -795,7 +795,7 @@ class DataDisplayWindow(QWidget):
         layout.addWidget(self.table_view)
         
         # 只有需要读取按钮的窗口才添加按钮
-        if self.window_type not in ['alarm_protect', 'other_status', 'battery_status']:
+        if self.window_type not in ['alarm_protect', 'other_status', 'battery_status', 'voltage_params']:
             # 添加按钮（所有数据窗口都有读取按钮）
             button_layout = QHBoxLayout()
             button_layout.setSpacing(3)

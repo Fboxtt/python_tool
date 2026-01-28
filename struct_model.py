@@ -467,6 +467,65 @@ def get_battery_status_display_data(sbs_data_dict):
     return result
 
 
+def get_voltage_params_display_data(sbs_data_dict):
+    """
+    获取电压参数窗口的显示数据
+    从SBS数据中提取电芯电压，计算平均电压、最大电压、最小电压、电压差值
+    
+    Args:
+        sbs_data_dict: PC_GET_SBS 解析后的字典（flat_dict格式）
+        
+    Returns:
+        list: 数据列表，每项格式 [name, value]（2列数据）
+    """
+    result = []
+    
+    try:
+        # 提取所有电芯电压（从第1节到第16节，根据实际配置可能是32节）
+        cell_voltages = []
+        for i in range(1, 33):  # 最多支持32节
+            voltage_key = f"第【{i}】节电压"
+            if voltage_key in sbs_data_dict:
+                voltage_value = sbs_data_dict[voltage_key]
+                # 确保是数值类型且大于100mV才算有效电压
+                if isinstance(voltage_value, (int, float)) and voltage_value > 100:
+                    cell_voltages.append(voltage_value)
+        
+        # 如果没有找到电芯电压，返回空
+        if not cell_voltages:
+            return [
+                ['平均电压', '', '-'],
+                ['最大电压', '', '-'],
+                ['最小电压', '', '-'],
+                ['电压差值', '', '-']
+            ]
+        
+        # 计算电压参数
+        avg_voltage = sum(cell_voltages) / len(cell_voltages)
+        max_voltage = max(cell_voltages)
+        min_voltage = min(cell_voltages)
+        voltage_diff = max_voltage - min_voltage
+        
+        # 格式化显示（假设电压单位是mV）
+        # 使用3元素格式：(名称, 十六进制, 十进制值)，与其他窗口数据格式统一
+        result.append(['平均电压', '', f"{avg_voltage:.1f} mV"])
+        result.append(['最大电压', '', f"{max_voltage} mV"])
+        result.append(['最小电压', '', f"{min_voltage} mV"])
+        result.append(['电压差值', '', f"{voltage_diff} mV"])
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        result = [
+            ['平均电压', '', 'Error'],
+            ['最大电压', '', 'Error'],
+            ['最小电压', '', 'Error'],
+            ['电压差值', '', 'Error']
+        ]
+    
+    return result
+
+
 # ---------------------------- 结构体定义 ----------------------------
 # 注意：所有格式字符串均已展开为具体字符，确保顺序严格匹配
 STRUCT_FORMATS = {
@@ -951,6 +1010,17 @@ def get_all_display_windows():
         'cmd_code': 0,
         'expected_row_count': 1,
         'window_type': 'battery_status'
+    })
+    
+    # 添加电压参数窗口
+    windows.append({
+        'window_id': 'VOLTAGE_PARAMS',
+        'title': '⚡ 电压参数',
+        'column_mode': 2,
+        'default_visible': True,
+        'cmd_code': 0,
+        'expected_row_count': 4,
+        'window_type': 'voltage_params'
     })
     
     return windows
