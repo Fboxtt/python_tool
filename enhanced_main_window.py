@@ -17,7 +17,7 @@ from PyQt6.QtGui import QFont, QCursor, QIcon, QPixmap
 from newblue3_17 import BluetoothTool, SimplifiedBluetoothTool, load_ui_dynamically
 from log_controller import LogManager, ComunManager
 from multi_window_manager import MultiWindowManager
-from struct_model import HexParserApp, STRUCT_COMMANDS
+from struct_model import HexParserApp, STRUCT_COMMANDS, reload_struct_variables
 from language_manager import t, set_language, get_current_language
 
 # 尝试导入版本信息

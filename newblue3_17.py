@@ -33,7 +33,8 @@ from OTA_controller import ReceveDataStatus,BmsCmdType,ComStatus,DownloadErr
 from struct_model import (
     HexParserApp, get_write_command_code, can_command_be_written,
     STRUCT_FORMATS, STRUCT_VARIABLES, get_write_command_from_read,
-    get_all_status_bits_for_display, parse_all_status_from_sbs
+    get_all_status_bits_for_display, parse_all_status_from_sbs,
+    reload_struct_variables
 )
 import struct
 
