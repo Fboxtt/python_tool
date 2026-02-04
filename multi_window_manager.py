@@ -993,7 +993,7 @@ class TwoColumnTableModel(BatteryTableModel):
     def __init__(self, data=None, parent=None):
         super().__init__(data, parent)
         self._columns = 2
-        self._headers = ['参数名', '当前值']
+        self._headers = ['Para', 'Val']
         
     def _organize_data(self):
         """重新组织数据为2列"""

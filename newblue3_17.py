@@ -347,7 +347,7 @@ class BluetoothTool(QWidget):
         bt_layout.addWidget(self.bt_connect_button)
 
         # 扫描按钮
-        self.scan_button = QPushButton('🔍 扫描并刷新')
+        self.scan_button = QPushButton(t('ui.btn_scan_refresh'))
         self.scan_button.setStyleSheet("""
             QPushButton {
                 background-color: #27ae60;
