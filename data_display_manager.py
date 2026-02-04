@@ -700,11 +700,6 @@ class DataDisplayManager(QMainWindow):
         contact_label.setFont(font)
         contact_label.setContentsMargins(15, 0, 0, 0)
         layout.addWidget(contact_label)
-        # 32串/16串配置切换
-        self.cell_32_checkbox = QCheckBox('32电芯配置')
-        self.cell_32_checkbox.setToolTip('勾选：32电芯+15温度传感器\n不勾选：16电芯+SBS 5温度+KB 8温度')
-        self.cell_32_checkbox.stateChanged.connect(self.on_cell_config_changed)
-        layout.addWidget(self.cell_32_checkbox)
 
         layout.addStretch()
 
@@ -1233,20 +1228,6 @@ class DataDisplayManager(QMainWindow):
         self.update_status_bits_direct(test_data)
         if self.logger:
             self.logger.write_log(f"生成测试状态位数据: {len(test_data)} 个")
-    def on_cell_config_changed(self, state):
-        """处理32电芯配置checkbox状态变化"""
-        try:
-            if state == Qt.CheckState.Checked.value:
-                self.data_parser.hex_parser.set_struct_to_cell_32()
-                if self.logger:
-                    self.logger.write_log("已切换到32串配置（32电芯 + 15温度传感器）")
-            else:
-                self.data_parser.hex_parser.set_struct_to_cell_16()
-                if self.logger:
-                    self.logger.write_log("已切换到16串配置（16电芯 + SBS:5温度 + KB:8温度）")
-        except Exception as e:
-            if self.logger:
-                self.logger.write_log(f"切换配置失败: {str(e)}")
 
 
 # ==================== 独立运行（用于调试）====================

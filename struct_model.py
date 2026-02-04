@@ -1174,7 +1174,6 @@ class HexParserApp(QMainWindow):
         config_data["STRUCT_VARIABLES"] = STRUCT_VARIABLES
 
         # 强制写入配置文件（已禁用）
-        print("16串配置已更新（SBS:5个温度, KB:8个温度）")
         # self.set_config_file(force_write=True)  # 已禁用配置文件写入
 
     def set_struct_to_cell_32(self):
@@ -1221,14 +1220,50 @@ class HexParserApp(QMainWindow):
         config_data["STRUCT_VARIABLES"] = STRUCT_VARIABLES
 
         # 强制写入配置文件（已禁用）
-        print("32串配置已更新")
         # self.set_config_file(force_write=True)  # 已禁用配置文件写入
     def get_struct_name_list(self):
+        """生成CSV表头列表（包含16串和32串配置）"""
+        self.struct_name_list = []
+        
+        # 1. 先生成非SBS/KB的表头
         for key, value in STRUCT_VARIABLES.items():
-            struct_str = key
-            for i in value:
-                struct_str += "," + i
-            self.struct_name_list.append(struct_str)
+            if key not in ['PC_GET_SBS', 'PC_GET_KB']:
+                struct_str = key
+                for i in value:
+                    struct_str += "," + i
+                self.struct_name_list.append(struct_str)
+        
+        # 2. 生成16串配置的SBS/KB表头
+        # 临时切换到16串
+        original_config = self.get_current_cell_config()
+        self.set_struct_to_cell_16()
+        
+        for key in ['PC_GET_SBS', 'PC_GET_KB']:
+            if key in STRUCT_VARIABLES:
+                struct_str = key + "(16串)"
+                for i in STRUCT_VARIABLES[key]:
+                    struct_str += "," + i
+                self.struct_name_list.append(struct_str)
+        
+        # 3. 生成32串配置的SBS/KB表头
+        self.set_struct_to_cell_32()
+        
+        for key in ['PC_GET_SBS', 'PC_GET_KB']:
+            if key in STRUCT_VARIABLES:
+                struct_str = key + "(32串)"
+                for i in STRUCT_VARIABLES[key]:
+                    struct_str += "," + i
+                self.struct_name_list.append(struct_str)
+        
+        # 4. 恢复原始配置
+        if original_config == 16:
+            self.set_struct_to_cell_16()
+        elif original_config == 32:
+            self.set_struct_to_cell_32()
+        else:
+            # 默认使用16串配置
+            self.set_struct_to_cell_16()
+        
         return self.struct_name_list
 
     def get_current_cell_config(self):
@@ -1342,10 +1377,67 @@ class HexParserApp(QMainWindow):
                 self.text_edit.append(f"解析 {struct_name} 失败: {str(e)}")
 
         return parsed_data
+    
+    def auto_detect_and_switch_config(self, cmd:int, data_bytes:bytes):
+        """
+        根据接收到的数据长度自动检测并切换16串/32串配置
+        
+        Args:
+            cmd: 命令码
+            data_bytes: 接收到的数据字节
+        
+        Returns:
+            bool: 是否成功切换配置
+        """
+        # 只对PC_GET_SBS和PC_GET_KB指令进行自动检测
+        if cmd not in [0x13, 0x07]:  # PC_GET_SBS=0x13, PC_GET_KB=0x07
+            return False
+        
+        # 计算16串和32串的期望长度
+        if cmd == 0x13:  # PC_GET_SBS
+            # 16串: <LL + H*16 + l + h*5 + HHH + L*5 + HH + L*3
+            size_16 = struct.calcsize("<LL" + "H"*16 + "l" + "h"*5 + "HHH" + "L"*5 + "HH" + "L"*3)
+            # 32串: <LL + H*32 + l + h*13 + HHH + L*5 + HH + L*3
+            size_32 = struct.calcsize("<LL" + "H"*32 + "l" + "h"*13 + "HHH" + "L"*5 + "HH" + "L"*3)
+        elif cmd == 0x07:  # PC_GET_KB
+            # 16串: <HH + H*16 + HhHhHhHhHhHh + H*8
+            size_16 = struct.calcsize("<HH" + "H"*16 + "Hh"*6 + "H"*8)
+            # 32串: <HH + H*32 + HhHhHhHhHhHh + H*16
+            size_32 = struct.calcsize("<HH" + "H"*32 + "Hh"*6 + "H"*16)
+        else:
+            return False
+        
+        data_len = len(data_bytes)
+        current_config = self.get_current_cell_config()
+        
+        # 根据长度判断应该使用哪个配置
+        if data_len == size_16:
+            if current_config != 16:
+                LogManager.get_instance().write_log(f"检测到16串数据(长度{data_len}字节)，自动切换到16串配置")
+                self.set_struct_to_cell_16()
+                return True
+        elif data_len == size_32:
+            if current_config != 32:
+                LogManager.get_instance().write_log(f"检测到32串数据(长度{data_len}字节)，自动切换到32串配置")
+                self.set_struct_to_cell_32()
+                return True
+        else:
+            # 不匹配时只在第一次报错，避免日志刷屏
+            if not hasattr(self, '_last_size_mismatch') or self._last_size_mismatch != (cmd, data_len):
+                LogManager.get_instance().write_log(
+                    f"数据长度{data_len}字节不匹配16串({size_16}字节)或32串({size_32}字节)"
+                )
+                self._last_size_mismatch = (cmd, data_len)
+        
+        return False
+    
     def decode_cmd_hex_data(self, cmd:int, data_bytes:bytes):
         """
         把二进制数据转换成字典数据
         """
+        # 🔥 自动检测并切换配置
+        self.auto_detect_and_switch_config(cmd, data_bytes)
+        
         parsed_data = {}
         if cmd in STRUCT_COMMANDS.values():
             for key, value in STRUCT_COMMANDS.items():

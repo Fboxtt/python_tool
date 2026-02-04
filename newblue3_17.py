@@ -595,11 +595,6 @@ class BluetoothTool(QWidget):
         self.hex_info_label.setStyleSheet("font-size: 9px; color: #666;")
         hex_layout.addWidget(self.hex_info_label)
         
-        self.cell_32_checkbox = QCheckBox('32电芯配置')
-        self.cell_32_checkbox.setStyleSheet("font-size: 10px;")
-        self.cell_32_checkbox.setToolTip('勾选：32电芯+15温度\n不勾选：16电芯+SBS 5温度+KB 8温度')
-        self.cell_32_checkbox.stateChanged.connect(self.on_cell_config_changed)
-        hex_layout.addWidget(self.cell_32_checkbox)
         
         hex_group.setLayout(hex_layout)
         advanced_layout.addWidget(hex_group)
@@ -2785,38 +2780,6 @@ class BluetoothTool(QWidget):
             self.blue_write_log(f"检测配置失败: {str(e)}")
             traceback.print_exc()
 
-    def on_cell_config_changed(self, state):
-        """处理32电芯配置checkbox状态变化"""
-        try:
-            if state == Qt.CheckState.Checked.value:
-                # 切换到32串配置
-                self.blue_write_log("正在切换到32串配置...")
-                self.hex_parser.set_struct_to_cell_32()
-                self.blue_write_log("已切换到32串配置（32电芯 + 15温度传感器）")
-            else:
-                # 切换到16串配置
-                self.blue_write_log("正在切换到16串配置...")
-                self.hex_parser.set_struct_to_cell_16()
-                self.blue_write_log("已切换到16串配置（16电芯 + SBS:5温度 + KB:8温度）")
-            
-            # 同步到主界面（如果主界面存在）
-            try:
-                # 尝试找到主界面窗口
-                from PyQt6.QtWidgets import QApplication
-                for widget in QApplication.topLevelWidgets():
-                    if hasattr(widget, 'cell_32_checkbox') and widget != self:
-                        # 找到主界面，同步配置
-                        widget.cell_32_checkbox.blockSignals(True)
-                        widget.cell_32_checkbox.setChecked(state == Qt.CheckState.Checked.value)
-                        widget.cell_32_checkbox.blockSignals(False)
-                        break
-            except Exception as sync_error:
-                # 同步失败不影响主要功能
-                pass
-                
-        except Exception as e:
-            self.blue_write_log(f"切换配置失败: {str(e)}")
-            traceback.print_exc()
 
     def on_auto_connect_changed(self, state):
         """处理自动连接checkbox状态变化"""

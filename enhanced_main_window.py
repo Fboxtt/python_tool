@@ -178,8 +178,6 @@ class EnhancedMainWindow(QMainWindow):
         
         central_widget.setLayout(main_layout)
         
-        # 同步bluetooth_tool的32电芯配置到主界面
-        QTimer.singleShot(100, self.sync_cell_config_from_bluetooth_tool)
         
         # 设置定时器
         self.setup_timers()
@@ -236,11 +234,6 @@ class EnhancedMainWindow(QMainWindow):
             self.use_simplified_window.setEnabled(True)
         layout.addWidget(self.use_simplified_window)
         
-        # 32电芯配置checkbox
-        self.cell_32_checkbox = QCheckBox('⚡ 32电芯配置')
-        self.cell_32_checkbox.setToolTip('勾选：32电芯+15温度传感器\n不勾选：16电芯+SBS 5温度+KB 8温度')
-        self.cell_32_checkbox.stateChanged.connect(self.on_cell_config_changed)
-        layout.addWidget(self.cell_32_checkbox)
         
         # 连接控制
         self.connect_btn = QPushButton('📱 打开连接窗口')
@@ -558,38 +551,6 @@ class EnhancedMainWindow(QMainWindow):
         # 更新所有数据窗口的写入功能状态
         self.multi_window_manager.set_write_enabled(is_factory_mode)
         
-    def on_cell_config_changed(self, state):
-        """32电芯配置checkbox状态改变"""
-        is_32_cell = (state == Qt.CheckState.Checked.value)
-        config_name = "32电芯+15温度" if is_32_cell else "16电芯+SBS 5温度+KB 8温度"
-        self.bluetooth_tool.blue_write_log(f"切换电芯配置: {config_name}")
-        
-        # 同步到bluetooth_tool的配置
-        if hasattr(self, 'bluetooth_tool') and self.bluetooth_tool:
-            # 阻止触发bluetooth_tool的信号，避免循环
-            self.bluetooth_tool.cell_32_checkbox.blockSignals(True)
-            self.bluetooth_tool.cell_32_checkbox.setChecked(is_32_cell)
-            self.bluetooth_tool.cell_32_checkbox.blockSignals(False)
-            
-            # 调用bluetooth_tool的配置切换逻辑
-            self.bluetooth_tool.on_cell_config_changed(state)
-    
-    def sync_cell_config_from_bluetooth_tool(self):
-        """从bluetooth_tool同步32电芯配置到主界面"""
-        if hasattr(self, 'bluetooth_tool') and self.bluetooth_tool:
-            try:
-                # 获取bluetooth_tool的配置状态
-                is_32_cell = self.bluetooth_tool.cell_32_checkbox.isChecked()
-                
-                # 阻止触发主界面的信号，避免循环
-                self.cell_32_checkbox.blockSignals(True)
-                self.cell_32_checkbox.setChecked(is_32_cell)
-                self.cell_32_checkbox.blockSignals(False)
-                
-                config_name = "32电芯+15温度" if is_32_cell else "16电芯+SBS 5温度+KB 8温度"
-                self.bluetooth_tool.blue_write_log(f"已加载电芯配置: {config_name}")
-            except Exception as e:
-                self.bluetooth_tool.blue_write_log(f"同步电芯配置失败: {str(e)}")
         
     def query_version(self):
         """查询版本"""
