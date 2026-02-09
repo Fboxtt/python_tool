@@ -793,9 +793,6 @@ HEX_DISPLAY_VARIABLES = {
     "PC_GET_BMS": [
         # 可以根据需要添加其他命令的十六进制显示变量
     ],
-    "PC_GET_MOSHTDATA": [
-        "MOS温度告警", "MOS温度告警恢复", "MOS温度保护", "MOS温度保护恢复"
-    ],
     "PC_GET_CLUSTER_SBS": [
         "集群保护状态", "集群故障状态"
     ]
