@@ -697,9 +697,9 @@ class DataDisplayWindow(QWidget):
         elif self.window_id == 'PC_GET_VER':
             # 版本信息窗口：保持原来的横向布局
             if self.column_mode == 2:
-                self.col_widths = [48, 210]
+                self.col_widths = [48, 260]
             else:
-                self.col_widths = [48, 210, 210]
+                self.col_widths = [48, 260, 260]
         elif self.window_type == 'alarm_protect':
             # 告警-保护窗口：4列（告警名称, 告警值, 保护名称, 保护值）
             self.col_widths = [59, 15, 75, 15]  # 值列宽度从30减半到15
