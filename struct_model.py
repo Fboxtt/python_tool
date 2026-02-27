@@ -796,6 +796,9 @@ HEX_DISPLAY_VARIABLES = {
     ],
     "PC_GET_CLUSTER_SBS": [
         "集群保护状态", "集群故障状态"
+    ],
+    "PC_GET_INF": [
+        "PC地址", "唯一ID"
     ]
 }
 
