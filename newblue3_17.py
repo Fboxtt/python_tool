@@ -2485,16 +2485,16 @@ class BluetoothTool(QWidget):
             # 检查注册响应标志
             if self.register_response is True:
                 self.update_registration_status(True)
-                self.blue_write_log("注册成功")
+                self.blue_write_log("✔️注册成功✔️")
             elif self.register_response is False:
                 self.update_registration_status(False)
-                self.blue_write_log("注册失败")
+                self.blue_write_log("❌注册失败❌")
             else:
                 self.update_registration_status(False)
-                self.blue_write_log("注册失败：未收到响应")
+                self.blue_write_log("❌注册失败❌：未收到响应")
 
         except Exception as e:
-            self.blue_write_log(f"注册异常: {str(e)}")
+            self.blue_write_log(f"❌注册异常❌: {str(e)}")
             self.update_registration_status(False)
 
     def update_registration_status(self, is_registered: bool):

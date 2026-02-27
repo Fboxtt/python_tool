@@ -782,7 +782,8 @@ STRUCT_COMMANDS = {
     "PC_GET_MOSHTDATA": 0x65,
     "PC_SET_MOSHTDATA": 0x66,
     "MCU_A_PRINT": 0x94,
-    "PC_GET_INF" : 0x71
+    "PC_GET_INF" : 0x71,
+    "BMS_MCU_OPEN": 0x7B
 }
 
 # 定义需要显示十六进制的变量
@@ -797,6 +798,26 @@ HEX_DISPLAY_VARIABLES = {
         "集群保护状态", "集群故障状态"
     ]
 }
+
+# ======================== 特殊指令定义 ========================
+# 以命令名称为key，直接复用 STRUCT_COMMANDS 中的定义
+SPECIAL_COMMAND_HANDLERS = {
+    'BMS_MCU_OPEN': {
+        'message': '⚠️ 检测到电池重启指令！电池已重启 ⚠️',
+        'clear_buffer': True,
+        'stop_processing': True
+    }
+}
+
+def detect_special_command(data_bytes):
+    """检测特殊指令并返回处理信息（复用 STRUCT_COMMANDS 获取指令码）"""
+    if not data_bytes or len(data_bytes) < 5:
+        return None
+    cmd_code = data_bytes[4] & 0x7F
+    for cmd_name, handler in SPECIAL_COMMAND_HANDLERS.items():
+        if STRUCT_COMMANDS.get(cmd_name) == cmd_code:
+            return {**handler, 'cmd_name': cmd_name, 'cmd_code': cmd_code}
+    return None
 
 # 将所有字典组合成一个字典
 config_data = {

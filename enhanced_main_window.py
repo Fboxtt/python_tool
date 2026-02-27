@@ -17,7 +17,15 @@ from PyQt6.QtGui import QFont, QCursor, QIcon, QPixmap
 from newblue3_17 import BluetoothTool, SimplifiedBluetoothTool, load_ui_dynamically
 from log_controller import LogManager, ComunManager
 from multi_window_manager import MultiWindowManager
-from struct_model import HexParserApp, STRUCT_COMMANDS
+from struct_model import (
+    HexParserApp, 
+    STRUCT_COMMANDS,
+    get_alarm_protect_display_data,
+    get_other_status_display_data,
+    get_battery_status_display_data,
+    get_voltage_params_display_data,
+    detect_special_command
+)
 
 # 尝试导入版本信息
 try:
@@ -693,17 +701,21 @@ class EnhancedMainWindow(QMainWindow):
     def custom_process_complete_data(self):
         """自定义数据处理方法（替代bluetooth_tool的原始方法）"""
         try:
-            # 获取接收到的数据
             if not hasattr(self.bluetooth_tool, 'received_data_buffer'):
                 return
-
             data_buffer = bytes(self.bluetooth_tool.received_data_buffer)
-
-            if len(data_buffer) == 0:
+            if not data_buffer:
                 return
             self.bluetooth_tool.display_received_data(data_buffer)
-            
-            # 检查是否是密码响应（原始方法的逻辑）
+            # 检测特殊指令
+            special_cmd = detect_special_command(data_buffer)
+            if special_cmd:
+                self.bluetooth_tool.blue_write_log(special_cmd['message'])
+                if special_cmd['clear_buffer']:
+                    self.bluetooth_tool.received_data_buffer.clear()
+                if special_cmd['stop_processing']:
+                    return
+            # 检查密码响应
             if self.bluetooth_tool.check_new_password_response(data_buffer):
                 self.bluetooth_tool.handle_new_password_response(data_buffer)
                 self.bluetooth_tool.received_data_buffer.clear()
@@ -824,13 +836,6 @@ class EnhancedMainWindow(QMainWindow):
             dict_data: SBS解析后的字典数据
         """
         try:
-            from struct_model import (
-                get_alarm_protect_display_data,
-                get_other_status_display_data,
-                get_battery_status_display_data,
-                get_voltage_params_display_data
-            )
-            
             # 将dict_data转换为flat_dict（需要转换为整数）
             flat_dict = {}
             for category, items in dict_data.items():
