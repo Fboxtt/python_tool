@@ -725,7 +725,7 @@ class EnhancedMainWindow(QMainWindow):
             if self.bluetooth_tool.is_ota_command(data_buffer):
                 # 特殊处理：71指令（PC_GET_INF）即使是OTA命令，也应该走普通数据解析
                 cmd_code = data_buffer[4] & 0x7F if len(data_buffer) >= 5 else 0
-                if cmd_code == 0x71:  # PC_GET_INF
+                if self.bluetooth_tool.program_task == None and cmd_code == 0x71:  # PC_GET_INF
                     # 继续下面的普通数据处理
                     pass
                 else:
