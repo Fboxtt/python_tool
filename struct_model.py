@@ -572,6 +572,7 @@ STRUCT_FORMATS = {
     "PC_SET_SERIALNUM": "<30s",  # 序列号：30字节字符串
     "PC_GET_FUSESTATE": "<HH",  # 保险丝信息：使能状态、保险丝状态
     "PC_SET_FUSESTATE": "<HH",  # 保险丝信息：使能状态、保险丝状态
+    "PC_GET_SOC_STOP_PARA": "<HHHH",
     "PC_GET_CLUSTER_SBS": "<"
         "BB"  # byBrand, byCurrRate
         "H"   # wBattModuleCap
@@ -692,6 +693,9 @@ STRUCT_VARIABLES = {
         "保险丝使能",
         "保险丝状态"
     ],
+    "PC_GET_SOC_STOP_PARA": [
+        "停止充电SOC", "停止放电SOC", "预留1", "预留2"
+    ],
     "PC_GET_CLUSTER_SBS": [
         "品牌", "当前倍率",
         "电池模块容量",
@@ -781,6 +785,8 @@ STRUCT_COMMANDS = {
     "PC_SET_SLEEP": 0x64,
     "PC_GET_MOSHTDATA": 0x65,
     "PC_SET_MOSHTDATA": 0x66,
+    "PC_SET_SOC_STOP_PARA": 0x67,
+    "PC_GET_SOC_STOP_PARA": 0x68,
     "MCU_A_PRINT": 0x94,
     "PC_GET_INF" : 0x71,
     "BMS_MCU_OPEN": 0x7B
@@ -800,6 +806,33 @@ HEX_DISPLAY_VARIABLES = {
     "PC_GET_INF": [
         "PC地址", "唯一ID"
     ]
+}
+
+# ======================== 写入校验定义 ========================
+def _validate_soc_stop_para(write_values, var_names):
+    """
+    校验SOC停止参数：停止充电SOC必须大于停止放电SOC，且两者范围0~80%
+    write_values: 按顺序排列的写入值列表
+    var_names: 对应变量名列表
+    返回: (ok: bool, error_msg: str)
+    """
+    try:
+        idx_chg = var_names.index("停止充电SOC")
+        idx_dis = var_names.index("停止放电SOC")
+        chg_soc = int(write_values[idx_chg])
+        dis_soc = int(write_values[idx_dis])
+        if not (0 <= chg_soc <= 80):
+            return False, f"停止充电SOC值 {chg_soc}% 超出范围(0~80%)"
+        if not (0 <= dis_soc <= 80):
+            return False, f"停止放电SOC值 {dis_soc}% 超出范围(0~80%)"
+        if chg_soc <= dis_soc:
+            return False, f"停止充电SOC({chg_soc}%)必须大于停止放电SOC({dis_soc}%)"
+        return True, ""
+    except Exception as e:
+        return False, f"SOC参数校验异常: {str(e)}"
+
+WRITE_VALIDATORS = {
+    "PC_GET_SOC_STOP_PARA": _validate_soc_stop_para,
 }
 
 # ======================== 特殊指令定义 ========================
@@ -840,6 +873,7 @@ WRITE_READ_COMMAND_MAPPING = {
     "PC_SET_CELL_CAP_PARA": "PC_GET_CELL_CAP_PARA",
     "PC_SET_LIFE_PARA": "PC_GET_LIFE_PARA",
     "PC_SET_MOSHTDATA": "PC_GET_MOSHTDATA",
+    "PC_SET_SOC_STOP_PARA": "PC_GET_SOC_STOP_PARA",
     "PC_SET_SERIALNUM": "PC_GET_SERIALNUM",
     "PC_SET_FUSESTATE": "PC_GET_FUSESTATE",
 }
@@ -853,6 +887,7 @@ READ_WRITE_COMMAND_MAPPING = {
     "PC_GET_CELL_CAP_PARA": "PC_SET_CELL_CAP_PARA",
     "PC_GET_LIFE_PARA": "PC_SET_LIFE_PARA",
     "PC_GET_MOSHTDATA": "PC_SET_MOSHTDATA",
+    "PC_GET_SOC_STOP_PARA": "PC_SET_SOC_STOP_PARA",
     "PC_GET_SERIALNUM": "PC_SET_SERIALNUM",
     "PC_GET_FUSESTATE": "PC_SET_FUSESTATE",
 }
@@ -976,6 +1011,7 @@ def get_all_display_windows():
             'SERIALNUM': '🔢 序列号',
             'FUSESTATE': '🔌 保险丝信息',
             'CLUSTER_SBS': '🔗 并机信息',
+            'SOC_STOP_PARA': '🔋 保电SOC设置',
         }
         
         title = title_map.get(display_name, f'📄 {display_name}')

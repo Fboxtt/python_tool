@@ -601,7 +601,7 @@ class EnhancedMainWindow(QMainWindow):
         """处理写入请求"""
         try:
             # 获取写入命令码
-            from struct_model import get_write_command_code, STRUCT_FORMATS
+            from struct_model import get_write_command_code, STRUCT_FORMATS, STRUCT_VARIABLES, WRITE_VALIDATORS
             import struct
             
             cmd_code = get_write_command_code(window_id)
@@ -665,6 +665,15 @@ class EnhancedMainWindow(QMainWindow):
                     except (ValueError, TypeError):
                         self.bluetooth_tool.blue_write_log(f"行{row_idx}值转换失败: {value_str}")
                         write_values.append(0)
+            
+            # 写入前校验（如有校验函数）
+            validator = WRITE_VALIDATORS.get(window_id)
+            if validator:
+                var_names = STRUCT_VARIABLES.get(window_id, [])
+                ok, err_msg = validator(write_values, var_names)
+                if not ok:
+                    self.bluetooth_tool.blue_write_log(f"❌ 写入校验失败: {err_msg}")
+                    return
             
             # 根据结构体格式打包
             if window_id not in STRUCT_FORMATS:
