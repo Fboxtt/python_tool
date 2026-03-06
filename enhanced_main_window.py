@@ -765,10 +765,12 @@ class EnhancedMainWindow(QMainWindow):
 
             # 检查是否是OTA指令
             if self.bluetooth_tool.is_ota_command(data_buffer):
-                # 特殊处理：71指令（PC_GET_INF）即使是OTA命令，也应该走普通数据解析
+                # 特殊处理：71指令（PC_GET_INF）需要同时满足OTA验证和窗口显示
                 cmd_code = data_buffer[4] & 0x7F if len(data_buffer) >= 5 else 0
-                if self.bluetooth_tool.program_task == None and cmd_code == 0x71:  # PC_GET_INF
-                    # 继续下面的普通数据处理
+                if cmd_code == 0x71:  # PC_GET_INF
+                    # 先调用split_data，设置no80_cmd和cmd_ack供OTA控制器判断
+                    self.bluetooth_tool.text_decode.split_data(bytearray(data_buffer))
+                    # 继续下面的普通数据处理，同时更新显示窗口
                     pass
                 else:
                     # 其他OTA指令正常处理

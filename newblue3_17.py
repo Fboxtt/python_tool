@@ -2198,10 +2198,13 @@ class BluetoothTool(QWidget):
                 await asyncio.sleep(time512 * 4)
                 if(self.text_decode.no80_cmd == BmsCmdType.REC_TOTAL_CHECKSUM  and self.text_decode.cmd_ack == 0x00):
                     self.blue_write_log(f"✅ 总校验和验证成功")
+                    err_count = 0
                     break
                 else:
                     self.blue_write_log(f"❌ 总校验和未成功，重试 (err_count={err_count})")
                     err_count += 1
+            if err_count > 0:
+                raise ValueError("校验和命令发送错误次数 >= 5")
             self.blue_write_log("烧录完成")
             await asyncio.sleep(6)
 
