@@ -78,6 +78,10 @@ class EnhancedMainWindow(QMainWindow):
         # 监控任务
         self.scan_task = None
         
+        # 连接/断开信号
+        self.bluetooth_tool.device_connected.connect(self.check_connection_status)
+        self.bluetooth_tool.device_disconnected.connect(self._on_device_disconnected)
+        
         self.init_ui()
         
     def init_ui(self):
@@ -483,10 +487,22 @@ class EnhancedMainWindow(QMainWindow):
         self.disconnect_btn.setEnabled(is_connected)
         self.monitor_btn.setEnabled(is_connected)
         
+    def _on_device_disconnected(self):
+        """设备断开时立即清理（由 device_disconnected 信号触发）"""
+        if self.scan_task:
+            self.scan_task.cancel()
+            self.scan_task = None
+            self.monitor_btn.setText('▶️ 开始监控')
+        self.multi_window_manager.clear_send_queue()
+        self.bluetooth_tool.blue_write_log("🧹 监控已停止，发送队列已清空")
+        self.check_connection_status()  # 立即更新按钮状态
     def disconnect_device(self):
         """断开设备连接"""
+        # 直接停止监控，不调用 toggle_monitoring 避免状态判断出错
         if self.scan_task:
-            self.toggle_monitoring()
+            self.scan_task.cancel()
+            self.scan_task = None
+            self.monitor_btn.setText('▶️ 开始监控')
         try:
             if self.bluetooth_tool.client and self.bluetooth_tool.client.is_connected:
                 asyncio.create_task(self.bluetooth_tool.disconnect_device())
@@ -494,23 +510,38 @@ class EnhancedMainWindow(QMainWindow):
                 asyncio.create_task(self.bluetooth_tool.disconnect_serial())
         except:
             pass
-        QTimer.singleShot(200, self.check_connection_status)
+        self.check_connection_status()  # 立即更新按钮状态，无需延迟
         
     def toggle_monitoring(self):
         """切换监控状态"""
-        if self.monitor_btn.text() == '▶️ 开始监控':
-            self.monitor_btn.setText('⏸️ 停止监控')
-            self.scan_task = asyncio.create_task(self.monitoring_loop())
-            self.bluetooth_tool.blue_write_log("开始监控")
-        else:
-            self.monitor_btn.setText('▶️ 开始监控')
-            if self.scan_task:
+        # 防止快速重复点击重入
+        if getattr(self, '_monitoring_toggling', False):
+            return
+        self._monitoring_toggling = True
+        try:
+            # 以 scan_task 是否存在为唯一状态判断，不依赖 button text
+            if self.scan_task is None:
+                try:
+                    is_connected = (self.bluetooth_tool.client and self.bluetooth_tool.client.is_connected) or self.bluetooth_tool.is_serial_connected
+                except:
+                    is_connected = False
+                if not is_connected:
+                    self.bluetooth_tool.blue_write_log("⚠️ 未连接设备，无法开始监控")
+                    return
+                self.monitor_btn.setText('⏸️ 停止监控')
+                self.scan_task = asyncio.create_task(self.monitoring_loop())
+                self.bluetooth_tool.blue_write_log("开始监控")
+            else:
+                self.monitor_btn.setText('▶️ 开始监控')
                 self.scan_task.cancel()
                 self.scan_task = None
-            self.bluetooth_tool.blue_write_log("停止监控")
+                self.bluetooth_tool.blue_write_log("停止监控")
+        finally:
+            self._monitoring_toggling = False
             
     async def monitoring_loop(self):
         """监控循环 - 定期查询数据"""
+        current_task = asyncio.current_task()
         try:
             while True:
                 # 检查连接状态
@@ -530,8 +561,10 @@ class EnhancedMainWindow(QMainWindow):
         except Exception as e:
             self.bluetooth_tool.blue_write_log(f"监控循环错误: {str(e)}")
         finally:
-            self.monitor_btn.setText('▶️ 开始监控')
-            self.scan_task = None
+            # 只有当自己仍是当前 scan_task 时才更新 UI，防止覆盖快速重启创建的新 task
+            if self.scan_task is current_task:
+                self.monitor_btn.setText('▶️ 开始监控')
+                self.scan_task = None
             
     async def queue_send_command(self, cmd_code, struct_name=None, priority=False):
         """通过队列发送命令

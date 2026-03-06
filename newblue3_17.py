@@ -176,6 +176,8 @@ class SplashScreen(QSplashScreen):
 # 修改现有的BluetoothTool类为二级窗口
 class BluetoothTool(QWidget):
     receive_ok_signal = pyqtSignal(int,bytes)
+    device_disconnected = pyqtSignal()  # 蓝牙或串口断开时发射
+    device_connected = pyqtSignal()     # 蓝牙或串口连接成功时发射
     def __init__(self):
         super().__init__()
         # ==================== 连接管理 ====================
@@ -1046,6 +1048,7 @@ class BluetoothTool(QWidget):
                 if self.auto_connect_enabled:
                     self.stop_auto_connect_timer()
                     self.blue_write_log("✅ 串口连接成功，自动连接定时器已停止")
+                self.device_connected.emit()
             else:
                 self.blue_write_log(f"串口 {port} 未能成功打开")
                 
@@ -1080,6 +1083,7 @@ class BluetoothTool(QWidget):
         self.update_shared_buttons()
 
         self.blue_write_log("串口连接已断开")
+        self.device_disconnected.emit()
         
         # 如果启用了自动连接，重启定时器
         if self.auto_connect_enabled:
@@ -1626,6 +1630,7 @@ class BluetoothTool(QWidget):
             
             # 更新状态：已连接
             self.update_bluetooth_status('已连接', device_name=device_name, device_address=device_address)
+            self.device_connected.emit()
             
             # 记录连接成功
             log_prefix = "🤖" if is_auto else "👆"
@@ -1861,6 +1866,7 @@ class BluetoothTool(QWidget):
         
         # 更新UI状态：断开（会自动设置按钮状态）
         self.update_bluetooth_status('断开')
+        self.device_disconnected.emit()
         
         # 如果启用了自动连接，重启定时器持续尝试重连
         if self.auto_connect_enabled:
