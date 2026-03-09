@@ -596,7 +596,11 @@ class BluetoothTool(QWidget):
         self.hex_info_label = QLabel('大小: 0B')
         self.hex_info_label.setStyleSheet("font-size: 9px;")
         hex_layout.addWidget(self.hex_info_label)
-        
+        # 固件版本信息
+        self.hex_version_label = QLabel('版本: —')
+        self.hex_version_label.setStyleSheet("font-size: 9px;")
+        self.hex_version_label.setWordWrap(True)
+        hex_layout.addWidget(self.hex_version_label)
         
         hex_group.setLayout(hex_layout)
         advanced_layout.addWidget(hex_group)
@@ -2067,9 +2071,22 @@ class BluetoothTool(QWidget):
                 # 显示文件名，支持自动换行
                 self.hex_file_label.setText(f'📄 {file_info["filename"]}')
                 self.hex_info_label.setText(f'大小: {file_info["size"]} 字节')
+                # 读取并显示固件版本号
+                ver_info = self.hex_model.get_version_info()
+                if ver_info['error']:
+                    self.hex_version_label.setText(f'版本: 读取失败')
+                    self.blue_write_log(f"版本读取失败: {ver_info['error']}")
+                else:
+                    self.hex_version_label.setText(
+                        f'[{ver_info["platform"]}] {ver_info["version_str"]}  UID:{ver_info["uid_str"]}'
+                    )
+                    self.blue_write_log(
+                        f"固件版本: [{ver_info['platform']}] {ver_info['version_str']}  UID:{ver_info['uid_str']}"
+                    )
                 self.blue_write_log(f"已选择HEX文件: {file_info['filename']}")
             else:
                 self.hex_file_label.setText('❌ 文件解析失败')
+                self.hex_version_label.setText('版本: —')
                 QMessageBox.warning(self, '警告', 'HEX文件解析失败')
 
     def on_program_clicked(self):
@@ -3868,6 +3885,8 @@ class SimplifiedBluetoothTool(QWidget):
         ota_title = QLabel('OTA 烧录')
         ota_title.setFont(QFont('Arial', 10, QFont.Weight.Bold))
         main_layout.addWidget(ota_title)
+        self.hex_version_display = self.bluetooth_tool.hex_version_label
+        main_layout.addWidget(self.hex_version_display)
         self.ota_step_display = self.bluetooth_tool.ota_step_label
         main_layout.addWidget(self.ota_step_display)
         self.ota_progress_display = self.bluetooth_tool.ota_progress_bar
