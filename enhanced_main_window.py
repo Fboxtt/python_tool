@@ -83,6 +83,9 @@ class EnhancedMainWindow(QMainWindow):
         self.bluetooth_tool.device_disconnected.connect(self._on_device_disconnected)
         
         self.init_ui()
+        # 注册增强窗口引用到bluetooth_tool，供OTA暂停/恢复监控使用
+        self.bluetooth_tool._enhanced_window_ref = self
+        self._ota_paused_monitoring = False
         
     def init_ui(self):
         """初始化UI"""
@@ -538,7 +541,27 @@ class EnhancedMainWindow(QMainWindow):
                 self.bluetooth_tool.blue_write_log("停止监控")
         finally:
             self._monitoring_toggling = False
-            
+
+    def pause_monitoring_for_ota(self):
+        """OTA开始时暂停监控，并禁用监控按钮"""
+        if self.scan_task:
+            self._ota_paused_monitoring = True
+            self.scan_task.cancel()
+            self.scan_task = None
+            self.monitor_btn.setText('▶️ 开始监控')
+            self.bluetooth_tool.blue_write_log("⏸️ OTA开始，监控已暂停")
+        else:
+            self._ota_paused_monitoring = False
+        self.monitor_btn.setEnabled(False)
+
+    def resume_monitoring_after_ota(self):
+        """OTA结束后恢复监控按钮，并在之前有监控时自动重启"""
+        self.monitor_btn.setEnabled(True)
+        if getattr(self, '_ota_paused_monitoring', False):
+            self._ota_paused_monitoring = False
+            self.bluetooth_tool.blue_write_log("▶️ OTA结束，自动恢复监控")
+            self.toggle_monitoring()
+
     async def monitoring_loop(self):
         """监控循环 - 定期查询数据"""
         current_task = asyncio.current_task()

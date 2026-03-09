@@ -13,7 +13,7 @@ from PyQt6.QtCore import QTimer  # 导入 QTimer
 from PyQt6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QPushButton, QListWidget, QLabel, QMessageBox, QTextEdit, QLineEdit, QHBoxLayout,
     QCheckBox, QFileDialog, QComboBox, QGridLayout, QMainWindow, QSplashScreen, QSizePolicy, QTableView, QHeaderView, QAbstractItemView,
-    QStyledItemDelegate, QStyle, QDoubleSpinBox, QTabWidget, QGroupBox
+    QStyledItemDelegate, QStyle, QDoubleSpinBox, QTabWidget, QGroupBox, QProgressBar
 )
 from PyQt6.QtCore import Qt, QAbstractTableModel, QModelIndex
 from PyQt6.QtGui import QPixmap, QFont, QColor, QPainter
@@ -586,7 +586,7 @@ class BluetoothTool(QWidget):
         
         # 文件名标签单独一行，支持换行
         self.hex_file_label = QLabel('未选择文件')
-        self.hex_file_label.setStyleSheet("font-size: 10px; color: #333; padding: 2px;")
+        self.hex_file_label.setStyleSheet("font-size: 10px; padding: 2px;")
         self.hex_file_label.setWordWrap(True)  # 允许自动换行
         self.hex_file_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
         self.hex_file_label.setMaximumWidth(400)  # 限制最大宽度，确保换行
@@ -594,7 +594,7 @@ class BluetoothTool(QWidget):
         
         # 文件大小信息
         self.hex_info_label = QLabel('大小: 0B')
-        self.hex_info_label.setStyleSheet("font-size: 9px; color: #666;")
+        self.hex_info_label.setStyleSheet("font-size: 9px;")
         hex_layout.addWidget(self.hex_info_label)
         
         
@@ -640,13 +640,26 @@ class BluetoothTool(QWidget):
         program_group = self._create_compact_group("烧录控制")
         program_layout = QVBoxLayout()
         program_layout.setSpacing(2)
-        
+        self.ota_step_label = QLabel('— 等待开始 —')
+        self.ota_step_label.setStyleSheet("font-size: 9px;")
+        self.ota_step_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        program_layout.addWidget(self.ota_step_label)
+        self.ota_progress_bar = QProgressBar()
+        self.ota_progress_bar.setRange(0, 100)
+        self.ota_progress_bar.setValue(0)
+        self.ota_progress_bar.setFixedHeight(12)
+        self.ota_progress_bar.setTextVisible(False)
+        self.ota_progress_bar.setStyleSheet("""
+            QProgressBar { border: 1px solid #ccc; border-radius: 3px; background: #f0f0f0; }
+            QProgressBar::chunk { background: #27ae60; border-radius: 2px; }
+        """)
+        program_layout.addWidget(self.ota_progress_bar)
         self.program_button = self._create_compact_button('开始烧录', '#e67e22')
         self.program_button.clicked.connect(self.on_program_clicked)
         program_layout.addWidget(self.program_button)
         
         self.packet_success_label = QLabel('包号: 0 / 0')
-        self.packet_success_label.setStyleSheet("font-size: 9px; color: #666;")
+        self.packet_success_label.setStyleSheet("font-size: 9px;")
         program_layout.addWidget(self.packet_success_label)
         
         self.batch_program_button = self._create_compact_button('批量烧录', '#d35400')
@@ -654,7 +667,7 @@ class BluetoothTool(QWidget):
         program_layout.addWidget(self.batch_program_button)
         
         self.batch_success_label = QLabel('成功: 0')
-        self.batch_success_label.setStyleSheet("font-size: 9px; color: #666;")
+        self.batch_success_label.setStyleSheet("font-size: 9px;")
         program_layout.addWidget(self.batch_success_label)
         
         program_group.setLayout(program_layout)
@@ -738,13 +751,13 @@ class BluetoothTool(QWidget):
         continuous_layout.addWidget(self.test_send_button)
         
         self.no_ack_label = QLabel('无回应=0')
-        self.no_ack_label.setStyleSheet("font-size: 9px; color: #666;")
+        self.no_ack_label.setStyleSheet("font-size: 9px;")
         self.no_ack_count = 0
         self.err_ack_label = QLabel('ack错误=0')
-        self.err_ack_label.setStyleSheet("font-size: 9px; color: #666;")
+        self.err_ack_label.setStyleSheet("font-size: 9px;")
         self.err_ack_count = 0
         self.total_send_label = QLabel('总次数=0')
-        self.total_send_label.setStyleSheet("font-size: 9px; color: #666;")
+        self.total_send_label.setStyleSheet("font-size: 9px;")
         
         continuous_layout.addWidget(self.no_ack_label)
         continuous_layout.addWidget(self.err_ack_label)
@@ -2080,6 +2093,13 @@ class BluetoothTool(QWidget):
             time128 = int(self.test128.text()) / 1000
             time512 = int(self.test512.text()) / 1000
             self.program_button.setText('再点击即停止')
+            # 重置进度条和状态标签
+            self.ota_progress_bar.setValue(0)
+            self.ota_step_label.setText('🔄 握手中...')
+            self.ota_step_label.setStyleSheet("font-size: 9px; color: #e67e22;")
+            # 暂停监控（如果正在监控）
+            if hasattr(self, '_enhanced_window_ref') and self._enhanced_window_ref:
+                self._enhanced_window_ref.pause_monitoring_for_ota()
             err_count = 0
             # while err_count < 4:
             #     data = self.download_data.get_download_data(BmsCmdType.DOWNLOAD_BUFFER)
@@ -2109,6 +2129,8 @@ class BluetoothTool(QWidget):
                     if(self.text_decode.is_download_cmd):
                         self.blue_write_log(f"✅ 握手命令发送成功")
                         shake_success = True
+                        self.ota_progress_bar.setValue(15)
+                        self.ota_step_label.setText('✅ 握手  🔄 擦除中...')
                         break
                     self.blue_write_log(f"❌ 握手未成功，继续重试 (err_count={err_count})")
                     err_count += 1
@@ -2135,6 +2157,8 @@ class BluetoothTool(QWidget):
                 if(self.text_decode.no80_cmd == BmsCmdType.DOWNLOAD_BUFFER  and self.text_decode.cmd_ack == 0x00):
                     self.blue_write_log(f"✅ 擦除命令发送成功")
                     self.packet_success_label.setText('擦除成功')
+                    self.ota_progress_bar.setValue(30)
+                    self.ota_step_label.setText('✅ 握手  ✅ 擦除  🔄 写入中...')
                     break
                 else:
                     self.blue_write_log(f"❌ 擦除未成功，继续重试 (err_count={err_count})")
@@ -2172,6 +2196,9 @@ class BluetoothTool(QWidget):
                                 self.text_decode.cmd_packet_num == hex_packet + 1):
                                     self.blue_write_log(f"✅ 包{hex_packet + 1}发送成功")
                                     self.packet_success_label.setText(f'包号: {hex_packet + 1} 总包数: {self.download_data.packet_num}')
+                                    if self.download_data.packet_num > 0:
+                                        write_pct = int(30 + 45 * (hex_packet + 1) / self.download_data.packet_num)
+                                        self.ota_progress_bar.setValue(write_pct)
                                     err_count = 0
                                     hex_packet += 1
                                     break
@@ -2202,6 +2229,8 @@ class BluetoothTool(QWidget):
                 if(self.text_decode.no80_cmd == BmsCmdType.REC_TOTAL_CHECKSUM  and self.text_decode.cmd_ack == 0x00):
                     self.blue_write_log(f"✅ 总校验和验证成功")
                     err_count = 0
+                    self.ota_progress_bar.setValue(80)
+                    self.ota_step_label.setText('✅ 握手  ✅ 擦除  ✅ 写入  🔄 重启中...')
                     break
                 else:
                     self.blue_write_log(f"❌ 总校验和未成功，重试 (err_count={err_count})")
@@ -2215,6 +2244,8 @@ class BluetoothTool(QWidget):
             await asyncio.sleep(5)
             if self.text_decode.no80_cmd == BmsCmdType.BMS_MCU_OPEN  and self.text_decode.cmd_ack == 0x00:
                 self.blue_write_log("电池重启")
+            self.ota_progress_bar.setValue(90)
+            self.ota_step_label.setText('✅ 握手  ✅ 擦除  ✅ 写入  ✅ 重启  🔄 验证...')
             await asyncio.sleep(3)
             while err_count < 5:
                 data = self.download_data.get_download_data(BmsCmdType.READ_IC_INF)
@@ -2224,6 +2255,9 @@ class BluetoothTool(QWidget):
                 if(self.text_decode.no80_cmd == BmsCmdType.READ_IC_INF  and self.text_decode.cmd_ack == 0x00):
                     self.blue_write_log(f"✅ 71指令查询成功，烧录完成")
                     self.ota_ok_count += 1
+                    self.ota_progress_bar.setValue(100)
+                    self.ota_step_label.setText('✅ 握手  ✅ 擦除  ✅ 写入  ✅ 重启  ✅ 成功')
+                    self.ota_step_label.setStyleSheet("font-size: 9px; color: #27ae60;")
                     break
                 else:
                     self.blue_write_log(f"❌ 71指令查询失败，重试 (err_count={err_count})")
@@ -2232,6 +2266,8 @@ class BluetoothTool(QWidget):
         except Exception as e:
             traceback.print_exc()
             self.blue_write_log(f"烧录失败: {str(e)}")
+            self.ota_step_label.setText('❌ 烧录失败')
+            self.ota_step_label.setStyleSheet("font-size: 9px; color: #e74c3c;")
             # QMessageBox.critical(self, '错误', f'烧录失败: {str(e)}')
 
         finally:
@@ -2239,6 +2275,9 @@ class BluetoothTool(QWidget):
             self.program_task = None
             self.program_button.setEnabled(True)
             self.program_button.setText('开始烧录')
+            # 恢复监控
+            if hasattr(self, '_enhanced_window_ref') and self._enhanced_window_ref:
+                self._enhanced_window_ref.resume_monitoring_after_ota()
 
     def on_scan_all_clicked(self):
         """同步方法，用于触发异步扫描蓝牙和刷新串口"""
@@ -3693,7 +3732,7 @@ class SimplifiedBluetoothTool(QWidget):
         
         # 提示标签
         auto_save_hint_simple = QLabel('💡 自动保存')
-        auto_save_hint_simple.setStyleSheet("QLabel { color: #666; font-size: 9px; }")
+        auto_save_hint_simple.setStyleSheet("QLabel { font-size: 9px; }")
         auto_layout.addWidget(auto_save_hint_simple)
         
         bluetooth_layout.addLayout(auto_layout)
@@ -3770,42 +3809,32 @@ class SimplifiedBluetoothTool(QWidget):
         test_layout.addStretch()
         main_layout.addLayout(test_layout)
         
-        # ========== 充放电控制（横排紧凑）==========
-        charge_discharge_layout = QHBoxLayout()
-        charge_discharge_layout.setSpacing(3)
+        # ========== 充放电 & 保电控制（网格紧凑布局）==========
+        ctrl_grid = QGridLayout()
+        ctrl_grid.setSpacing(3)
+        ctrl_grid.setContentsMargins(0, 0, 0, 0)
 
-        # 使用原窗口的充放电按钮
         self.open_charge_button = self.bluetooth_tool.open_charge_button
         self.close_charge_button = self.bluetooth_tool.close_charge_button
         self.open_discharge_button = self.bluetooth_tool.open_discharge_button
         self.close_discharge_button = self.bluetooth_tool.close_discharge_button
-
-        for btn in [self.open_charge_button, self.close_charge_button, 
-                    self.open_discharge_button, self.close_discharge_button]:
-            btn.setMaximumWidth(90)
-
-        charge_discharge_layout.addWidget(self.open_charge_button)
-        charge_discharge_layout.addWidget(self.close_charge_button)
-        charge_discharge_layout.addWidget(self.open_discharge_button)
-        charge_discharge_layout.addWidget(self.close_discharge_button)
-
-        main_layout.addLayout(charge_discharge_layout)
-
-        # ========== 保电控制（横排紧凑）==========
-        store_power_layout = QHBoxLayout()
-        store_power_layout.setSpacing(3)
-
-        # 使用原窗口的保电按钮
         self.open_store_power_button = self.bluetooth_tool.open_store_power_button
         self.close_store_power_button = self.bluetooth_tool.close_store_power_button
 
-        for btn in [self.open_store_power_button, self.close_store_power_button]:
-            btn.setMaximumWidth(90)
+        for btn in [self.open_charge_button, self.close_charge_button,
+                    self.open_discharge_button, self.close_discharge_button,
+                    self.open_store_power_button, self.close_store_power_button]:
+            btn.setMinimumWidth(0)
+            btn.setMaximumWidth(16777215)
 
-        store_power_layout.addWidget(self.open_store_power_button)
-        store_power_layout.addWidget(self.close_store_power_button)
+        ctrl_grid.addWidget(self.open_charge_button, 0, 0)
+        ctrl_grid.addWidget(self.close_charge_button, 0, 1)
+        ctrl_grid.addWidget(self.open_discharge_button, 1, 0)
+        ctrl_grid.addWidget(self.close_discharge_button, 1, 1)
+        ctrl_grid.addWidget(self.open_store_power_button, 2, 0)
+        ctrl_grid.addWidget(self.close_store_power_button, 2, 1)
 
-        main_layout.addLayout(store_power_layout)
+        main_layout.addLayout(ctrl_grid)
 
         # ========== 关机控制 ==========
         shutdown_layout = QHBoxLayout()
@@ -3835,8 +3864,21 @@ class SimplifiedBluetoothTool(QWidget):
         heating_layout.addLayout(heating_buttons_layout)
         main_layout.addLayout(heating_layout)
         
+        # ========== OTA 烧录 ==========
+        ota_title = QLabel('OTA 烧录')
+        ota_title.setFont(QFont('Arial', 10, QFont.Weight.Bold))
+        main_layout.addWidget(ota_title)
+        self.ota_step_display = self.bluetooth_tool.ota_step_label
+        main_layout.addWidget(self.ota_step_display)
+        self.ota_progress_display = self.bluetooth_tool.ota_progress_bar
+        main_layout.addWidget(self.ota_progress_display)
+        self.program_button_display = self.bluetooth_tool.program_button
+        main_layout.addWidget(self.program_button_display)
+        self.packet_label_display = self.bluetooth_tool.packet_success_label
+        main_layout.addWidget(self.packet_label_display)
+
         self.setLayout(main_layout)
-        self.setFixedSize(520, 630)  # 增加高度以容纳自动连接配置和重试间隔
+        self.setFixedSize(520, 760)  # 增加高度以容纳OTA区域
     
     def focusOutEvent(self, event):
         """失去焦点时隐藏（点击窗口外部）"""
