@@ -19,6 +19,7 @@ from PyQt6.QtCore import Qt, QAbstractTableModel, QModelIndex
 from PyQt6.QtGui import QPixmap, QFont, QColor, QPainter
 from bleak import BleakScanner, BleakClient
 from qasync import QEventLoop, asyncSlot
+import serial
 import serial.tools.list_ports
 from PyQt6 import uic
 from log_controller import LogManager
@@ -38,6 +39,7 @@ import struct
 
 from ui_main import Ui_Form
 from data_display_manager import DataDisplayManager  # ⭐ 导入数据显示管理器
+from language_manager import t, set_language, get_current_language  # 导入语言管理器
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -168,7 +170,7 @@ class SplashScreen(QSplashScreen):
 
         # 显示启动信息
         self.showMessage(
-            "正在启动应用...",
+            t('ui.startup_app'),
             Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignCenter,
             Qt.GlobalColor.black
         )
@@ -248,7 +250,7 @@ class BluetoothTool(QWidget):
         # 检测当前配置并设置checkbox状态（不触发信号）
         self.detect_and_set_cell_config()
     def initUI(self):
-        self.setWindowTitle('firstuse - 蓝牙调试工具')
+        self.setWindowTitle(t('ui.bt_tool_title'))
 
         # 创建主布局
         main_layout = QHBoxLayout()
@@ -264,36 +266,36 @@ class BluetoothTool(QWidget):
         connection_layout.setContentsMargins(5, 5, 5, 5)
         
         # 自动连接配置（紧凑）
-        auto_group = self._create_compact_group("自动连接")
+        auto_group = self._create_compact_group(t('ui.auto_connect_group'))
         auto_layout = QVBoxLayout()
         auto_layout.setSpacing(2)
         
-        self.auto_connect_checkbox = QCheckBox('启用')
+        self.auto_connect_checkbox = QCheckBox(t('ui.auto_connect_enable'))
         self.auto_connect_checkbox.setStyleSheet("font-size: 10px;")
         self.auto_connect_checkbox.stateChanged.connect(self.on_auto_connect_changed)
         auto_layout.addWidget(self.auto_connect_checkbox)
         
         # 设备名称和MAC地址合并为一行
         device_row1 = QHBoxLayout()
-        device_row1.addWidget(QLabel('名称:'))
+        device_row1.addWidget(QLabel(t('ui.device_name_label')))
         self.auto_connect_name_input = QLineEdit()
-        self.auto_connect_name_input.setPlaceholderText('设备名称')
+        self.auto_connect_name_input.setPlaceholderText(t('ui.device_name_placeholder'))
         self.auto_connect_name_input.setStyleSheet("font-size: 10px;")
         self.auto_connect_name_input.textChanged.connect(self.on_auto_connect_config_changed)
         device_row1.addWidget(self.auto_connect_name_input)
         auto_layout.addLayout(device_row1)
         
         device_row2 = QHBoxLayout()
-        device_row2.addWidget(QLabel('MAC:'))
+        device_row2.addWidget(QLabel(t('ui.mac_address_label')))
         self.auto_connect_mac_input = QLineEdit()
-        self.auto_connect_mac_input.setPlaceholderText('MAC地址(可选)')
+        self.auto_connect_mac_input.setPlaceholderText(t('ui.mac_address_placeholder'))
         self.auto_connect_mac_input.setStyleSheet("font-size: 10px;")
         self.auto_connect_mac_input.textChanged.connect(self.on_auto_connect_config_changed)
         device_row2.addWidget(self.auto_connect_mac_input)
         auto_layout.addLayout(device_row2)
         
         interval_row = QHBoxLayout()
-        interval_row.addWidget(QLabel('间隔:'))
+        interval_row.addWidget(QLabel(t('ui.interval_label')))
         self.auto_connect_interval_spinbox = QDoubleSpinBox()
         self.auto_connect_interval_spinbox.setMinimum(1.0)
         self.auto_connect_interval_spinbox.setMaximum(60.0)
@@ -303,7 +305,7 @@ class BluetoothTool(QWidget):
         self.auto_connect_interval_spinbox.setFixedWidth(60)
         self.auto_connect_interval_spinbox.valueChanged.connect(self.on_retry_interval_changed)
         interval_row.addWidget(self.auto_connect_interval_spinbox)
-        interval_row.addWidget(QLabel('秒'))
+        interval_row.addWidget(QLabel(t('ui.interval_seconds')))
         interval_row.addStretch()
         auto_layout.addLayout(interval_row)
         
@@ -311,11 +313,11 @@ class BluetoothTool(QWidget):
         connection_layout.addWidget(auto_group)
         
         # 蓝牙连接（紧凑）
-        bt_group = self._create_compact_group("蓝牙连接")
+        bt_group = self._create_compact_group(t('ui.bt_connection_group'))
         bt_layout = QVBoxLayout()
         bt_layout.setSpacing(3)
         
-        self.label = QLabel('设备列表:')
+        self.label = QLabel(t('ui.device_list_label'))
         self.label.setStyleSheet("font-size: 10px;")
         bt_layout.addWidget(self.label)
         
@@ -342,7 +344,7 @@ class BluetoothTool(QWidget):
         self.rssi_threshold_layout = rssi_row
         
         # 连接/断开按钮（合并为一个按钮，文字切换）
-        self.bt_connect_button = self._create_compact_button('连接', '#27ae60')
+        self.bt_connect_button = self._create_compact_button(t('ui.btn_connect'), '#27ae60')
         self.bt_connect_button.clicked.connect(self.on_bt_connect_clicked)
         bt_layout.addWidget(self.bt_connect_button)
 
@@ -373,7 +375,7 @@ class BluetoothTool(QWidget):
         connection_layout.addWidget(bt_group)
         
         # 串口连接（紧凑）
-        serial_group = self._create_compact_group("串口连接")
+        serial_group = self._create_compact_group(t('ui.serial_connection_group'))
         serial_layout = QGridLayout()
         serial_layout.setSpacing(2)
         
@@ -392,27 +394,27 @@ class BluetoothTool(QWidget):
         self.stop_bits_combo.setCurrentText('1')
         self.stop_bits_combo.setStyleSheet("font-size: 10px;")
         self.parity_combo = QComboBox()
-        self.parity_combo.addItems(['无', '奇校验', '偶校验'])
+        self.parity_combo.addItems([t('ui.parity_none'), t('ui.parity_odd'), t('ui.parity_even')])
         self.parity_combo.setStyleSheet("font-size: 10px;")
         
-        serial_layout.addWidget(QLabel('串口:'), 0, 0)
+        serial_layout.addWidget(QLabel(t('ui.serial_port_label')), 0, 0)
         serial_layout.addWidget(self.port_combo, 0, 1)
-        serial_layout.addWidget(QLabel('波特率:'), 1, 0)
+        serial_layout.addWidget(QLabel(t('ui.baud_rate_label')), 1, 0)
         serial_layout.addWidget(self.baud_combo, 1, 1)
-        serial_layout.addWidget(QLabel('数据位:'), 2, 0)
+        serial_layout.addWidget(QLabel(t('ui.data_bits_label')), 2, 0)
         serial_layout.addWidget(self.data_bits_combo, 2, 1)
-        serial_layout.addWidget(QLabel('停止位:'), 3, 0)
+        serial_layout.addWidget(QLabel(t('ui.stop_bits_label')), 3, 0)
         serial_layout.addWidget(self.stop_bits_combo, 3, 1)
-        serial_layout.addWidget(QLabel('校验位:'), 4, 0)
+        serial_layout.addWidget(QLabel(t('ui.parity_label')), 4, 0)
         serial_layout.addWidget(self.parity_combo, 4, 1)
         
-        self.serial_connect_button = self._create_compact_button('连接串口', '#3498db')
+        self.serial_connect_button = self._create_compact_button(t('ui.btn_connect_serial'), '#3498db')
         self.serial_connect_button.clicked.connect(self.on_serial_connect_clicked)
         serial_layout.addWidget(self.serial_connect_button, 5, 0, 1, 2)
         
         # 监控间隔
         monitor_row = QHBoxLayout()
-        monitor_row.addWidget(QLabel('监控间隔:'))
+        monitor_row.addWidget(QLabel(t('ui.monitor_interval_label')))
         self.monitor_interval_spinbox = QDoubleSpinBox()
         self.monitor_interval_spinbox.setMinimum(0.5)
         self.monitor_interval_spinbox.setMaximum(100.0)
@@ -421,7 +423,7 @@ class BluetoothTool(QWidget):
         self.monitor_interval_spinbox.setFixedWidth(60)
         self.monitor_interval_spinbox.setStyleSheet("font-size: 10px;")
         monitor_row.addWidget(self.monitor_interval_spinbox)
-        monitor_row.addWidget(QLabel('秒'))
+        monitor_row.addWidget(QLabel(t('ui.interval_seconds')))
         monitor_row.addStretch()
         serial_layout.addLayout(monitor_row, 6, 0, 1, 2)
         
@@ -429,7 +431,7 @@ class BluetoothTool(QWidget):
         connection_layout.addWidget(serial_group)
 
         connection_layout.addStretch()
-        left_tabs.addTab(connection_tab, "连接")
+        left_tabs.addTab(connection_tab, t('ui.tab_connection'))
         
         # ==================== Tab 2: 设备控制 ====================
         control_tab = QWidget()
@@ -438,17 +440,17 @@ class BluetoothTool(QWidget):
         control_layout.setContentsMargins(5, 5, 5, 5)
         
         # 充放电控制
-        mos_group = self._create_compact_group("MOS控制")
+        mos_group = self._create_compact_group(t('ui.mos_control_group'))
         mos_layout = QGridLayout()
         mos_layout.setSpacing(2)
         
-        self.open_charge_button = self._create_compact_button('充电开', '#27ae60')
+        self.open_charge_button = self._create_compact_button(t('ui.btn_charge_on'), '#27ae60')
         self.open_charge_button.clicked.connect(self.on_open_charge_clicked)
-        self.close_charge_button = self._create_compact_button('充电关', '#e74c3c')
+        self.close_charge_button = self._create_compact_button(t('ui.btn_charge_off'), '#e74c3c')
         self.close_charge_button.clicked.connect(self.on_close_charge_clicked)
-        self.open_discharge_button = self._create_compact_button('放电开', '#27ae60')
+        self.open_discharge_button = self._create_compact_button(t('ui.btn_discharge_on'), '#27ae60')
         self.open_discharge_button.clicked.connect(self.on_open_discharge_clicked)
-        self.close_discharge_button = self._create_compact_button('放电关', '#e74c3c')
+        self.close_discharge_button = self._create_compact_button(t('ui.btn_discharge_off'), '#e74c3c')
         self.close_discharge_button.clicked.connect(self.on_close_discharge_clicked)
         
         mos_layout.addWidget(self.open_charge_button, 0, 0)
@@ -460,13 +462,13 @@ class BluetoothTool(QWidget):
         control_layout.addWidget(mos_group)
         
         # 保电控制
-        store_group = self._create_compact_group("保电控制")
+        store_group = self._create_compact_group(t('ui.store_power_group'))
         store_layout = QHBoxLayout()
         store_layout.setSpacing(2)
         
-        self.open_store_power_button = self._create_compact_button('保电开', '#27ae60')
+        self.open_store_power_button = self._create_compact_button(t('ui.btn_store_power_on'), '#27ae60')
         self.open_store_power_button.clicked.connect(self.on_open_store_power_clicked)
-        self.close_store_power_button = self._create_compact_button('保电关', '#e74c3c')
+        self.close_store_power_button = self._create_compact_button(t('ui.btn_store_power_off'), '#e74c3c')
         self.close_store_power_button.clicked.connect(self.on_close_store_power_clicked)
         
         store_layout.addWidget(self.open_store_power_button)
@@ -492,13 +494,13 @@ class BluetoothTool(QWidget):
         control_layout.addWidget(chglimit_group)
 
         # 加热模式
-        heating_group = self._create_compact_group("加热模式")
+        heating_group = self._create_compact_group(t('ui.heating_mode_group'))
         heating_layout = QHBoxLayout()
         heating_layout.setSpacing(2)
         
-        self.self_heating_button = self._create_compact_button('自加热', '#e74c3c')
+        self.self_heating_button = self._create_compact_button(t('ui.btn_self_heating'), '#e74c3c')
         self.self_heating_button.clicked.connect(self.on_self_heating_clicked)
-        self.charger_heating_button = self._create_compact_button('充电器加热', '#3498db')
+        self.charger_heating_button = self._create_compact_button(t('ui.btn_charger_heating'), '#3498db')
         self.charger_heating_button.clicked.connect(self.on_charger_heating_clicked)
         
         heating_layout.addWidget(self.self_heating_button)
@@ -508,21 +510,21 @@ class BluetoothTool(QWidget):
         control_layout.addWidget(heating_group)
         
         # RT控制
-        rt_group = self._create_compact_group("RT控制")
+        rt_group = self._create_compact_group(t('ui.rt_control_group'))
         rt_layout = QGridLayout()
         rt_layout.setSpacing(2)
         
-        self.rt0_enable_button = self._create_compact_button('RT0开', '#27ae60')
+        self.rt0_enable_button = self._create_compact_button(t('ui.btn_rt0_on'), '#27ae60')
         self.rt0_enable_button.clicked.connect(self.on_rt0_enable_clicked)
-        self.rt1_enable_button = self._create_compact_button('RT1开', '#27ae60')
+        self.rt1_enable_button = self._create_compact_button(t('ui.btn_rt1_on'), '#27ae60')
         self.rt1_enable_button.clicked.connect(self.on_rt1_enable_clicked)
-        self.rt2_enable_button = self._create_compact_button('RT2开', '#27ae60')
+        self.rt2_enable_button = self._create_compact_button(t('ui.btn_rt2_on'), '#27ae60')
         self.rt2_enable_button.clicked.connect(self.on_rt2_enable_clicked)
-        self.rt0_disable_button = self._create_compact_button('RT0关', '#e74c3c')
+        self.rt0_disable_button = self._create_compact_button(t('ui.btn_rt0_off'), '#e74c3c')
         self.rt0_disable_button.clicked.connect(self.on_rt0_disable_clicked)
-        self.rt1_disable_button = self._create_compact_button('RT1关', '#e74c3c')
+        self.rt1_disable_button = self._create_compact_button(t('ui.btn_rt1_off'), '#e74c3c')
         self.rt1_disable_button.clicked.connect(self.on_rt1_disable_clicked)
-        self.rt2_disable_button = self._create_compact_button('RT2关', '#e74c3c')
+        self.rt2_disable_button = self._create_compact_button(t('ui.btn_rt2_off'), '#e74c3c')
         self.rt2_disable_button.clicked.connect(self.on_rt2_disable_clicked)
         
         rt_layout.addWidget(self.rt0_enable_button, 0, 0)
@@ -536,25 +538,25 @@ class BluetoothTool(QWidget):
         control_layout.addWidget(rt_group)
         
         # 其他控制
-        other_group = self._create_compact_group("其他控制")
+        other_group = self._create_compact_group(t('ui.other_control_group'))
         other_layout = QVBoxLayout()
         other_layout.setSpacing(2)
         
-        self.shutdown_button = self._create_compact_button('🔌 设备关机', '#95a5a6')
+        self.shutdown_button = self._create_compact_button(t('ui.btn_shutdown'), '#95a5a6')
         self.shutdown_button.clicked.connect(self.on_shutdown_clicked)
         other_layout.addWidget(self.shutdown_button)
         
         # 蓝牙名称修改
         bt_name_row = QHBoxLayout()
-        bt_name_row.addWidget(QLabel('名称:'))
+        bt_name_row.addWidget(QLabel(t('ui.bt_name_label')))
         self.bt_name_input = QLineEdit()
-        self.bt_name_input.setPlaceholderText('输入新蓝牙名称')
+        self.bt_name_input.setPlaceholderText(t('ui.bt_name_placeholder'))
         self.bt_name_input.setMaxLength(20)  # 限制20个字符
         self.bt_name_input.setStyleSheet("font-size: 10px;")
         bt_name_row.addWidget(self.bt_name_input)
         other_layout.addLayout(bt_name_row)
         
-        self.bt_name_button = self._create_compact_button('修改蓝牙名称', '#3498db')
+        self.bt_name_button = self._create_compact_button(t('ui.btn_change_bt_name'), '#3498db')
         self.bt_name_button.clicked.connect(self.on_change_bt_name_clicked)
         other_layout.addWidget(self.bt_name_button)
         
@@ -562,7 +564,7 @@ class BluetoothTool(QWidget):
         control_layout.addWidget(other_group)
         
         control_layout.addStretch()
-        left_tabs.addTab(control_tab, "控制")
+        left_tabs.addTab(control_tab, t('ui.tab_control'))
         
         # ==================== Tab 3: 密码&烧录 ====================
         advanced_tab = QWidget()
@@ -571,13 +573,13 @@ class BluetoothTool(QWidget):
         advanced_layout.setContentsMargins(5, 5, 5, 5)
         
         # HEX文件部分（紧凑）
-        hex_group = self._create_compact_group("HEX文件")
+        hex_group = self._create_compact_group(t('ui.hex_file_group'))
         hex_layout = QVBoxLayout()
         hex_layout.setSpacing(2)
         
         # 选择按钮单独一行
         hex_btn_row = QHBoxLayout()
-        self.hex_file_button = QPushButton('选择HEX文件')
+        self.hex_file_button = QPushButton(t('ui.btn_select_hex'))
         self.hex_file_button.setFixedHeight(22)
         self.hex_file_button.clicked.connect(self.on_select_hex_file)
         hex_btn_row.addWidget(self.hex_file_button)
@@ -585,7 +587,7 @@ class BluetoothTool(QWidget):
         hex_layout.addLayout(hex_btn_row)
         
         # 文件名标签单独一行，支持换行
-        self.hex_file_label = QLabel('未选择文件')
+        self.hex_file_label = QLabel(t('ui.hex_file_not_selected'))
         self.hex_file_label.setStyleSheet("font-size: 10px; color: #333; padding: 2px;")
         self.hex_file_label.setWordWrap(True)  # 允许自动换行
         self.hex_file_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
@@ -593,23 +595,28 @@ class BluetoothTool(QWidget):
         hex_layout.addWidget(self.hex_file_label)
         
         # 文件大小信息
-        self.hex_info_label = QLabel('大小: 0B')
+        self.hex_info_label = QLabel(t('ui.hex_file_size', '0'))
         self.hex_info_label.setStyleSheet("font-size: 9px; color: #666;")
         hex_layout.addWidget(self.hex_info_label)
         
+        self.cell_32_checkbox = QCheckBox(t('ui.cell_32_config_checkbox'))
+        self.cell_32_checkbox.setStyleSheet("font-size: 10px;")
+        self.cell_32_checkbox.setToolTip(t('ui.cell_32_tooltip'))
+        self.cell_32_checkbox.stateChanged.connect(self.on_cell_config_changed)
+        hex_layout.addWidget(self.cell_32_checkbox)
         
         hex_group.setLayout(hex_layout)
         advanced_layout.addWidget(hex_group)
         
         # 密码管理
-        password_group = self._create_compact_group("密码管理")
+        password_group = self._create_compact_group(t('ui.password_group'))
         password_layout = QVBoxLayout()
         password_layout.setSpacing(2)
         
         pwd_input_row = QHBoxLayout()
-        pwd_input_row.addWidget(QLabel('密码:'))
+        pwd_input_row.addWidget(QLabel(t('ui.password_label')))
         self.password_input = QLineEdit()
-        self.password_input.setPlaceholderText('6位密码')
+        self.password_input.setPlaceholderText(t('ui.password_placeholder'))
         self.password_input.setMaxLength(6)
         self.password_input.setStyleSheet("font-size: 10px;")
         pwd_input_row.addWidget(self.password_input)
@@ -618,13 +625,13 @@ class BluetoothTool(QWidget):
         pwd_btn_layout = QGridLayout()
         pwd_btn_layout.setSpacing(2)
         
-        self.query_lock_button = self._create_compact_button('查询', '#3498db')
+        self.query_lock_button = self._create_compact_button(t('ui.btn_query_lock'), '#3498db')
         self.query_lock_button.clicked.connect(self.on_query_lock_clicked)
-        self.login_button = self._create_compact_button('验证', '#27ae60')
+        self.login_button = self._create_compact_button(t('ui.btn_login'), '#27ae60')
         self.login_button.clicked.connect(self.on_login_clicked)
-        self.set_password_button = self._create_compact_button('设置', '#f39c12')
+        self.set_password_button = self._create_compact_button(t('ui.btn_set_password'), '#f39c12')
         self.set_password_button.clicked.connect(self.on_set_password_clicked)
-        self.reset_password_button = self._create_compact_button('取消', '#e74c3c')
+        self.reset_password_button = self._create_compact_button(t('ui.btn_reset_password'), '#e74c3c')
         self.reset_password_button.clicked.connect(self.on_reset_password_clicked)
         
         pwd_btn_layout.addWidget(self.query_lock_button, 0, 0)
@@ -637,23 +644,23 @@ class BluetoothTool(QWidget):
         advanced_layout.addWidget(password_group)
         
         # 烧录控制
-        program_group = self._create_compact_group("烧录控制")
+        program_group = self._create_compact_group(t('ui.programming_group'))
         program_layout = QVBoxLayout()
         program_layout.setSpacing(2)
         
-        self.program_button = self._create_compact_button('开始烧录', '#e67e22')
+        self.program_button = self._create_compact_button(t('ui.btn_start_programming'), '#e67e22')
         self.program_button.clicked.connect(self.on_program_clicked)
         program_layout.addWidget(self.program_button)
         
-        self.packet_success_label = QLabel('包号: 0 / 0')
+        self.packet_success_label = QLabel(t('ui.packet_progress', '0', '0'))
         self.packet_success_label.setStyleSheet("font-size: 9px; color: #666;")
         program_layout.addWidget(self.packet_success_label)
         
-        self.batch_program_button = self._create_compact_button('批量烧录', '#d35400')
+        self.batch_program_button = self._create_compact_button(t('ui.btn_batch_program'), '#d35400')
         self.batch_program_button.clicked.connect(self.on_batch_program_clicked)
         program_layout.addWidget(self.batch_program_button)
         
-        self.batch_success_label = QLabel('成功: 0')
+        self.batch_success_label = QLabel(t('ui.batch_success_count', '0'))
         self.batch_success_label.setStyleSheet("font-size: 9px; color: #666;")
         program_layout.addWidget(self.batch_success_label)
         
@@ -661,7 +668,7 @@ class BluetoothTool(QWidget):
         advanced_layout.addWidget(program_group)
         
         advanced_layout.addStretch()
-        left_tabs.addTab(advanced_tab, "高级")
+        left_tabs.addTab(advanced_tab, t('ui.tab_advanced'))
         
         # ==================== Tab 4: 测试 ====================
         test_tab = QWidget()
@@ -670,23 +677,23 @@ class BluetoothTool(QWidget):
         test_layout.setContentsMargins(5, 5, 5, 5)
         
         # 数据发送测试
-        send_test_group = self._create_compact_group("发送测试")
+        send_test_group = self._create_compact_group(t('ui.send_test_group'))
         send_test_layout = QVBoxLayout()
         send_test_layout.setSpacing(2)
         
         send_row1 = QHBoxLayout()
-        send_row1.addWidget(QLabel('输入:'))
+        send_row1.addWidget(QLabel(t('ui.send_input_label')))
         self.send_input = QLineEdit()
-        self.send_input.setPlaceholderText('发送数据')
+        self.send_input.setPlaceholderText(t('ui.send_input_placeholder'))
         self.send_input.setStyleSheet("font-size: 10px;")
         send_row1.addWidget(self.send_input)
         send_test_layout.addLayout(send_row1)
         
         send_row2 = QHBoxLayout()
-        self.hex_send_checkbox = QCheckBox('HEX')
+        self.hex_send_checkbox = QCheckBox(t('ui.checkbox_hex'))
         self.hex_send_checkbox.setChecked(True)
         self.hex_send_checkbox.setStyleSheet("font-size: 10px;")
-        self.crlf_send_checkbox = QCheckBox('\\r\\n')
+        self.crlf_send_checkbox = QCheckBox(t('ui.checkbox_crlf'))
         self.crlf_send_checkbox.setStyleSheet("font-size: 10px;")
         send_row2.addWidget(self.hex_send_checkbox)
         send_row2.addWidget(self.crlf_send_checkbox)
@@ -694,10 +701,10 @@ class BluetoothTool(QWidget):
         send_test_layout.addLayout(send_row2)
         
         send_row3 = QHBoxLayout()
-        self.send_button = self._create_compact_button('发送', '#3498db')
+        self.send_button = self._create_compact_button(t('ui.btn_send'), '#3498db')
         self.send_button.setEnabled(False)
         self.send_button.clicked.connect(self.on_send_data_clicked)
-        self.register_button = self._create_compact_button('注册', '#27ae60')
+        self.register_button = self._create_compact_button(t('ui.btn_register'), '#27ae60')
         self.register_button.clicked.connect(self.on_register_clicked)
         self.status_indicator = QLabel()
         self.update_registration_status(False)
@@ -711,17 +718,17 @@ class BluetoothTool(QWidget):
         test_layout.addWidget(send_test_group)
         
         # 连续发送测试
-        continuous_group = self._create_compact_group("连续发送")
+        continuous_group = self._create_compact_group(t('ui.continuous_send_group'))
         continuous_layout = QVBoxLayout()
         continuous_layout.setSpacing(2)
         
         test_row1 = QHBoxLayout()
-        test_row1.addWidget(QLabel('间隔1:'))
+        test_row1.addWidget(QLabel(t('ui.interval1_label')))
         self.test128 = QLineEdit('0')
         self.test128.setFixedWidth(50)
         self.test128.setStyleSheet("font-size: 10px;")
         test_row1.addWidget(self.test128)
-        test_row1.addWidget(QLabel('间隔2:'))
+        test_row1.addWidget(QLabel(t('ui.interval2_label')))
         self.test512 = QLineEdit('280')
         self.test512.setFixedWidth(50)
         self.test512.setStyleSheet("font-size: 10px;")
@@ -733,17 +740,17 @@ class BluetoothTool(QWidget):
         test_row1.addStretch()
         continuous_layout.addLayout(test_row1)
         
-        self.test_send_button = self._create_compact_button('开始连续发送', '#9b59b6')
+        self.test_send_button = self._create_compact_button(t('ui.btn_start_continuous'), '#9b59b6')
         self.test_send_button.clicked.connect(self.on_test_send_buttoned)
         continuous_layout.addWidget(self.test_send_button)
         
-        self.no_ack_label = QLabel('无回应=0')
+        self.no_ack_label = QLabel(t('ui.no_ack_count', '0'))
         self.no_ack_label.setStyleSheet("font-size: 9px; color: #666;")
         self.no_ack_count = 0
-        self.err_ack_label = QLabel('ack错误=0')
+        self.err_ack_label = QLabel(t('ui.err_ack_count', '0'))
         self.err_ack_label.setStyleSheet("font-size: 9px; color: #666;")
         self.err_ack_count = 0
-        self.total_send_label = QLabel('总次数=0')
+        self.total_send_label = QLabel(t('ui.total_send_count', '0'))
         self.total_send_label.setStyleSheet("font-size: 9px; color: #666;")
         
         continuous_layout.addWidget(self.no_ack_label)
@@ -754,14 +761,14 @@ class BluetoothTool(QWidget):
         test_layout.addWidget(continuous_group)
         
         test_layout.addStretch()
-        left_tabs.addTab(test_tab, "测试")
+        left_tabs.addTab(test_tab, t('ui.tab_test'))
         
         # ==================== 右侧：接收窗口 ====================
         right_layout = QVBoxLayout()
         right_layout.setSpacing(3)
         right_layout.setContentsMargins(5, 5, 5, 5)
         
-        self.receive_label = QLabel('接收数据:')
+        self.receive_label = QLabel(t('ui.receive_data_label'))
         self.receive_label.setStyleSheet("font-size: 10px; font-weight: bold;")
         right_layout.addWidget(self.receive_label)
         
@@ -772,11 +779,11 @@ class BluetoothTool(QWidget):
         
         # 接收控制
         rx_control_layout = QHBoxLayout()
-        self.hex_display_checkbox = QCheckBox('HEX显示')
+        self.hex_display_checkbox = QCheckBox(t('ui.checkbox_hex_display'))
         self.hex_display_checkbox.setChecked(True)
         self.hex_display_checkbox.setStyleSheet("font-size: 10px;")
         self.hex_display_checkbox.stateChanged.connect(self.on_hex_display_changed)
-        self.clear_receive_button = self._create_compact_button('清空', '#95a5a6')
+        self.clear_receive_button = self._create_compact_button(t('ui.btn_clear_receive'), '#95a5a6')
         self.clear_receive_button.clicked.connect(lambda: self.receive_output.clear())
         rx_control_layout.addWidget(self.hex_display_checkbox)
         rx_control_layout.addWidget(self.clear_receive_button)
@@ -791,7 +798,7 @@ class BluetoothTool(QWidget):
         self.resize(850, 550)  # 紧凑的窗口尺寸
         
         # 初始化UI状态为断开（所有UI组件创建完成后）
-        self.update_bluetooth_status('断开')
+        self.update_bluetooth_status(t('ui.status_disconnected'))
         
         # 初始化时自动扫描
         QTimer.singleShot(100, self.on_scan_all_clicked)
@@ -887,21 +894,27 @@ class BluetoothTool(QWidget):
         # 如果指定了颜色，使用 QTextCursor 精确控制
         if color:
             from PyQt6.QtGui import QTextCursor, QTextCharFormat, QColor
-            scrollbar = self.receive_output.verticalScrollBar()
-            old_value = scrollbar.value()
-            was_at_bottom = (old_value == scrollbar.maximum())
+            
             cursor = self.receive_output.textCursor()
             cursor.movePosition(QTextCursor.MoveOperation.End)
+            
+            # 保存原始默认格式（自适应系统颜色）
             default_fmt = QTextCharFormat()
             default_fmt.setForeground(self.receive_output.palette().color(self.receive_output.palette().ColorRole.Text))
+            
+            # 设置文本格式（颜色）
             fmt = QTextCharFormat()
             fmt.setForeground(QColor(color))
             cursor.setCharFormat(fmt)
+            
+            # 插入带颜色的文本
             cursor.insertText(text + '\n')
+            
+            # 恢复为系统默认颜色（自适应深色/浅色主题）
             cursor.setCharFormat(default_fmt)
+            
+            # 更新光标位置
             self.receive_output.setTextCursor(cursor)
-            if not was_at_bottom:
-                scrollbar.setValue(old_value)
         else:
             self.receive_output.append(text)
         
@@ -990,7 +1003,7 @@ class BluetoothTool(QWidget):
                 self.commu_type = "none"
 
             self.is_serial_connected = False
-            self.serial_connect_button.setText('连接串口')
+            self.serial_connect_button.setText(t('ui.btn_connect_serial'))
             self.disable_serial_settings(False)
             
             # 更新共享按钮状态（考虑蓝牙连接状态）
@@ -1016,7 +1029,10 @@ class BluetoothTool(QWidget):
             baud_rate = int(self.baud_combo.currentText())
             data_bits = int(self.data_bits_combo.currentText())
             stop_bits = float(self.stop_bits_combo.currentText())
-            parity = {'无': 'N', '奇校验': 'O', '偶校验': 'E'}[self.parity_combo.currentText()]
+            # 使用索引获取校验位（顺序：无/None, 奇校验/Odd, 偶校验/Even）
+            parity_map = ['N', 'O', 'E']  # None, Odd, Even
+            parity_index = self.parity_combo.currentIndex()
+            parity = parity_map[parity_index] if 0 <= parity_index < len(parity_map) else 'N'
 
             # 在线程池中执行阻塞的串口连接操作
             loop = asyncio.get_event_loop()
@@ -1036,7 +1052,7 @@ class BluetoothTool(QWidget):
                 self.device_name = port
                 self.commu_type = "serial"
                 self.is_serial_connected = True
-                self.serial_connect_button.setText('断开串口')
+                self.serial_connect_button.setText(t('ui.btn_disconnect_serial'))
                 self.blue_write_log(f"串口 {port} 连接成功")
                 
                 # 禁用参数设置
@@ -1056,8 +1072,21 @@ class BluetoothTool(QWidget):
             else:
                 self.blue_write_log(f"串口 {port} 未能成功打开")
                 
-        except Exception as e:
+        except KeyError as e:
+            # 校验位选择错误（不应该发生，但以防万一）
+            self.blue_write_log(f"串口连接失败: 校验位配置错误 - {str(e)}")
+        except ValueError as e:
+            # 参数值错误
+            self.blue_write_log(f"串口连接失败: 参数错误 - {str(e)}")
+        except serial.SerialException as e:
+            # 串口硬件错误
             self.blue_write_log(f"串口连接失败: {str(e)}")
+        except Exception as e:
+            # 其他未知错误
+            error_msg = str(e) if str(e) else repr(e)
+            self.blue_write_log(f"串口连接失败: {error_msg}")
+            import traceback
+            self.blue_write_log(f"详细错误: {traceback.format_exc()}")
 
     async def disconnect_serial(self):
         """断开串口连接"""
@@ -1080,7 +1109,7 @@ class BluetoothTool(QWidget):
         self.commu_type = "none"
         self.serial_port = None
         # 更新UI
-        self.serial_connect_button.setText('连接串口')
+        self.serial_connect_button.setText(t('ui.btn_connect_serial'))
         self.disable_serial_settings(False)
         
         # 更新共享按钮状态（考虑蓝牙连接状态）
@@ -1303,7 +1332,7 @@ class BluetoothTool(QWidget):
             self.scan_button.setEnabled(False)  # 禁用扫描
             self.device_list.setEnabled(False)  # 禁用设备列表
             self.bt_connect_button.setEnabled(True)  # 启用按钮（用于断开）
-            self.bt_connect_button.setText('断开')  # 改为"断开"
+            self.bt_connect_button.setText(t('ui.btn_disconnect'))  # 改为"断开"
             self.bt_connect_button.setStyleSheet(self._get_button_style('#e74c3c'))  # 红色
             
         elif state == 'connecting':
@@ -1329,7 +1358,7 @@ class BluetoothTool(QWidget):
             self.scan_button.setEnabled(True)  # 启用扫描
             self.device_list.setEnabled(True)  # 启用设备列表
             self.bt_connect_button.setEnabled(True)  # 启用按钮（用于连接）
-            self.bt_connect_button.setText('连接')  # 改为"连接"
+            self.bt_connect_button.setText(t('ui.btn_connect'))  # 改为"连接"
             self.bt_connect_button.setStyleSheet(self._get_button_style('#27ae60'))  # 绿色
         
         # 更新蓝牙状态标签
@@ -1442,10 +1471,10 @@ class BluetoothTool(QWidget):
     async def scan_devices(self):
         """异步方法，扫描蓝牙设备"""
         self.device_list.clear()
-        self.label.setText('正在扫描设备...')
+        self.label.setText(t('ui.scanning_devices'))
         radio_ok = await self.ensure_bluetooth_radio_enabled()
         if not radio_ok:
-            self.label.setText('蓝牙适配器未就绪，请检查系统蓝牙设置')
+            self.label.setText(t('ui.bt_adapter_not_ready'))
             self.blue_write_log("⚠️ 蓝牙适配器检查失败，继续尝试扫描...")
         # 获取用户输入的信号强度阈值
         try:
@@ -1557,7 +1586,7 @@ class BluetoothTool(QWidget):
 
                 # self.blue_write_log(device_info)
 
-        self.label.setText('发现的蓝牙设备:')
+        self.label.setText(t('ui.devices_found'))
         
         # 如果是手动扫描且启用了自动连接，尝试自动连接
         if self.auto_connect_enabled and not self.is_auto_scanning and not self.is_connecting:
@@ -2065,7 +2094,7 @@ class BluetoothTool(QWidget):
             self.program_task.cancel()
             self.program_task = None
             self.program_button.setEnabled(True)
-            self.program_button.setText('开始烧录')
+            self.program_button.setText(t('ui.btn_start_programming'))
         else:
             if not self.client or not self.client.is_connected:
                 if not self.serial_port or not self.serial_port.is_open:
@@ -2079,7 +2108,7 @@ class BluetoothTool(QWidget):
             self.ota_start_count += 1
             time128 = int(self.test128.text()) / 1000
             time512 = int(self.test512.text()) / 1000
-            self.program_button.setText('再点击即停止')
+            self.program_button.setText(t('ui.btn_stop_programming'))
             err_count = 0
             # while err_count < 4:
             #     data = self.download_data.get_download_data(BmsCmdType.DOWNLOAD_BUFFER)
@@ -2101,7 +2130,7 @@ class BluetoothTool(QWidget):
             while shake_count < 3:
                 err_count = 0
                 while err_count < 3:
-                    self.packet_success_label.setText('开始握手')
+                    self.packet_success_label.setText(t('ui.handshake_start'))
                     data = bytearray([0x00,0x00,0x04,0x01,0x76,0x55,0xaa,0x7a])
                     self.display_send_data(data)
                     await self.byte_send(data)
@@ -2117,7 +2146,7 @@ class BluetoothTool(QWidget):
                         self.blue_write_log(f"握手失败")
                 shake_count += 1
             else:
-                self.packet_success_label.setText('握手成功')
+                self.packet_success_label.setText(t('ui.handshake_success'))
                 self.blue_write_log(f"握手最终成功")
             # self.text_decode.legality = ReceveDataStatus.ERR_NOTHING
 
@@ -2134,7 +2163,7 @@ class BluetoothTool(QWidget):
                     await asyncio.sleep(time512 * 4)
                 if(self.text_decode.no80_cmd == BmsCmdType.DOWNLOAD_BUFFER  and self.text_decode.cmd_ack == 0x00):
                     self.blue_write_log(f"✅ 擦除命令发送成功")
-                    self.packet_success_label.setText('擦除成功')
+                    self.packet_success_label.setText(t('ui.erase_success'))
                     break
                 else:
                     self.blue_write_log(f"❌ 擦除未成功，继续重试 (err_count={err_count})")
@@ -2238,7 +2267,7 @@ class BluetoothTool(QWidget):
             # 恢复按钮状态
             self.program_task = None
             self.program_button.setEnabled(True)
-            self.program_button.setText('开始烧录')
+            self.program_button.setText(t('ui.btn_start_programming'))
 
     def on_scan_all_clicked(self):
         """同步方法，用于触发异步扫描蓝牙和刷新串口"""
@@ -2454,13 +2483,13 @@ class BluetoothTool(QWidget):
         """同步方法，批量烧录100次"""
         if self.batch_task:
             self.batch_task.cancel()
-            self.batch_program_button.setText('开始烧录100')
+            self.batch_program_button.setText(t('ui.start_batch_100'))
             self.batch_task = None
             return
-        self.batch_program_button.setText('再点击即停止')
+        self.batch_program_button.setText(t('ui.btn_stop_batch'))
         self.ota_start_count = 0
         self.ota_ok_count = 0
-        self.batch_success_label.setText('成功数: 0')
+        self.batch_success_label.setText(t('ui.batch_success_count', '0'))
         self.batch_task = asyncio.create_task(self.batch_programming())
 
     async def batch_programming(self):
@@ -2468,13 +2497,13 @@ class BluetoothTool(QWidget):
         for i in range(100):
             try:
                 await self.start_programming()
-                self.batch_success_label.setText(f'总数: {self.ota_start_count} 成功数: {self.ota_ok_count}')
+                self.batch_success_label.setText(t('ui.batch_total_count', str(self.ota_start_count), str(self.ota_ok_count)))
             except Exception as e:
                 self.blue_write_log(f'第{i+1}次烧录失败: {e}')
                 traceback.print_exc()
                 self.batch_task = None
                 continue
-        self.batch_program_button.setText('开始烧录100')
+        self.batch_program_button.setText(t('ui.start_batch_100'))
 
     def on_register_clicked(self):
         asyncio.create_task(self.send_register_cmd())
@@ -3619,7 +3648,7 @@ class SimplifiedBluetoothTool(QWidget):
         
     def initSimplifiedUI(self):
         """初始化简化UI"""
-        self.setWindowTitle('蓝牙/串口连接')
+        self.setWindowTitle(t('ui.bt_tool_simplified_title'))
         
         main_layout = QVBoxLayout()
         main_layout.setContentsMargins(10, 10, 10, 10)
@@ -3630,7 +3659,7 @@ class SimplifiedBluetoothTool(QWidget):
         
         # ========== 左侧：蓝牙 ==========
         bluetooth_layout = QVBoxLayout()
-        bluetooth_title = QLabel('蓝牙连接')
+        bluetooth_title = QLabel(t('ui.simplified_bt_title'))
         bluetooth_title.setFont(QFont('Arial', 11, QFont.Weight.Bold))
         bluetooth_layout.addWidget(bluetooth_title)
         
@@ -3662,7 +3691,7 @@ class SimplifiedBluetoothTool(QWidget):
         
         # 自动连接配置（复用原窗口的控件）
         auto_layout = QVBoxLayout()
-        auto_title = QLabel('自动连接')
+        auto_title = QLabel(t('ui.simplified_auto_connect'))
         auto_title.setFont(QFont('Arial', 10, QFont.Weight.Bold))
         auto_layout.addWidget(auto_title)
         
@@ -3670,14 +3699,14 @@ class SimplifiedBluetoothTool(QWidget):
         auto_layout.addWidget(self.auto_connect_checkbox)
         
         name_layout = QHBoxLayout()
-        name_layout.addWidget(QLabel('名称:'))
+        name_layout.addWidget(QLabel(t('ui.device_name_label')))
         self.auto_connect_name_input = self.bluetooth_tool.auto_connect_name_input
         self.auto_connect_name_input.setMaximumWidth(120)
         name_layout.addWidget(self.auto_connect_name_input)
         auto_layout.addLayout(name_layout)
         
         mac_layout_simple = QHBoxLayout()
-        mac_layout_simple.addWidget(QLabel('MAC:'))
+        mac_layout_simple.addWidget(QLabel(t('ui.mac_address_label')))
         self.auto_connect_mac_input = self.bluetooth_tool.auto_connect_mac_input
         self.auto_connect_mac_input.setMaximumWidth(120)
         mac_layout_simple.addWidget(self.auto_connect_mac_input)
@@ -3685,14 +3714,14 @@ class SimplifiedBluetoothTool(QWidget):
         
         # 重试间隔设置
         interval_layout_simple = QHBoxLayout()
-        interval_layout_simple.addWidget(QLabel('间隔(秒):'))
+        interval_layout_simple.addWidget(QLabel(f"{t('ui.interval_label')}({t('ui.interval_seconds')}):"))
         self.auto_connect_interval_spinbox = self.bluetooth_tool.auto_connect_interval_spinbox
         self.auto_connect_interval_spinbox.setMaximumWidth(60)
         interval_layout_simple.addWidget(self.auto_connect_interval_spinbox)
         auto_layout.addLayout(interval_layout_simple)
         
         # 提示标签
-        auto_save_hint_simple = QLabel('💡 自动保存')
+        auto_save_hint_simple = QLabel(t('ui.auto_save_hint'))
         auto_save_hint_simple.setStyleSheet("QLabel { color: #666; font-size: 9px; }")
         auto_layout.addWidget(auto_save_hint_simple)
         
@@ -3700,7 +3729,7 @@ class SimplifiedBluetoothTool(QWidget):
         
         # ========== 右侧：串口 ==========
         serial_layout = QVBoxLayout()
-        serial_title = QLabel('串口连接')
+        serial_title = QLabel(t('ui.simplified_serial_title'))
         serial_title.setFont(QFont('Arial', 11, QFont.Weight.Bold))
         serial_layout.addWidget(serial_title)
         
@@ -3714,15 +3743,15 @@ class SimplifiedBluetoothTool(QWidget):
         self.stop_bits_combo = self.bluetooth_tool.stop_bits_combo
         self.parity_combo = self.bluetooth_tool.parity_combo
         
-        param_grid.addWidget(QLabel('串口:'), 0, 0)
+        param_grid.addWidget(QLabel(t('ui.serial_port_label')), 0, 0)
         param_grid.addWidget(self.port_combo, 0, 1)
-        param_grid.addWidget(QLabel('波特率:'), 1, 0)
+        param_grid.addWidget(QLabel(t('ui.baud_rate_label')), 1, 0)
         param_grid.addWidget(self.baud_combo, 1, 1)
-        param_grid.addWidget(QLabel('数据位:'), 2, 0)
+        param_grid.addWidget(QLabel(t('ui.data_bits_label')), 2, 0)
         param_grid.addWidget(self.data_bits_combo, 2, 1)
-        param_grid.addWidget(QLabel('停止位:'), 3, 0)
+        param_grid.addWidget(QLabel(t('ui.stop_bits_label')), 3, 0)
         param_grid.addWidget(self.stop_bits_combo, 3, 1)
-        param_grid.addWidget(QLabel('校验位:'), 4, 0)
+        param_grid.addWidget(QLabel(t('ui.parity_label')), 4, 0)
         param_grid.addWidget(self.parity_combo, 4, 1)
         
         serial_layout.addLayout(param_grid)
@@ -3760,7 +3789,7 @@ class SimplifiedBluetoothTool(QWidget):
         
         # 使用原窗口的注册按钮，改名为"连接测试"
         self.register_button = self.bluetooth_tool.register_button
-        self.register_button.setText('连接测试')
+        self.register_button.setText(t('ui.btn_connection_test'))
         test_layout.addWidget(self.register_button)
         
         # 使用原窗口的状态指示灯
@@ -3815,7 +3844,7 @@ class SimplifiedBluetoothTool(QWidget):
 
         # ========== 加热模式控制 ==========
         heating_layout = QVBoxLayout()
-        heating_title = QLabel('加热模式')
+        heating_title = QLabel(t('ui.heating_mode_title'))
         heating_title.setFont(QFont('Arial', 11, QFont.Weight.Bold))
         heating_layout.addWidget(heating_title)
 

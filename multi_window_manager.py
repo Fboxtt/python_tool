@@ -13,6 +13,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QObject, QAbstractTableModel
 from PyQt6.QtGui import QFont, QColor, QPainter
 from display_widgets import BatteryTableModel, get_adaptive_colors, BitFlagsTableModel, _global_refresh_timer_manager
+from language_manager import t
 
 
 # ============== 圆形通讯状态指示器（优化版）==============
@@ -686,6 +687,7 @@ class DataDisplayWindow(QWidget):
         self.column_mode = column_mode
         self.expected_row_count = expected_row_count
         self.window_type = window_type
+        self.logger = None  # 将在create_window中设置
         self._determine_column_widths()
         self.init_ui()
     
@@ -702,10 +704,10 @@ class DataDisplayWindow(QWidget):
                 self.col_widths = [48, 260, 260]
         elif self.window_type == 'alarm_protect':
             # 告警-保护窗口：4列（告警名称, 告警值, 保护名称, 保护值）
-            self.col_widths = [59, 15, 75, 15]  # 值列宽度从30减半到15
+            self.col_widths = [90, 15, 100, 15]  # 值列宽度从30减半到15
         elif self.window_type == 'other_status':
             # 其他状态信息窗口：6列（错误名称, 错误值, 信息名称, 信息值, 均衡名称, 均衡值）
-            self.col_widths = [75, 15, 63, 15, 44, 15]  # 值列宽度从30减半到15
+            self.col_widths = [100, 15, 100, 15, 70, 15]  # 值列宽度从30减半到15
         else:
             if self.column_mode == 2:
                 self.col_widths = [97, 60]
@@ -732,17 +734,32 @@ class DataDisplayWindow(QWidget):
         
         # 根据列模式和窗口类型创建不同的数据模型
         if self.window_type == 'alarm_protect':
-            self.table_model = BitFlagsTableModel(num_columns=4, headers=['告警', '值', '保护', '值'], value_columns=[1, 3])
+            headers = [t('ui.table_header_alarm'), t('ui.table_header_value'), t('ui.table_header_protect'), t('ui.table_header_value')]
+            self.table_model = BitFlagsTableModel(
+                num_columns=4, 
+                headers=headers, 
+                value_columns=[1, 3]
+            )
             self.table_view.setModel(self.table_model)
             for col, width in enumerate(self.col_widths):
                 self.table_view.setColumnWidth(col, width)
         elif self.window_type == 'other_status':
-            self.table_model = BitFlagsTableModel(num_columns=6, headers=['错误', '值', '信息', '值', '均衡', '值'], value_columns=[1, 3, 5])
+            headers = [t('ui.table_header_fault'), t('ui.table_header_value'), t('ui.table_header_info'), t('ui.table_header_value'), t('ui.table_header_balance'), t('ui.table_header_value')]
+            self.table_model = BitFlagsTableModel(
+                num_columns=6, 
+                headers=headers, 
+                value_columns=[1, 3, 5]
+            )
             self.table_view.setModel(self.table_model)
             for col, width in enumerate(self.col_widths):
                 self.table_view.setColumnWidth(col, width)
         elif self.window_type == 'battery_status':
-            self.table_model = BitFlagsTableModel(num_columns=2, headers=['参数名', '状态值'], value_columns=[])
+            headers = [t('ui.table_header_param_name'), t('ui.table_header_status_value')]
+            self.table_model = BitFlagsTableModel(
+                num_columns=2, 
+                headers=headers, 
+                value_columns=[]
+            )
             self.table_view.setModel(self.table_model)
             for col, width in enumerate(self.col_widths):
                 self.table_view.setColumnWidth(col, width)
@@ -801,7 +818,7 @@ class DataDisplayWindow(QWidget):
             button_layout.setSpacing(3)
             button_layout.setContentsMargins(0, 0, 0, 0)
             
-            self.read_button = QPushButton('🔄 读取')
+            self.read_button = QPushButton(t('ui.read'))
             self.read_button.setMinimumWidth(60)
             self.read_button.setMaximumWidth(60)
             self.read_button.setMinimumHeight(24)
@@ -813,7 +830,7 @@ class DataDisplayWindow(QWidget):
             
             # 3列模式额外添加写入按钮
             if self.column_mode == 3:
-                self.write_button = QPushButton('✏️ 写入')
+                self.write_button = QPushButton(t('ui.write'))
                 self.write_button.setMinimumWidth(60)
                 self.write_button.setMaximumWidth(60)
                 self.write_button.setMinimumHeight(24)
@@ -1369,7 +1386,12 @@ class MultiWindowManager(QWidget):
         
         # 写入功能启用状态（默认启用）
         self._write_enabled = True
-        
+
+        # 用户模式状态（默认工厂模式）
+        self._is_user_mode = False
+        # 用户模式允许的窗口列表
+        self._user_allowed_windows = {'PC_GET_SBS', 'PC_GET_VER', 'ALARM_PROTECT', 'OTHER_STATUS', 'BATTERY_STATUS'}
+
         # 初始化蓝牙队列发送器
         self.queue_sender = BluetoothQueueSender(bluetooth_tool, logger)
         
@@ -1389,7 +1411,7 @@ class MultiWindowManager(QWidget):
         left_layout.setContentsMargins(5, 5, 5, 5)
         
         # 标题
-        title_label = QLabel('数据窗口控制')
+        title_label = QLabel(t('ui.window_control_title'))
         font = title_label.font()
         font.setBold(True)
         font.setPointSize(12)
@@ -1412,15 +1434,15 @@ class MultiWindowManager(QWidget):
         # 控制按钮
         button_layout = QVBoxLayout()
         
-        self.select_all_btn = QPushButton('全选')
+        self.select_all_btn = QPushButton(t('ui.select_all'))
         self.select_all_btn.clicked.connect(self.select_all_windows)
         button_layout.addWidget(self.select_all_btn)
-        
-        self.deselect_all_btn = QPushButton('全不选')
+
+        self.deselect_all_btn = QPushButton(t('ui.deselect_all'))
         self.deselect_all_btn.clicked.connect(self.deselect_all_windows)
         button_layout.addWidget(self.deselect_all_btn)
-        
-        self.read_all_btn = QPushButton('📖 读取所有')
+
+        self.read_all_btn = QPushButton(t('ui.read_all'))
         self.read_all_btn.clicked.connect(self.read_all_checked_windows)
         font = self.read_all_btn.font()
         font.setBold(True)
@@ -1451,7 +1473,7 @@ class MultiWindowManager(QWidget):
         right_layout.setContentsMargins(2, 2, 2, 2)
         
         # 窗口显示区域标题
-        display_title = QLabel('数据显示窗口')
+        display_title = QLabel(t('ui.data_display_title'))
         font = display_title.font()
         font.setBold(True)
         font.setPointSize(12)
@@ -1558,6 +1580,11 @@ class MultiWindowManager(QWidget):
             else:
                 window_type_name = f"数据窗口({column_mode}列)"
             self.logger.write_log(f"创建{window_type_name}: {title}")
+        
+        # 使用bluetooth_tool的日志记录窗口创建（特殊窗口）
+        if window_id in ['ALARM_PROTECT', 'BATTERY_STATUS', 'OTHER_STATUS']:
+            if hasattr(self, 'bluetooth_tool') and self.bluetooth_tool:
+                self.bluetooth_tool.blue_write_log(f"创建{window_id}窗口: {title} (类型: {window_type}, 列数: {column_mode})")
             
     def remove_window(self, window_id):
         """移除数据显示窗口"""
@@ -1729,14 +1756,28 @@ class MultiWindowManager(QWidget):
             self.remove_window(window_id)
             
     def select_all_windows(self):
-        """全选所有窗口"""
-        for checkbox in self.checkboxes.values():
-            checkbox.setChecked(True)
+        """全选窗口"""
+        if self._is_user_mode:
+            # 用户模式：只选中允许的窗口
+            for window_id, checkbox in self.checkboxes.items():
+                if window_id in self._user_allowed_windows:
+                    checkbox.setChecked(True)
+        else:
+            # 工厂模式：选中所有窗口
+            for checkbox in self.checkboxes.values():
+                checkbox.setChecked(True)
             
     def deselect_all_windows(self):
-        """全不选所有窗口"""
-        for checkbox in self.checkboxes.values():
-            checkbox.setChecked(False)
+        """全不选窗口"""
+        if self._is_user_mode:
+            # 用户模式：只取消选中允许的窗口
+            for window_id, checkbox in self.checkboxes.items():
+                if window_id in self._user_allowed_windows:
+                    checkbox.setChecked(False)
+        else:
+            # 工厂模式：取消选中所有窗口
+            for checkbox in self.checkboxes.values():
+                checkbox.setChecked(False)
             
     def read_all_checked_windows(self):
         """读取所有已勾选的窗口数据"""
@@ -1835,7 +1876,42 @@ class MultiWindowManager(QWidget):
         
         if self.logger:
             self.logger.write_log(f"{'启用' if enabled else '禁用'}所有窗口写入功能")
-        
+
+    def set_user_mode_restrictions(self, is_user_mode):
+        """设置用户模式限制
+
+        Args:
+            is_user_mode: True=用户模式，限制窗口选择；False=工厂模式，允许所有窗口
+        """
+        self._is_user_mode = is_user_mode
+
+        if is_user_mode:
+            # 用户模式：只允许特定的窗口
+            allowed_windows = {'PC_GET_SBS', 'PC_GET_VER', 'ALARM_PROTECT', 'OTHER_STATUS', 'BATTERY_STATUS'}
+
+            # 取消勾选不允许的窗口
+            for window_id, checkbox in self.checkboxes.items():
+                if window_id not in allowed_windows:
+                    if checkbox.isChecked():
+                        checkbox.blockSignals(True)
+                        checkbox.setChecked(False)
+                        checkbox.blockSignals(False)
+                        # 隐藏对应的窗口
+                        if window_id in self.windows:
+                            self.windows[window_id].hide()
+                            self.windows.pop(window_id, None)
+
+            # 禁用不允许的checkbox
+            for window_id, checkbox in self.checkboxes.items():
+                if window_id not in allowed_windows:
+                    checkbox.setEnabled(False)
+                else:
+                    checkbox.setEnabled(True)
+        else:
+            # 工厂模式：允许所有窗口
+            for checkbox in self.checkboxes.values():
+                checkbox.setEnabled(True)
+
     def clear_window_write_values(self, window_id):
         """清空指定窗口的写入值"""
         if window_id in self.windows:
