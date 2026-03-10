@@ -1741,7 +1741,7 @@ class BluetoothTool(QWidget):
                 
             except Exception as e:
                 self._manual_disconnect = False
-                self._ota_msgbox(QMessageBox.Icon.Critical, '断开失败', str(e)).exec()
+                await self._show_msgbox_async(QMessageBox.Icon.Critical, '断开失败', str(e))
         else:
             self.blue_write_log("⚠️ 蓝牙未连接")
 
@@ -2116,13 +2116,32 @@ class BluetoothTool(QWidget):
         }
 
     def _ota_msgbox(self, icon, title, text, buttons=QMessageBox.StandardButton.Ok, default=None):
-        """创建置顶的OTA弹窗，防止被SimplifiedBluetoothTool遮挡"""
+        """同步置顶弹窗（仅在同步上下文中调用，如槽函数）"""
         mb = QMessageBox(icon, title, text, buttons)
         mb.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
         if default is not None:
             mb.setDefaultButton(default)
         mb.exec()
         return mb.standardButton(mb.clickedButton())
+
+    async def _show_msgbox_async(self, icon, title, text, buttons=QMessageBox.StandardButton.Ok, default=None):
+        """异步置顶弹窗：不阻塞asyncio事件循环，串口接收task可正常运行"""
+        loop = asyncio.get_event_loop()
+        future = loop.create_future()
+        mb = QMessageBox(icon, title, text, buttons)
+        mb.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
+        if default is not None:
+            mb.setDefaultButton(default)
+        def _on_btn(btn):
+            if not future.done():
+                future.set_result(mb.standardButton(btn))
+        mb.buttonClicked.connect(_on_btn)
+        # 用X关闭时兜底
+        mb.finished.connect(lambda r: future.set_result(QMessageBox.StandardButton.No) if not future.done() else None)
+        mb.show()
+        mb.raise_()
+        mb.activateWindow()
+        return await future
 
     async def _pre_ota_check(self):
         """OTA前置检查：验证固件版本和唯一ID
@@ -2135,11 +2154,11 @@ class BluetoothTool(QWidget):
         time512 = int(self.test512.text()) / 1000
         # 检查HEX文件
         if not self.hex_model.is_file_loaded:
-            self._ota_msgbox(QMessageBox.Icon.Warning, 'OTA检查', '请先选择HEX文件')
+            self.blue_write_log("⚠️ OTA检查：HEX文件未加载")
             return False
         hex_ver = self.hex_model.get_version_info()
         if hex_ver['error']:
-            reply = self._ota_msgbox(
+            reply = await self._show_msgbox_async(
                 QMessageBox.Icon.Question, 'OTA检查',
                 f'无法读取HEX版本信息：{hex_ver["error"]}\n是否仍然继续OTA？',
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
@@ -2154,7 +2173,7 @@ class BluetoothTool(QWidget):
         await asyncio.sleep(time512 * 3)
         # 检查是否收到71响应
         if self.text_decode.no80_cmd != BmsCmdType.READ_IC_INF or self.text_decode.cmd_ack != 0x00:
-            reply = self._ota_msgbox(
+            reply = await self._show_msgbox_async(
                 QMessageBox.Icon.Question, 'OTA检查',
                 '获取设备信息失败（无响应或响应错误）\n是否仍然继续OTA？',
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
@@ -2164,7 +2183,7 @@ class BluetoothTool(QWidget):
         # 解析设备信息
         dev_inf = self._parse_inf_for_ota()
         if dev_inf is None:
-            reply = self._ota_msgbox(
+            reply = await self._show_msgbox_async(
                 QMessageBox.Icon.Question, 'OTA检查',
                 '设备信息解析失败\n是否仍然继续OTA？',
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
@@ -2232,7 +2251,7 @@ class BluetoothTool(QWidget):
                 title = '⚠️ OTA检查 - 版本相同'
             else:
                 title = '✅ OTA检查 - 可以升级'
-            reply = self._ota_msgbox(
+            reply = await self._show_msgbox_async(
                 QMessageBox.Icon.Question, title,
                 msg + '\n\n是否继续OTA升级？',
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
@@ -2240,7 +2259,7 @@ class BluetoothTool(QWidget):
             )
             return reply == QMessageBox.StandardButton.Yes
         else:
-            self._ota_msgbox(
+            await self._show_msgbox_async(
                 QMessageBox.Icon.Critical, '❌ OTA检查 - 无法升级',
                 msg + '\n\n请检查后重试。'
             )
@@ -2254,9 +2273,14 @@ class BluetoothTool(QWidget):
             self.program_button.setEnabled(True)
             self.program_button.setText('开始烧录')
         else:
+            # ── 同步前置校验，避免进入async后触发嵌套事件循环破坏串口 ──
             if not self.client or not self.client.is_connected:
                 if not self.serial_port or not self.serial_port.is_open:
                     QMessageBox.warning(self, '警告', '请先连接设备')
+                    return
+            if not self.hex_model.is_file_loaded:
+                QMessageBox.warning(self, '警告', '请先选择HEX文件')
+                return
             # 点击即重置进度条和状态
             self.ota_progress_bar.setValue(0)
             self.ota_step_label.setText('🔍 查询设备信息...')
@@ -2267,6 +2291,9 @@ class BluetoothTool(QWidget):
     async def start_programming(self):
         """异步方法，执行烧录过程"""
         try:
+            # ======== 先暂停监控，避免监控响应干扰OTA通讯状态 ========
+            if hasattr(self, '_enhanced_window_ref') and self._enhanced_window_ref:
+                self._enhanced_window_ref.pause_monitoring_for_ota()
             # ======== OTA前置检查（版本&唯一ID验证）========
             self.ota_step_label.setText('🔍 查询设备信息...')
             can_proceed = await self._pre_ota_check()
@@ -2282,9 +2309,6 @@ class BluetoothTool(QWidget):
             self.ota_progress_bar.setValue(0)
             self.ota_step_label.setText('🔄 握手中...')
             self.ota_step_label.setStyleSheet("font-size: 9px; color: #e67e22;")
-            # 暂停监控（如果正在监控）
-            if hasattr(self, '_enhanced_window_ref') and self._enhanced_window_ref:
-                self._enhanced_window_ref.pause_monitoring_for_ota()
             err_count = 0
             # while err_count < 4:
             #     data = self.download_data.get_download_data(BmsCmdType.DOWNLOAD_BUFFER)
@@ -2350,8 +2374,7 @@ class BluetoothTool(QWidget):
                     err_count += 1
             else:
                 self.blue_write_log(f"擦除失败")
-
-            # while
+                raise Exception("擦除失败，终止OTA，请重新连接后再试")
 
 
             # 发送下载命令并等待响应
@@ -4074,7 +4097,7 @@ class SimplifiedBluetoothTool(QWidget):
                 self.simplified_hex_filename_label.setText('[内置固件]')
             else:
                 self.builtin_hex_checkbox.setChecked(False)
-                self._ota_msgbox(QMessageBox.Icon.Critical, '错误', '内置固件加载失败').exec()
+                self._ota_msgbox(QMessageBox.Icon.Critical, '错误', '内置固件加载失败')
         else:
             # 取消勾选时清空
             bt = self.bluetooth_tool
