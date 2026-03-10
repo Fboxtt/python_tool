@@ -2128,7 +2128,7 @@ class BluetoothTool(QWidget):
         """异步置顶弹窗：不阻塞asyncio事件循环，串口接收task可正常运行"""
         loop = asyncio.get_event_loop()
         future = loop.create_future()
-        mb = QMessageBox(icon, title, text, buttons)
+        mb = QMessageBox(icon, title, text, buttons, self)
         mb.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
         if default is not None:
             mb.setDefaultButton(default)
@@ -2139,6 +2139,13 @@ class BluetoothTool(QWidget):
         # 用X关闭时兜底
         mb.finished.connect(lambda r: future.set_result(QMessageBox.StandardButton.No) if not future.done() else None)
         mb.show()
+        # 居中到父窗口（简化窗口或主窗口）
+        parent = self
+        geo = parent.geometry()
+        mb.move(
+            geo.x() + (geo.width() - mb.sizeHint().width()) // 2,
+            geo.y() + (geo.height() - mb.sizeHint().height()) // 2
+        )
         mb.raise_()
         mb.activateWindow()
         return await future
@@ -2165,7 +2172,8 @@ class BluetoothTool(QWidget):
                 QMessageBox.StandardButton.No
             )
             return reply == QMessageBox.StandardButton.Yes
-        # 发送71指令查询设备当前信息
+        # 发送71指令查询设备当前信息，先清空上次缓存，防止查询失败时误用旧数据
+        self.last_inf_data_hex = None
         self.ota_step_label.setText('🔍 查询设备信息...')
         data = self.text_decode.send_hex_fill(0x71)
         self.display_send_data(data)
@@ -2173,13 +2181,18 @@ class BluetoothTool(QWidget):
         await asyncio.sleep(time512 * 3)
         # 检查是否收到71响应
         if self.text_decode.no80_cmd != BmsCmdType.READ_IC_INF or self.text_decode.cmd_ack != 0x00:
-            reply = await self._show_msgbox_async(
-                QMessageBox.Icon.Question, 'OTA检查',
-                '获取设备信息失败（无响应或响应错误）\n是否仍然继续OTA？',
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                QMessageBox.StandardButton.No
+            await self._show_msgbox_async(
+                QMessageBox.Icon.Critical, 'OTA检查 — 无法升级 / Cannot Upgrade',
+                '未收到设备信息响应，无法继续OTA。\n\n'
+                '可能原因：\n'
+                '  • 设备连接不正确\n'
+                '  • 设备固件不支持OTA功能\n\n'
+                'No response received from device.\n\n'
+                'Possible reasons:\n'
+                '  • Device is not connected correctly\n'
+                '  • Device firmware does not support OTA'
             )
-            return reply == QMessageBox.StandardButton.Yes
+            return False
         # 解析设备信息
         dev_inf = self._parse_inf_for_ota()
         if dev_inf is None:
