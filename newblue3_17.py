@@ -4013,7 +4013,7 @@ class SimplifiedBluetoothTool(QWidget):
         ota_title = QLabel('OTA 烧录')
         ota_title.setFont(QFont('Arial', 10, QFont.Weight.Bold))
         main_layout.addWidget(ota_title)
-        # HEX文件选择行（独立按钮 + 独立标签，不移动原有控件）
+        # HEX文件选择行（独立按钮 + checkbox内置固件 + 独立标签）
         hex_row = QHBoxLayout()
         hex_row.setSpacing(5)
         self.simplified_hex_button = QPushButton('📂 选择HEX')
@@ -4023,9 +4023,13 @@ class SimplifiedBluetoothTool(QWidget):
             "QPushButton:hover { background-color: #e8e8e8; }"
         )
         self.simplified_hex_button.clicked.connect(self._on_simplified_hex_select)
+        self.builtin_hex_checkbox = QCheckBox('使用内置固件')
+        self.builtin_hex_checkbox.setStyleSheet("font-size: 9px;")
+        self.builtin_hex_checkbox.stateChanged.connect(self._on_builtin_hex_changed)
         self.simplified_hex_filename_label = QLabel('未选择文件')
         self.simplified_hex_filename_label.setStyleSheet("font-size: 9px;")
         hex_row.addWidget(self.simplified_hex_button)
+        hex_row.addWidget(self.builtin_hex_checkbox)
         hex_row.addWidget(self.simplified_hex_filename_label, 1)
         main_layout.addLayout(hex_row)
         self.hex_version_display = self.bluetooth_tool.hex_version_label
@@ -4048,6 +4052,39 @@ class SimplifiedBluetoothTool(QWidget):
         # 同步文件名到简化窗口的独立标签
         text = self.bluetooth_tool.hex_file_label.text()
         self.simplified_hex_filename_label.setText(text)
+
+    def _on_builtin_hex_changed(self, state):
+        """内置固件checkbox状态变化"""
+        checked = (state == 2)
+        # 勾选时禁用手动选择按钮
+        self.simplified_hex_button.setEnabled(not checked)
+        if checked:
+            # 加载内置固件
+            bt = self.bluetooth_tool
+            if bt.hex_model.load_builtin_hex():
+                ver_info = bt.hex_model.get_version_info()
+                bt.hex_file_label.setText('[内置固件]')
+                bt.hex_info_label.setText(f'大小: {bt.hex_model.size} 字节')
+                if ver_info['error']:
+                    bt.hex_version_label.setText('版本: 读取失败')
+                else:
+                    bt.hex_version_label.setText(
+                        f'[{ver_info["platform"]}] {ver_info["version_str"]}  UID:{ver_info["uid_str"]}'
+                    )
+                self.simplified_hex_filename_label.setText('[内置固件]')
+            else:
+                self.builtin_hex_checkbox.setChecked(False)
+                self._ota_msgbox(QMessageBox.Icon.Critical, '错误', '内置固件加载失败').exec()
+        else:
+            # 取消勾选时清空
+            bt = self.bluetooth_tool
+            bt.hex_file_label.setText('未选择文件')
+            bt.hex_info_label.setText('大小: 0B')
+            bt.hex_version_label.setText('版本: —')
+            bt.hex_model.is_file_loaded = False
+            bt.hex_model.hex_data = None
+            bt.hex_model.filename = ''
+            self.simplified_hex_filename_label.setText('未选择文件')
     
     def focusOutEvent(self, event):
         """失去焦点时隐藏（点击窗口外部）"""

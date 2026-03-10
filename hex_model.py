@@ -1,6 +1,8 @@
 from intelhex import IntelHex
 import traceback
 import struct
+import base64
+import io
 
 class HexFileModel:
     def __init__(self):
@@ -26,6 +28,30 @@ class HexFileModel:
                 return False
         except Exception as e:
             print(f"解析HEX文件失败: {e}")
+            traceback.print_exc()
+            self.filename = ""
+            self.hex_data = None
+            self.size = 0
+            return False
+
+    def load_builtin_hex(self) -> bool:
+        """从内置固件（builtin_hex.py）加载HEX，无需外部文件"""
+        try:
+            from builtin_hex import BUILTIN_HEX_B64
+            raw = base64.b64decode(BUILTIN_HEX_B64)
+            self.hex_data = IntelHex(io.StringIO(raw.decode('ascii')))
+            start = self.hex_data.minaddr()
+            end = self.hex_data.maxaddr()
+            self.size = end - start + 1
+            if self.size > 0:
+                self.filename = '[内置固件]'
+                self.is_file_loaded = True
+                return True
+            else:
+                self.is_file_loaded = False
+                return False
+        except Exception as e:
+            print(f"加载内置HEX失败: {e}")
             traceback.print_exc()
             self.filename = ""
             self.hex_data = None

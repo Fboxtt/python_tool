@@ -174,6 +174,7 @@ def build_exe(mode: str, version: str):
         "--add-data=测试上位机.ui;.",
         "--add-data=monitor_interface.ui;.",
         "--add-data=build_version_info.py;.",
+        "--add-data=builtin_hex.py;.",
         "--add-data=Ampere-Time-logo.ico;.",
         f"--distpath={output_dir}",
         f"--runtime-hook=runtime_hook_enhanced_{mode}.py",
@@ -205,6 +206,36 @@ def build_exe(mode: str, version: str):
     os.remove(f"runtime_hook_enhanced_{mode}.py")  # 清理临时文件
     
     return output_dir, exe_name
+
+def generate_builtin_hex():
+    """扫描 src/ 目录，找第一个 .hex 文件，生成 builtin_hex.py"""
+    import base64, glob
+    hex_files = glob.glob('src/*.hex') + glob.glob('src/*.HEX')
+    if not hex_files:
+        print("⚠️  src/ 下未找到 HEX 文件，builtin_hex.py 不会更新")
+        return False
+    hex_path = hex_files[0]
+    print(f"✅ 找到 HEX 文件: {hex_path}")
+    with open(hex_path, 'rb') as f:
+        raw = f.read()
+    b64 = base64.b64encode(raw).decode('ascii')
+    import os
+    basename = os.path.basename(hex_path)
+    chunk = 100
+    lines = [
+        '# -*- coding: utf-8 -*-',
+        '# 内置固件（base64编码），由 build_enhance.py 自动生成，勿手动修改',
+        f'# 源文件: {basename}',
+        'BUILTIN_HEX_B64 = (',
+    ]
+    for i in range(0, len(b64), chunk):
+        lines.append('    "' + b64[i:i+chunk] + '"')
+    lines.append(')')
+    lines.append('')
+    with open('builtin_hex.py', 'w', encoding='utf-8') as f:
+        f.write('\n'.join(lines))
+    print(f"✅ builtin_hex.py 已生成 ({len(raw)} 字节 → {len(b64)} 字符 base64)")
+    return True
 
 def convert_ui_to_py(ui_file, py_file):
     """转换UI文件为Python文件 - 使用PyQt6"""
@@ -253,11 +284,15 @@ if __name__ == "__main__":
     print("\n步骤3: 生成版本信息文件...")
     generate_version_info(build_date, git_info, version)
     
-    # 步骤4: 转换UI文件
-    print("\n步骤4: 转换UI文件...")
+    # 步骤4: 生成内置固件
+    print("\n步骤4: 生成内置固件 builtin_hex.py ...")
+    generate_builtin_hex()
+
+    # 步骤5: 转换UI文件
+    print("\n步骤5: 转换UI文件...")
     
-    # 步骤5: 编译版本
-    print("\n步骤5: 编译可执行文件...")
+    # 步骤6: 编译版本
+    print("\n步骤6: 编译可执行文件...")
     built_files = []
     for mode in ["factoryApp", "userApp", "firstuse"]:
         print(f"\n{'='*50}")
