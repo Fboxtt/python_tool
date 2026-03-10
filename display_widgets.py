@@ -192,7 +192,7 @@ class BatteryTableModel(QAbstractTableModel):
         self._write_values = {}  # 存储写入值的字典，key为原始行索引，value为写入值
         self._columns = 9  # 9列显示：3组参数
         self._max_rows_per_column = 25  # 每列组最大行数
-        self._headers = ['参数名1', '当前值1', '写入值1', '参数名2', '当前值2', '写入值2', '参数名3', '当前值3', '写入值3']
+        self._headers = ['Para', 'Val', 'Write', 'Para', 'Val', 'Write', 'Para', 'Val', 'Write']
         self._organized_data = []  # 重新组织后的数据
         self._write_enabled = True  # 默认启用写入
 

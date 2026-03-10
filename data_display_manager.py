@@ -25,7 +25,7 @@ except ImportError as e:
 
 from struct_model import (
     get_all_status_bits_for_display, parse_all_status_from_sbs,
-    HexParserApp, STRUCT_COMMANDS
+    HexParserApp, STRUCT_COMMANDS, reload_struct_variables
 )
 # SN码解析规则映射表
 SN_PRODUCT_TYPE = {'B': '电池', 'C': '充电器', 'M': 'MPPT', 'D': 'DCDC', 'H': '逆充控', 'A': '逆充', 'I': '纯逆变器'}
