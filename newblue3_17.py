@@ -225,6 +225,8 @@ class BluetoothTool(QWidget):
         self.batch_task = None
         # 保存最近一次71指令的data_hex，供OTA前置检查使用
         self.last_inf_data_hex = bytearray()
+        # 用户主动断开标志，避免断开回调重复弹窗
+        self._manual_disconnect = False
         # 响应状态标志（用于test_send_data等功能，基于信号机制）
         self.last_response_status = None  # None=未收到, True=已收到
         self.last_response_ack = None  # 响应的ACK码
@@ -1715,7 +1717,10 @@ class BluetoothTool(QWidget):
         """异步方法，断开蓝牙设备"""
         if self.client and self.client.is_connected:
             try:
+                # 标记为用户主动断开，避免 on_bluetooth_disconnected 重复弹窗
+                self._manual_disconnect = True
                 await self.client.disconnect()
+                self._manual_disconnect = False
                 
                 # 清理连接状态
                 self.client = None
@@ -1735,7 +1740,8 @@ class BluetoothTool(QWidget):
                     self.blue_write_log("✅ 蓝牙已断开")
                 
             except Exception as e:
-                QMessageBox.critical(self, '断开失败', str(e))
+                self._manual_disconnect = False
+                self._ota_msgbox(QMessageBox.Icon.Critical, '断开失败', str(e)).exec()
         else:
             self.blue_write_log("⚠️ 蓝牙未连接")
 
@@ -1900,8 +1906,7 @@ class BluetoothTool(QWidget):
             # 启动定时器持续尝试
             self.start_auto_connect_timer()
         else:
-            # 弹出提示消息
-            QMessageBox.warning(self, '连接已断开', '蓝牙设备已断开连接')
+            self.blue_write_log("⚠️ 蓝牙设备已断开连接")
     
     def _on_receive_response(self, cmd_code, data):
         """内部槽函数：处理接收到的响应（用于test_send_data等功能）
@@ -2110,6 +2115,15 @@ class BluetoothTool(QWidget):
             'unique_id': unique_id
         }
 
+    def _ota_msgbox(self, icon, title, text, buttons=QMessageBox.StandardButton.Ok, default=None):
+        """创建置顶的OTA弹窗，防止被SimplifiedBluetoothTool遮挡"""
+        mb = QMessageBox(icon, title, text, buttons)
+        mb.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
+        if default is not None:
+            mb.setDefaultButton(default)
+        mb.exec()
+        return mb.standardButton(mb.clickedButton())
+
     async def _pre_ota_check(self):
         """OTA前置检查：验证固件版本和唯一ID
         
@@ -2121,12 +2135,12 @@ class BluetoothTool(QWidget):
         time512 = int(self.test512.text()) / 1000
         # 检查HEX文件
         if not self.hex_model.is_file_loaded:
-            QMessageBox.warning(self, 'OTA检查', '请先选择HEX文件')
+            self._ota_msgbox(QMessageBox.Icon.Warning, 'OTA检查', '请先选择HEX文件')
             return False
         hex_ver = self.hex_model.get_version_info()
         if hex_ver['error']:
-            reply = QMessageBox.question(
-                self, 'OTA检查',
+            reply = self._ota_msgbox(
+                QMessageBox.Icon.Question, 'OTA检查',
                 f'无法读取HEX版本信息：{hex_ver["error"]}\n是否仍然继续OTA？',
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                 QMessageBox.StandardButton.No
@@ -2140,8 +2154,8 @@ class BluetoothTool(QWidget):
         await asyncio.sleep(time512 * 3)
         # 检查是否收到71响应
         if self.text_decode.no80_cmd != BmsCmdType.READ_IC_INF or self.text_decode.cmd_ack != 0x00:
-            reply = QMessageBox.question(
-                self, 'OTA检查',
+            reply = self._ota_msgbox(
+                QMessageBox.Icon.Question, 'OTA检查',
                 '获取设备信息失败（无响应或响应错误）\n是否仍然继续OTA？',
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                 QMessageBox.StandardButton.No
@@ -2150,8 +2164,8 @@ class BluetoothTool(QWidget):
         # 解析设备信息
         dev_inf = self._parse_inf_for_ota()
         if dev_inf is None:
-            reply = QMessageBox.question(
-                self, 'OTA检查',
+            reply = self._ota_msgbox(
+                QMessageBox.Icon.Question, 'OTA检查',
                 '设备信息解析失败\n是否仍然继续OTA？',
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                 QMessageBox.StandardButton.No
@@ -2218,16 +2232,16 @@ class BluetoothTool(QWidget):
                 title = '⚠️ OTA检查 - 版本相同'
             else:
                 title = '✅ OTA检查 - 可以升级'
-            reply = QMessageBox.question(
-                self, title,
+            reply = self._ota_msgbox(
+                QMessageBox.Icon.Question, title,
                 msg + '\n\n是否继续OTA升级？',
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                 QMessageBox.StandardButton.Yes
             )
             return reply == QMessageBox.StandardButton.Yes
         else:
-            QMessageBox.critical(
-                self, '❌ OTA检查 - 无法升级',
+            self._ota_msgbox(
+                QMessageBox.Icon.Critical, '❌ OTA检查 - 无法升级',
                 msg + '\n\n请检查后重试。'
             )
             return False
@@ -3840,7 +3854,8 @@ class SimplifiedBluetoothTool(QWidget):
         
         # ========== 左侧：蓝牙 ==========
         bluetooth_layout = QVBoxLayout()
-        bluetooth_title = QLabel('蓝牙连接')
+        bluetooth_layout.setSpacing(2)
+        bluetooth_title = QLabel('🔵 蓝牙连接')
         bluetooth_title.setFont(QFont('Arial', 11, QFont.Weight.Bold))
         bluetooth_layout.addWidget(bluetooth_title)
         
@@ -3862,7 +3877,7 @@ class SimplifiedBluetoothTool(QWidget):
         rssi_layout.addStretch()
         bluetooth_layout.addLayout(rssi_layout)
         
-        # 使用原窗口的连接/断开按钮（现在是一个按钮）
+        # 使用原窗口的连接/断开按钮
         self.bt_connect_button = self.bluetooth_tool.bt_connect_button
         bluetooth_layout.addWidget(self.bt_connect_button)
         
@@ -3870,47 +3885,9 @@ class SimplifiedBluetoothTool(QWidget):
         self.bluetooth_status_label = self.bluetooth_tool.bluetooth_status_label
         bluetooth_layout.addWidget(self.bluetooth_status_label)
         
-        # 自动连接配置（复用原窗口的控件）
-        auto_layout = QVBoxLayout()
-        auto_title = QLabel('自动连接')
-        auto_title.setFont(QFont('Arial', 10, QFont.Weight.Bold))
-        auto_layout.addWidget(auto_title)
-        
-        self.auto_connect_checkbox = self.bluetooth_tool.auto_connect_checkbox
-        auto_layout.addWidget(self.auto_connect_checkbox)
-        
-        name_layout = QHBoxLayout()
-        name_layout.addWidget(QLabel('名称:'))
-        self.auto_connect_name_input = self.bluetooth_tool.auto_connect_name_input
-        self.auto_connect_name_input.setMaximumWidth(120)
-        name_layout.addWidget(self.auto_connect_name_input)
-        auto_layout.addLayout(name_layout)
-        
-        mac_layout_simple = QHBoxLayout()
-        mac_layout_simple.addWidget(QLabel('MAC:'))
-        self.auto_connect_mac_input = self.bluetooth_tool.auto_connect_mac_input
-        self.auto_connect_mac_input.setMaximumWidth(120)
-        mac_layout_simple.addWidget(self.auto_connect_mac_input)
-        auto_layout.addLayout(mac_layout_simple)
-        
-        # 重试间隔设置
-        interval_layout_simple = QHBoxLayout()
-        interval_layout_simple.addWidget(QLabel('间隔(秒):'))
-        self.auto_connect_interval_spinbox = self.bluetooth_tool.auto_connect_interval_spinbox
-        self.auto_connect_interval_spinbox.setMaximumWidth(60)
-        interval_layout_simple.addWidget(self.auto_connect_interval_spinbox)
-        auto_layout.addLayout(interval_layout_simple)
-        
-        # 提示标签
-        auto_save_hint_simple = QLabel('💡 自动保存')
-        auto_save_hint_simple.setStyleSheet("QLabel { font-size: 9px; }")
-        auto_layout.addWidget(auto_save_hint_simple)
-        
-        bluetooth_layout.addLayout(auto_layout)
-        
         # ========== 右侧：串口 ==========
         serial_layout = QVBoxLayout()
-        serial_title = QLabel('串口连接')
+        serial_title = QLabel('🔌 串口连接')
         serial_title.setFont(QFont('Arial', 11, QFont.Weight.Bold))
         serial_layout.addWidget(serial_title)
         
@@ -3937,7 +3914,7 @@ class SimplifiedBluetoothTool(QWidget):
         
         serial_layout.addLayout(param_grid)
         
-        # 使用原窗口的串口连接按钮
+        # 使用原窗口的串口连接/断开按钮
         self.serial_connect_button = self.bluetooth_tool.serial_connect_button
         serial_layout.addWidget(self.serial_connect_button)
         
@@ -3968,12 +3945,10 @@ class SimplifiedBluetoothTool(QWidget):
         test_layout = QHBoxLayout()
         test_layout.setSpacing(5)
         
-        # 使用原窗口的注册按钮，改名为"连接测试"
         self.register_button = self.bluetooth_tool.register_button
         self.register_button.setText('连接测试')
         test_layout.addWidget(self.register_button)
         
-        # 使用原窗口的状态指示灯
         self.status_indicator = self.bluetooth_tool.status_indicator
         test_layout.addWidget(self.status_indicator)
         
@@ -4022,7 +3997,6 @@ class SimplifiedBluetoothTool(QWidget):
         heating_buttons_layout = QHBoxLayout()
         heating_buttons_layout.setSpacing(3)
 
-        # 使用原窗口的加热模式按钮
         self.self_heating_button = self.bluetooth_tool.self_heating_button
         self.charger_heating_button = self.bluetooth_tool.charger_heating_button
 
@@ -4039,6 +4013,21 @@ class SimplifiedBluetoothTool(QWidget):
         ota_title = QLabel('OTA 烧录')
         ota_title.setFont(QFont('Arial', 10, QFont.Weight.Bold))
         main_layout.addWidget(ota_title)
+        # HEX文件选择行（独立按钮 + 独立标签，不移动原有控件）
+        hex_row = QHBoxLayout()
+        hex_row.setSpacing(5)
+        self.simplified_hex_button = QPushButton('📂 选择HEX')
+        self.simplified_hex_button.setFixedHeight(22)
+        self.simplified_hex_button.setStyleSheet(
+            "QPushButton { font-size: 10px; padding: 2px 6px; border: 1px solid #ccc; border-radius: 3px; }"
+            "QPushButton:hover { background-color: #e8e8e8; }"
+        )
+        self.simplified_hex_button.clicked.connect(self._on_simplified_hex_select)
+        self.simplified_hex_filename_label = QLabel('未选择文件')
+        self.simplified_hex_filename_label.setStyleSheet("font-size: 9px;")
+        hex_row.addWidget(self.simplified_hex_button)
+        hex_row.addWidget(self.simplified_hex_filename_label, 1)
+        main_layout.addLayout(hex_row)
         self.hex_version_display = self.bluetooth_tool.hex_version_label
         main_layout.addWidget(self.hex_version_display)
         self.ota_step_display = self.bluetooth_tool.ota_step_label
@@ -4051,7 +4040,14 @@ class SimplifiedBluetoothTool(QWidget):
         main_layout.addWidget(self.packet_label_display)
 
         self.setLayout(main_layout)
-        self.setFixedSize(520, 760)  # 增加高度以容纳OTA区域
+        self.setFixedSize(520, 720)
+
+    def _on_simplified_hex_select(self):
+        """简化窗口的HEX文件选择（调用原函数并同步文件名到独立标签）"""
+        self.bluetooth_tool.on_select_hex_file()
+        # 同步文件名到简化窗口的独立标签
+        text = self.bluetooth_tool.hex_file_label.text()
+        self.simplified_hex_filename_label.setText(text)
     
     def focusOutEvent(self, event):
         """失去焦点时隐藏（点击窗口外部）"""
@@ -4066,6 +4062,10 @@ class SimplifiedBluetoothTool(QWidget):
         # print(f"[简化窗口] _check_and_hide 被调用")
         from PyQt6.QtWidgets import QComboBox
         from PyQt6.QtGui import QCursor
+        
+        # 有模态窗口（如QMessageBox）时不隐藏
+        if QApplication.instance().activeModalWidget() is not None:
+            return
         
         # 检查鼠标是否回到窗口内
         cursor_pos = self.mapFromGlobal(QCursor.pos())
@@ -4160,9 +4160,10 @@ class SimplifiedBluetoothTool(QWidget):
                         QTimer.singleShot(100, self._check_and_hide)
                         return super().eventFilter(obj, event)
                 
-                # 没有下拉框展开，直接隐藏
+                # 没有下拉框展开，且无模态窗口时才隐藏
                 # print(f"[简化窗口]   没有下拉框，隐藏窗口")
-                self.hide()
+                if QApplication.instance().activeModalWidget() is None:
+                    self.hide()
                 return False
         
         return super().eventFilter(obj, event)
