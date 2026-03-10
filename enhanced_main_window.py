@@ -793,6 +793,8 @@ class EnhancedMainWindow(QMainWindow):
                 if cmd_code == 0x71:  # PC_GET_INF
                     # 先调用split_data，设置no80_cmd和cmd_ack供OTA控制器判断
                     self.bluetooth_tool.text_decode.split_data(bytearray(data_buffer))
+                    # 保存data_hex供OTA前置检查（版本/唯一ID比较）使用
+                    self.bluetooth_tool.last_inf_data_hex = bytearray(self.bluetooth_tool.text_decode.data_hex)
                     # 继续下面的普通数据处理，同时更新显示窗口
                     pass
                 else:

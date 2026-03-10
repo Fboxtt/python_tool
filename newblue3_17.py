@@ -223,6 +223,8 @@ class BluetoothTool(QWidget):
         self.ota_start_count = 0
         self.ota_ok_count = 0
         self.batch_task = None
+        # 保存最近一次71指令的data_hex，供OTA前置检查使用
+        self.last_inf_data_hex = bytearray()
         # 响应状态标志（用于test_send_data等功能，基于信号机制）
         self.last_response_status = None  # None=未收到, True=已收到
         self.last_response_ack = None  # 响应的ACK码
@@ -2089,6 +2091,147 @@ class BluetoothTool(QWidget):
                 self.hex_version_label.setText('版本: —')
                 QMessageBox.warning(self, '警告', 'HEX文件解析失败')
 
+    def _parse_inf_for_ota(self):
+        """解析最近一次71指令返回的固件信息，用于OTA前置检查
+        
+        Returns:
+            dict or None: {'app_major', 'app_minor', 'app_rev', 'app_year', 'app_month', 'app_day', 'unique_id'}
+        """
+        data = self.last_inf_data_hex
+        if len(data) < 24:
+            return None
+        app_major, app_minor, app_rev, app_year, app_month, app_day, _, _ = struct.unpack_from('<HHHHBBBB', data, 12)
+        unique_id = None
+        if len(data) >= 72:
+            unique_id = struct.unpack_from('<L', data, 68)[0]
+        return {
+            'app_major': app_major, 'app_minor': app_minor, 'app_rev': app_rev,
+            'app_year': app_year, 'app_month': app_month, 'app_day': app_day,
+            'unique_id': unique_id
+        }
+
+    async def _pre_ota_check(self):
+        """OTA前置检查：验证固件版本和唯一ID
+        
+        Returns:
+            True: 通过检查，可以继续OTA
+            False: 检查未通过或用户取消
+        """
+        import re as _re
+        time512 = int(self.test512.text()) / 1000
+        # 检查HEX文件
+        if not self.hex_model.is_file_loaded:
+            QMessageBox.warning(self, 'OTA检查', '请先选择HEX文件')
+            return False
+        hex_ver = self.hex_model.get_version_info()
+        if hex_ver['error']:
+            reply = QMessageBox.question(
+                self, 'OTA检查',
+                f'无法读取HEX版本信息：{hex_ver["error"]}\n是否仍然继续OTA？',
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No
+            )
+            return reply == QMessageBox.StandardButton.Yes
+        # 发送71指令查询设备当前信息
+        self.ota_step_label.setText('🔍 查询设备信息...')
+        data = self.text_decode.send_hex_fill(0x71)
+        self.display_send_data(data)
+        await self.byte_send(data)
+        await asyncio.sleep(time512 * 3)
+        # 检查是否收到71响应
+        if self.text_decode.no80_cmd != BmsCmdType.READ_IC_INF or self.text_decode.cmd_ack != 0x00:
+            reply = QMessageBox.question(
+                self, 'OTA检查',
+                '获取设备信息失败（无响应或响应错误）\n是否仍然继续OTA？',
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No
+            )
+            return reply == QMessageBox.StandardButton.Yes
+        # 解析设备信息
+        dev_inf = self._parse_inf_for_ota()
+        if dev_inf is None:
+            reply = QMessageBox.question(
+                self, 'OTA检查',
+                '设备信息解析失败\n是否仍然继续OTA？',
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No
+            )
+            return reply == QMessageBox.StandardButton.Yes
+        dev_ver_str = f"V{dev_inf['app_major']}.{dev_inf['app_minor']}.{dev_inf['app_rev']} ({dev_inf['app_year']}-{dev_inf['app_month']:02d}-{dev_inf['app_day']:02d})"
+        hex_ver_str = hex_ver['version_str']
+        # 解析HEX版本号元组
+        hex_major = hex_minor = hex_rev = 0
+        m = _re.match(r'V(\d+)\.(\d+)\.(\d+)', hex_ver_str)
+        if m:
+            hex_major, hex_minor, hex_rev = int(m.group(1)), int(m.group(2)), int(m.group(3))
+        hex_ver_tuple = (hex_major, hex_minor, hex_rev)
+        dev_ver_tuple = (dev_inf['app_major'], dev_inf['app_minor'], dev_inf['app_rev'])
+        # ── 唯一ID检查 ──
+        uid_known = dev_inf['unique_id'] is not None
+        uid_match = True
+        dev_uid_str = '未知'
+        hex_uid_str = hex_ver['uid_str']
+        if uid_known:
+            dev_uid = dev_inf['unique_id']
+            dev_uid_str = f'0x{dev_uid:08X}'
+            try:
+                hex_uid = int(hex_uid_str, 16)
+            except Exception:
+                hex_uid = None
+            if hex_uid is not None and dev_uid != hex_uid:
+                uid_match = False
+        # ── 版本检查 ──
+        if hex_ver_tuple > dev_ver_tuple:
+            ver_result = '✅ 可以升级'
+        elif hex_ver_tuple == dev_ver_tuple:
+            ver_result = '⚠️ 相同'
+        else:
+            ver_result = '❌ 禁止降级'
+        # ── 唯一码结果 ──
+        if uid_known:
+            uid_result = '✅ 匹配' if uid_match else '❌ 不匹配'
+        else:
+            uid_result = '➖ 未返回'
+        # ── 左(固件HEX) / 右(设备当前) 对比表格 ──
+        col_w = 26  # 左列宽度（固件信息）
+        def pad(s, w):
+            # 简单左对齐填充，中文字符按2个宽度计
+            width = sum(2 if ord(c) > 127 else 1 for c in str(s))
+            return str(s) + ' ' * max(0, w - width)
+        line_sep  = '─' * 52
+        header    = f'{"固件 (HEX)":<{col_w}}{"设备 (当前)"}'
+        uid_row   = f'{pad(hex_uid_str if uid_known else hex_ver["uid_str"], col_w)}{dev_uid_str:<20}  {uid_result}'
+        ver_row   = f'{pad(hex_ver_str, col_w)}{dev_ver_str:<20}  {ver_result}'
+        plat_row  = f'{hex_ver["platform"]}'
+        msg = (
+            f'{header}\n'
+            f'{line_sep}\n'
+            f'唯一码:  {uid_row}\n'
+            f'版本:    {ver_row}\n'
+            f'平台:    {plat_row}\n'
+            f'{line_sep}'
+        )
+        # ── 汇总弹窗 ──
+        can_proceed = uid_match and hex_ver_tuple >= dev_ver_tuple
+        if can_proceed:
+            if hex_ver_tuple == dev_ver_tuple:
+                title = '⚠️ OTA检查 - 版本相同'
+            else:
+                title = '✅ OTA检查 - 可以升级'
+            reply = QMessageBox.question(
+                self, title,
+                msg + '\n\n是否继续OTA升级？',
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.Yes
+            )
+            return reply == QMessageBox.StandardButton.Yes
+        else:
+            QMessageBox.critical(
+                self, '❌ OTA检查 - 无法升级',
+                msg + '\n\n请检查后重试。'
+            )
+            return False
+
     def on_program_clicked(self):
         """同步方法，用于触发异步烧录"""
         if self.program_task:
@@ -2100,12 +2243,23 @@ class BluetoothTool(QWidget):
             if not self.client or not self.client.is_connected:
                 if not self.serial_port or not self.serial_port.is_open:
                     QMessageBox.warning(self, '警告', '请先连接设备')
+            # 点击即重置进度条和状态
+            self.ota_progress_bar.setValue(0)
+            self.ota_step_label.setText('🔍 查询设备信息...')
+            self.ota_step_label.setStyleSheet("font-size: 9px;")
             # 创建烧录任务
             self.program_task = asyncio.create_task(self.start_programming())
 
     async def start_programming(self):
         """异步方法，执行烧录过程"""
         try:
+            # ======== OTA前置检查（版本&唯一ID验证）========
+            self.ota_step_label.setText('🔍 查询设备信息...')
+            can_proceed = await self._pre_ota_check()
+            if not can_proceed:
+                self.ota_step_label.setText('— 等待开始 —')
+                self.ota_step_label.setStyleSheet("font-size: 9px;")
+                return
             self.ota_start_count += 1
             time128 = int(self.test128.text()) / 1000
             time512 = int(self.test512.text()) / 1000
