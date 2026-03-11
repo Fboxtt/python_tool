@@ -4125,22 +4125,36 @@ class SimplifiedBluetoothTool(QWidget):
         # 勾选时禁用手动选择按钮
         self.simplified_hex_button.setEnabled(not checked)
         if checked:
-            # 加载内置固件
             bt = self.bluetooth_tool
-            if bt.hex_model.load_builtin_hex():
-                ver_info = bt.hex_model.get_version_info()
-                bt.hex_file_label.setText('[内置固件]')
-                bt.hex_info_label.setText(f'大小: {bt.hex_model.size} 字节')
-                if ver_info['error']:
-                    bt.hex_version_label.setText('版本: 读取失败')
+            try:
+                import importlib
+                builtin_hex_module = importlib.import_module('builtin_hex')
+                hex_b64_data = builtin_hex_module.BUILTIN_HEX_B64
+                if bt.hex_model.load_builtin_hex(hex_b64_data):
+                    ver_info = bt.hex_model.get_version_info()
+                    bt.hex_file_label.setText('[内置固件]')
+                    bt.hex_info_label.setText(f'大小: {bt.hex_model.size} 字节')
+                    if ver_info['error']:
+                        bt.hex_version_label.setText('版本: 读取失败')
+                    else:
+                        bt.hex_version_label.setText(
+                            f'[{ver_info["platform"]}] {ver_info["version_str"]}  UID:{ver_info["uid_str"]}'
+                        )
+                    self.simplified_hex_filename_label.setText('[内置固件]')
                 else:
-                    bt.hex_version_label.setText(
-                        f'[{ver_info["platform"]}] {ver_info["version_str"]}  UID:{ver_info["uid_str"]}'
-                    )
-                self.simplified_hex_filename_label.setText('[内置固件]')
-            else:
+                    self.builtin_hex_checkbox.setChecked(False)
+                    bt._ota_msgbox(QMessageBox.Icon.Critical, '错误', '内置固件加载失败')
+            except ModuleNotFoundError:
                 self.builtin_hex_checkbox.setChecked(False)
-                self._ota_msgbox(QMessageBox.Icon.Critical, '错误', '内置固件加载失败')
+                bt.blue_write_log("❌ 错误：未找到内置固件文件 'builtin_hex.py'，请确保已正确打包。", color='red')
+                bt.blue_write_log("❌ Error: Built-in firmware file 'builtin_hex.py' not found. Please ensure it is correctly packaged.", color='red')
+                bt._ota_msgbox(QMessageBox.Icon.Warning, '错误 / Error',
+                               '未找到内置固件文件 (builtin_hex.py)。\n请确保已正确打包或选择外部HEX文件。\n\n'
+                               'Built-in firmware file (builtin_hex.py) not found.\nPlease ensure it is correctly packaged or select an external HEX file.')
+            except Exception as e:
+                self.builtin_hex_checkbox.setChecked(False)
+                bt.blue_write_log(f"❌ 加载内置固件失败: {e}", color='red')
+                bt._ota_msgbox(QMessageBox.Icon.Critical, '错误', f'内置固件加载失败: {e}')
         else:
             # 取消勾选时清空
             bt = self.bluetooth_tool

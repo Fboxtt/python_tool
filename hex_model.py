@@ -34,11 +34,13 @@ class HexFileModel:
             self.size = 0
             return False
 
-    def load_builtin_hex(self) -> bool:
-        """从内置固件（builtin_hex.py）加载HEX，无需外部文件"""
+    def load_builtin_hex(self, hex_b64_data: str = None) -> bool:
+        """从内置固件加载HEX，接受base64编码字符串参数"""
         try:
-            from builtin_hex import BUILTIN_HEX_B64
-            raw = base64.b64decode(BUILTIN_HEX_B64)
+            if hex_b64_data is None:
+                from builtin_hex import BUILTIN_HEX_B64
+                hex_b64_data = BUILTIN_HEX_B64
+            raw = base64.b64decode(hex_b64_data)
             self.hex_data = IntelHex(io.StringIO(raw.decode('ascii')))
             start = self.hex_data.minaddr()
             end = self.hex_data.maxaddr()
