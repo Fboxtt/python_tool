@@ -1004,9 +1004,14 @@ class BluetoothTool(QWidget):
     def on_serial_connect_clicked(self):
         """处理串口连接/断开"""
         if not self.is_serial_connected:
-            # 使用异步方法避免UI阻塞
+            # 使用异步方法避免UI阻塞；若蓝牙已连接则先断开蓝牙
             try:
-                asyncio.create_task(self.connect_serial_async())
+                async def _connect_serial():
+                    if self.client and self.client.is_connected:
+                        self.blue_write_log("蓝牙已连接，自动断开蓝牙后连接串口")
+                        await self.disconnect_device()
+                    await self.connect_serial_async()
+                asyncio.create_task(_connect_serial())
             except Exception as e:
                 self.blue_write_log(f"创建串口连接任务失败: {str(e)}")
                 traceback.print_exc()
@@ -1112,10 +1117,15 @@ class BluetoothTool(QWidget):
 
     async def handle_serial_disconnect(self):
         """处理串口意外断开"""
-        # 取消接收任务
+        # 取消接收任务，并等待任务真正结束，防止与新任务冲突
         if self.serial_receive_task:
-            self.serial_receive_task.cancel()
+            task = self.serial_receive_task
             self.serial_receive_task = None
+            task.cancel()
+            try:
+                await task
+            except (asyncio.CancelledError, Exception):
+                pass
         # 关闭串口
         if self.serial_port:
             try:
@@ -1282,9 +1292,8 @@ class BluetoothTool(QWidget):
     def on_bt_connect_clicked(self):
         """蓝牙连接/断开按钮点击处理（合并逻辑）"""
         bluetooth_connected = bool(self.client and self.client.is_connected)
-        
         if not bluetooth_connected:
-            # 当前未连接，执行连接
+            # 当前未连接，执行连接（connect_device内部会自动断开串口）
             asyncio.create_task(self.connect_device())
         else:
             # 当前已连接，执行断开
@@ -1619,6 +1628,28 @@ class BluetoothTool(QWidget):
         Args:
             is_auto: 是否为自动连接（True=自动连接，False=手动连接）
         """
+        # ========== 0. 若串口已连接，先断开串口 ==========
+        if self.is_serial_connected:
+            self.blue_write_log("串口已连接，自动断开串口后连接蓝牙")
+            if self.serial_receive_task:
+                task = self.serial_receive_task
+                self.serial_receive_task = None
+                task.cancel()
+                if self.serial_port and self.serial_port.is_open:
+                    self.serial_port.close()
+                try:
+                    await task
+                except (asyncio.CancelledError, Exception):
+                    pass
+            elif self.serial_port and self.serial_port.is_open:
+                self.serial_port.close()
+            self.is_serial_connected = False
+            self.commu_type = "none"
+            self.serial_port = None
+            self.serial_connect_button.setText(t('ui.btn_connect_serial'))
+            self.disable_serial_settings(False)
+            self.update_shared_buttons()
+            self.blue_write_log("串口连接已断开")
         # ========== 1. 防止重复连接 ==========
         if not self.connection_manager.acquire_connection_lock():
             self.blue_write_log("⚠️ 正在连接中，请勿重复操作")

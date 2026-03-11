@@ -712,6 +712,21 @@ class EnhancedMainWindow(QMainWindow):
         QTimer.singleShot(100, self._restart_window)
     def _restart_window(self):
         """重启窗口以应用新语言"""
+        # 语言切换前先同步释放串口资源，防止新窗口无法连接串口
+        try:
+            bt = self.bluetooth_tool
+            if bt.is_serial_connected:
+                if bt.serial_receive_task:
+                    bt.serial_receive_task.cancel()
+                    bt.serial_receive_task = None
+                if bt.serial_port and bt.serial_port.is_open:
+                    bt.serial_port.close()
+                bt.is_serial_connected = False
+                bt.commu_type = "none"
+                bt.serial_port = None
+                bt.blue_write_log("语言切换：串口已释放")
+        except Exception:
+            pass
         new_window = EnhancedMainWindow()
         new_window.show()
         # 挂到 QApplication 防止被垃圾回收
@@ -1118,6 +1133,8 @@ class EnhancedMainWindow(QMainWindow):
         # 断开连接
         if self.bluetooth_tool.client and self.bluetooth_tool.client.is_connected:
             asyncio.create_task(self.bluetooth_tool.disconnect_device())
+        if self.bluetooth_tool.is_serial_connected:
+            asyncio.create_task(self.bluetooth_tool.disconnect_serial())
         
         # 关闭蓝牙工具窗口（newblue.py窗口）
         try:
