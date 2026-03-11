@@ -287,8 +287,8 @@ class EnhancedMainWindow(QMainWindow):
         
         # 语言选择下拉框
         self.language_combo = QComboBox()
-        self.language_combo.addItem('🇨🇳 中文', 'zh_CN')
-        self.language_combo.addItem('🇺🇸 English', 'en_US')
+        self.language_combo.addItem('language: 中文', 'zh_CN')
+        self.language_combo.addItem('language: English', 'en_US')
         
         # 设置当前语言
         current_lang = get_current_language()
@@ -678,111 +678,24 @@ class EnhancedMainWindow(QMainWindow):
         self.logger.write_log(t('ui.log_queue_cleared'))
     
     def on_language_changed(self, index):
-        """语言下拉框选择改变"""
+        """语言下拉框选择改变 - 切换语言后重启窗口"""
         if index < 0:
             return
-        
-        # 获取选中的语言
         new_language = self.language_combo.itemData(index)
         current_language = get_current_language()
-        
-        # 如果语言没有变化，不做处理
         if new_language == current_language:
             return
-        
-        # 切换语言
         set_language(new_language)
-        
-        # 更新界面文本
-        self.update_ui_texts()
-        
-        # 记录日志
-        lang_name = t('ui.lang_name_zh') if new_language == 'zh_CN' else t('ui.lang_name_en')
-        self.logger.write_log(t('ui.log_language_switched', lang_name))
-        
-        # 显示提示信息
-        QMessageBox.information(
-            self,
-            t('ui.language_switched_title'),
-            t('ui.language_switched_message', lang_name)
-        )
+        QTimer.singleShot(100, self._restart_window)
+    def _restart_window(self):
+        """重启窗口以应用新语言"""
+        new_window = EnhancedMainWindow()
+        new_window.show()
+        # 挂到 QApplication 防止被垃圾回收
+        QApplication.instance()._keep_window = new_window
+        self._is_restarting = True
+        self.close()
     
-    def update_ui_texts(self):
-        """更新界面所有文本（切换语言后调用）"""
-        try:
-            # 1. 更新窗口标题
-            app_mode = os.environ.get('APP_MODE', 'factoryApp')
-            if app_mode == 'userApp':
-                # 用户版
-                if VERSION_INFO_AVAILABLE:
-                    try:
-                        version = build_version_info.VERSION
-                        window_title = t('ui.user_app_title') + f' v{version}'
-                        self.setWindowTitle(window_title)
-                    except:
-                        self.setWindowTitle(t('ui.user_app_title'))
-                else:
-                    self.setWindowTitle(t('ui.user_app_title'))
-            else:
-                # 工厂版
-                base_title = t('ui.window_title')
-                if VERSION_INFO_AVAILABLE:
-                    try:
-                        version_str = build_version_info.get_version_string()
-                        self.setWindowTitle(f'{base_title} | {version_str}')
-                    except:
-                        self.setWindowTitle(base_title)
-                else:
-                    self.setWindowTitle(base_title)
-            
-            # 2. 更新控制面板按钮和checkbox文本
-            self.factory_mode_checkbox.setText(t('ui.factory_mode'))
-            self.use_simplified_window.setText(t('ui.simplified_window'))
-            self.cell_32_checkbox.setText(t('ui.cell_32_config'))
-            self.cell_32_checkbox.setToolTip(t('ui.cell_32_tooltip'))
-            self.connect_btn.setText(t('ui.open_connection'))
-            self.disconnect_btn.setText(t('ui.disconnect'))
-            self.version_btn.setText(t('ui.query_version'))
-            self.clear_queue_btn.setText(t('ui.clear_queue'))
-            
-            # 监控按钮根据当前状态更新
-            if '⏸️' in self.monitor_btn.text():
-                self.monitor_btn.setText(t('ui.stop_monitor'))
-            else:
-                self.monitor_btn.setText(t('ui.start_monitor'))
-            
-            # 3. 更新状态标签
-            # 只更新断开状态的文本，连接状态保留设备信息
-            if '⭕' in self.conn_status_label.text():
-                self.conn_status_label.setText(t('ui.status_disconnected'))
-            
-            # 更新队列状态标签
-            queue_len = self.multi_window_manager.get_queue_length()
-            self.queue_status_label.setText(f"{t('ui.send_queue')}: {queue_len}")
-            
-            # 更新接收/发送计数标签
-            # 提取当前数字
-            try:
-                rx_text = self.rx_count_label.text()
-                if ':' in rx_text:
-                    count = rx_text.split(':')[1].strip()
-                    self.rx_count_label.setText(f"{t('ui.receive')}: {count}")
-                
-                tx_text = self.tx_count_label.text()
-                if ':' in tx_text:
-                    count = tx_text.split(':')[1].strip()
-                    self.tx_count_label.setText(f"{t('ui.send')}: {count}")
-            except:
-                pass
-            
-            # 4. 多窗口管理器会自动使用新语言的标题
-            # 因为 struct_model 已经集成了语言管理器
-            # 窗口标题会在下次更新数据时自动切换
-            
-        except Exception as e:
-            self.logger.write_log(t('ui.log_ui_update_error', str(e)))
-            traceback.print_exc()
-        
     def update_status_display(self):
         """更新状态显示"""
         # 更新队列状态
@@ -1173,8 +1086,9 @@ class EnhancedMainWindow(QMainWindow):
         if self.scan_task:
             self.scan_task.cancel()
             
-        # 关闭日志
-        self.logger.close_log()
+        # 关闭日志（重启时不关闭，避免新窗口写日志失败）
+        if not getattr(self, '_is_restarting', False):
+            self.logger.close_log()
         
         # 断开连接
         if self.bluetooth_tool.client and self.bluetooth_tool.client.is_connected:
