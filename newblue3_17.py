@@ -249,8 +249,6 @@ class BluetoothTool(QWidget):
         # 加载自动连接配置
         self.load_auto_connect_config()
 
-        # 检测当前配置并设置checkbox状态（不触发信号）
-        self.detect_and_set_cell_config()
     def initUI(self):
         self.setWindowTitle('firstuse - 蓝牙调试工具')
 
@@ -3025,33 +3023,6 @@ class BluetoothTool(QWidget):
 
         except Exception as e:
             self.blue_write_log(f"取消密码异常: {str(e)}")
-
-    def detect_and_set_cell_config(self):
-        """检测当前配置是16串还是32串，并设置checkbox状态"""
-        try:
-            # 调用 HexParserApp 的方法检测当前配置
-            cell_count = self.hex_parser.get_current_cell_config()
-
-            # 暂时阻止信号，避免触发配置切换
-            self.cell_32_checkbox.blockSignals(True)
-
-            if cell_count == 32:
-                self.cell_32_checkbox.setChecked(True)
-                self.blue_write_log("检测到当前配置：32串配置")
-            elif cell_count == 16:
-                self.cell_32_checkbox.setChecked(False)
-                self.blue_write_log("检测到当前配置：16串配置")
-            else:
-                self.cell_32_checkbox.setChecked(False)
-                self.blue_write_log(f"警告：未知的电芯配置，默认使用16串配置")
-
-            # 恢复信号
-            self.cell_32_checkbox.blockSignals(False)
-
-        except Exception as e:
-            self.blue_write_log(f"检测配置失败: {str(e)}")
-            traceback.print_exc()
-
 
     def on_auto_connect_changed(self, state):
         """处理自动连接checkbox状态变化"""
