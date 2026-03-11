@@ -1120,6 +1120,15 @@ class EnhancedMainWindow(QMainWindow):
                 self.simplified_bluetooth_tool.hide()
         super().focusInEvent(event)
     
+    def changeEvent(self, event):
+        """监听窗口状态变化，最小化时隐藏简化窗口"""
+        from PyQt6.QtCore import QEvent
+        if event.type() == QEvent.Type.WindowStateChange:
+            if self.isMinimized():
+                if hasattr(self, 'simplified_bluetooth_tool') and self.simplified_bluetooth_tool.isVisible():
+                    self.simplified_bluetooth_tool.hide()
+        super().changeEvent(event)
+
     def closeEvent(self, event):
         """重写关闭事件"""
         # 停止监控
