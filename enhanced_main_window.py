@@ -8,7 +8,7 @@ import asyncio
 import traceback
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-    QPushButton, QLabel, QMessageBox, QCheckBox
+    QPushButton, QLabel, QMessageBox, QCheckBox, QComboBox
 )
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QFont, QCursor, QIcon, QPixmap
@@ -18,7 +18,7 @@ from newblue3_17 import BluetoothTool, SimplifiedBluetoothTool, load_ui_dynamica
 from log_controller import LogManager, ComunManager
 from multi_window_manager import MultiWindowManager
 from struct_model import (
-    HexParserApp, 
+    HexParserApp,
     STRUCT_COMMANDS,
     get_alarm_protect_display_data,
     get_other_status_display_data,
@@ -26,6 +26,7 @@ from struct_model import (
     get_voltage_params_display_data,
     detect_special_command
 )
+from language_manager import t, set_language, get_current_language
 
 # 尝试导入版本信息
 try:
@@ -44,7 +45,7 @@ class EnhancedMainWindow(QMainWindow):
         
         # 初始化日志
         self.logger = LogManager.get_instance()
-        self.logger.write_log("增强版主窗口初始化")
+        self.logger.write_log(t('ui.log_init'))
         
         # 初始化当前数据来源
         self.current_data_source = None
@@ -98,23 +99,23 @@ class EnhancedMainWindow(QMainWindow):
             if VERSION_INFO_AVAILABLE:
                 try:
                     version = build_version_info.VERSION
-                    window_title = f'安培电池系统软件 v{version}'
-                    company_info = f'深圳安培时代数字新能源科技有限公司 - 电池系统软件 v{version}'
+                    window_title = t('ui.user_app_title') + f' v{version}'
+                    company_info = t('ui.company_info', version)
                     self.setWindowTitle(window_title)
                     
                     # 打印公司信息到日志
-                    self.bluetooth_tool.blue_write_log("="*60)
-                    self.bluetooth_tool.blue_write_log(company_info)
-                    self.bluetooth_tool.blue_write_log(f"版本号: v{version}")
-                    self.bluetooth_tool.blue_write_log("="*60)
+                    self.logger.write_log("="*60)
+                    self.logger.write_log(company_info)
+                    self.logger.write_log(t('ui.version_number', version))
+                    self.logger.write_log("="*60)
                 except Exception as e:
-                    self.bluetooth_tool.blue_write_log(f"读取版本信息出错: {e}")
-                    self.setWindowTitle('安培电池系统软件')
+                    self.logger.write_log(t('ui.version_read_error', e))
+                    self.setWindowTitle(t('ui.user_app_title'))
             else:
-                self.setWindowTitle('安培电池系统软件')
+                self.setWindowTitle(t('ui.user_app_title'))
         else:
             # 工厂版/开发版/firstuse：使用完整标题
-            base_title = '增强版BMS调试工具 - 多窗口管理'
+            base_title = t('ui.window_title')
             if VERSION_INFO_AVAILABLE:
                 try:
                     version_str = build_version_info.get_version_string()
@@ -122,17 +123,17 @@ class EnhancedMainWindow(QMainWindow):
                     
                     # 打印详细信息到日志
                     detailed_info = build_version_info.get_detailed_info()
-                    self.bluetooth_tool.blue_write_log("="*60)
-                    self.bluetooth_tool.blue_write_log("版本信息:")
-                    self.bluetooth_tool.blue_write_log(f"  打包日期: {detailed_info['build_date']}")
-                    self.bluetooth_tool.blue_write_log(f"  Git分支: {detailed_info['git_branch']}")
-                    self.bluetooth_tool.blue_write_log(f"  Commit: {detailed_info['git_commit_hash']}")
-                    self.bluetooth_tool.blue_write_log(f"  提交信息: {detailed_info['git_commit_message']}")
-                    self.bluetooth_tool.blue_write_log(f"  提交作者: {detailed_info['git_commit_author']}")
-                    self.bluetooth_tool.blue_write_log(f"  提交时间: {detailed_info['git_commit_date']}")
-                    self.bluetooth_tool.blue_write_log("="*60)
+                    self.logger.write_log("="*60)
+                    self.logger.write_log(t('ui.version_info_title'))
+                    self.logger.write_log(f"  {t('ui.build_date')}: {detailed_info['build_date']}")
+                    self.logger.write_log(f"  {t('ui.git_branch')}: {detailed_info['git_branch']}")
+                    self.logger.write_log(f"  {t('ui.git_commit')}: {detailed_info['git_commit_hash']}")
+                    self.logger.write_log(f"  {t('ui.commit_message')}: {detailed_info['git_commit_message']}")
+                    self.logger.write_log(f"  {t('ui.commit_author')}: {detailed_info['git_commit_author']}")
+                    self.logger.write_log(f"  {t('ui.commit_time')}: {detailed_info['git_commit_date']}")
+                    self.logger.write_log("="*60)
                 except Exception as e:
-                    self.bluetooth_tool.blue_write_log(f"读取版本信息出错: {e}")
+                    self.logger.write_log(t('ui.version_read_error', e))
                     self.setWindowTitle(base_title)
             else:
                 self.setWindowTitle(base_title)
@@ -212,7 +213,7 @@ class EnhancedMainWindow(QMainWindow):
             scaled_pixmap = pixmap.scaled(256, 256, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
             icon_label.setPixmap(scaled_pixmap)
             layout.addWidget(icon_label)
-        title_label = QLabel('BMS调试工具控制面板')
+        title_label = QLabel(t('ui.control_panel'))
         font = title_label.font()
         font.setBold(True)
         font.setPointSize(14)
@@ -225,7 +226,7 @@ class EnhancedMainWindow(QMainWindow):
         app_mode = os.environ.get('APP_MODE', 'factoryApp')
         
         # 工厂模式checkbox
-        self.factory_mode_checkbox = QCheckBox('🏭 工厂模式')
+        self.factory_mode_checkbox = QCheckBox(t('ui.factory_mode'))
         if app_mode == 'userApp':
             # 用户版：不可切换，强制不勾选（用户模式）
             self.factory_mode_checkbox.setChecked(False)
@@ -238,7 +239,7 @@ class EnhancedMainWindow(QMainWindow):
         layout.addWidget(self.factory_mode_checkbox)
         
         # 窗口模式切换checkbox
-        self.use_simplified_window = QCheckBox('📱 简化窗口')
+        self.use_simplified_window = QCheckBox(t('ui.simplified_window'))
         if app_mode == 'userApp':
             # 用户版：默认简化窗口，不可切换
             self.use_simplified_window.setChecked(True)
@@ -249,32 +250,59 @@ class EnhancedMainWindow(QMainWindow):
             self.use_simplified_window.setEnabled(True)
         layout.addWidget(self.use_simplified_window)
         
+        # 32电芯配置checkbox
+        self.cell_32_checkbox = QCheckBox(t('ui.cell_32_config'))
+        self.cell_32_checkbox.setToolTip(t('ui.cell_32_tooltip'))
+        self.cell_32_checkbox.stateChanged.connect(self.on_cell_config_changed)
+
+        # 英文用户版：禁用32-cell配置选项
+        if app_mode == 'userApp':
+            self.cell_32_checkbox.setChecked(False)
+            self.cell_32_checkbox.setEnabled(False)
+
+        layout.addWidget(self.cell_32_checkbox)
         
         # 连接控制
-        self.connect_btn = QPushButton('📱 打开连接窗口')
+        self.connect_btn = QPushButton(t('ui.open_connection'))
         self.connect_btn.clicked.connect(self.show_bluetooth_tool)
         layout.addWidget(self.connect_btn)
         
-        self.disconnect_btn = QPushButton('🔌 断开连接')
+        self.disconnect_btn = QPushButton(t('ui.disconnect'))
         self.disconnect_btn.clicked.connect(self.disconnect_device)
         self.disconnect_btn.setEnabled(False)
         layout.addWidget(self.disconnect_btn)
         
         # 监控控制
-        self.monitor_btn = QPushButton('▶️ 开始监控')
+        self.monitor_btn = QPushButton(t('ui.start_monitor'))
         self.monitor_btn.clicked.connect(self.toggle_monitoring)
         self.monitor_btn.setEnabled(False)
         layout.addWidget(self.monitor_btn)
         
         # 版本查询
-        self.version_btn = QPushButton('📋 查询版本')
+        self.version_btn = QPushButton(t('ui.query_version'))
         self.version_btn.clicked.connect(self.query_version)
         layout.addWidget(self.version_btn)
         
         # 清空队列
-        self.clear_queue_btn = QPushButton('🗑️ 清空队列')
+        self.clear_queue_btn = QPushButton(t('ui.clear_queue'))
         self.clear_queue_btn.clicked.connect(self.clear_send_queue)
         layout.addWidget(self.clear_queue_btn)
+        
+        # 语言选择下拉框
+        self.language_combo = QComboBox()
+        self.language_combo.addItem('language: 中文', 'zh_CN')
+        self.language_combo.addItem('language: English', 'en_US')
+        
+        # 设置当前语言
+        current_lang = get_current_language()
+        if current_lang == 'zh_CN':
+            self.language_combo.setCurrentIndex(0)
+        else:
+            self.language_combo.setCurrentIndex(1)
+        
+        self.language_combo.setToolTip('选择界面语言 / Select Language')
+        self.language_combo.currentIndexChanged.connect(self.on_language_changed)
+        layout.addWidget(self.language_combo)
         
         panel.setLayout(layout)
         panel.setMaximumHeight(60)
@@ -289,7 +317,7 @@ class EnhancedMainWindow(QMainWindow):
         layout.setContentsMargins(5, 5, 5, 5)
         
         # 连接状态
-        self.conn_status_label = QLabel('⭕ 断开')
+        self.conn_status_label = QLabel(t('ui.status_disconnected'))
         font = self.conn_status_label.font()
         font.setPointSize(11)
         self.conn_status_label.setFont(font)
@@ -300,19 +328,19 @@ class EnhancedMainWindow(QMainWindow):
         layout.addStretch()
         
         # 发送队列状态
-        self.queue_status_label = QLabel('📤 发送队列: 0')
+        self.queue_status_label = QLabel(f"{t('ui.send_queue')}: 0")
         self.queue_status_label.setFont(font)
         self.queue_status_label.setContentsMargins(3, 0, 10, 0)
         layout.addWidget(self.queue_status_label)
         
         # 数据接收计数
-        self.rx_count_label = QLabel('📥 接收: 0')
+        self.rx_count_label = QLabel(f"{t('ui.receive')}: 0")
         self.rx_count_label.setFont(font)
         self.rx_count_label.setContentsMargins(3, 0, 10, 0)
         layout.addWidget(self.rx_count_label)
         
         # 数据发送计数
-        self.tx_count_label = QLabel('📤 发送: 0')
+        self.tx_count_label = QLabel(f"{t('ui.send')}: 0")
         self.tx_count_label.setFont(font)
         self.tx_count_label.setContentsMargins(3, 0, 10, 0)
         layout.addWidget(self.tx_count_label)
@@ -341,7 +369,7 @@ class EnhancedMainWindow(QMainWindow):
                 window_type=window_type
             )
         
-        self.bluetooth_tool.blue_write_log(f"✅ 已自动配置 {len(window_configs)} 个显示窗口")
+        self.logger.write_log(t('ui.log_windows_configured', len(window_configs)))
         
         # 初始化写入功能状态（根据工厂模式checkbox的初始状态）
         QTimer.singleShot(100, lambda: self.multi_window_manager.set_write_enabled(
@@ -465,24 +493,24 @@ class EnhancedMainWindow(QMainWindow):
             if self.bluetooth_tool.client and self.bluetooth_tool.client.is_connected:
                 is_connected = True
                 # 显示蓝牙设备信息
-                device_name = getattr(self.bluetooth_tool, 'device_name', '未知设备')
+                device_name = getattr(self.bluetooth_tool, 'device_name', t('ui.unknown_device'))
                 device_address = getattr(self.bluetooth_tool, 'device_address', '')
                 if device_address:
-                    self.conn_status_label.setText(f'🔗 蓝牙已连接 | 📱 {device_name} | 📍 {device_address}')
+                    self.conn_status_label.setText(t('ui.bt_connected_with_addr', device_name, device_address))
                 else:
-                    self.conn_status_label.setText(f'🔗 蓝牙已连接 | 📱 {device_name}')
+                    self.conn_status_label.setText(t('ui.bt_connected_no_addr', device_name))
             elif self.bluetooth_tool.is_serial_connected:
                 is_connected = True
                 # 显示串口信息
-                port_name = self.bluetooth_tool.port_combo.currentText() if hasattr(self.bluetooth_tool, 'port_combo') else '未知串口'
-                self.conn_status_label.setText(f'🔗 串口已连接 | 🔌 {port_name}')
+                port_name = self.bluetooth_tool.port_combo.currentText() if hasattr(self.bluetooth_tool, 'port_combo') else t('ui.unknown_port')
+                self.conn_status_label.setText(t('ui.serial_connected', port_name))
         except:
             pass
         if not is_connected:
-            self.conn_status_label.setText('⭕ 断开')
+            self.conn_status_label.setText(t('ui.status_disconnected'))
             self.conn_status_label.setStyleSheet('color: #999;')  # 灰色
             if self.scan_task:
-                self.monitor_btn.setText('▶️ 开始监控')
+                self.monitor_btn.setText(t('ui.start_monitor'))
                 self.scan_task.cancel()
                 self.scan_task = None
         else:
@@ -531,14 +559,14 @@ class EnhancedMainWindow(QMainWindow):
                 if not is_connected:
                     self.bluetooth_tool.blue_write_log("⚠️ 未连接设备，无法开始监控")
                     return
-                self.monitor_btn.setText('⏸️ 停止监控')
+                self.monitor_btn.setText(t('ui.stop_monitor'))
                 self.scan_task = asyncio.create_task(self.monitoring_loop())
-                self.bluetooth_tool.blue_write_log("开始监控")
+                self.logger.write_log(t('ui.log_monitoring_start'))
             else:
-                self.monitor_btn.setText('▶️ 开始监控')
+                self.monitor_btn.setText(t('ui.start_monitor'))
                 self.scan_task.cancel()
                 self.scan_task = None
-                self.bluetooth_tool.blue_write_log("停止监控")
+                self.logger.write_log(t('ui.log_monitoring_stop'))
         finally:
             self._monitoring_toggling = False
 
@@ -582,11 +610,11 @@ class EnhancedMainWindow(QMainWindow):
         except asyncio.CancelledError:
             pass
         except Exception as e:
-            self.bluetooth_tool.blue_write_log(f"监控循环错误: {str(e)}")
+            self.logger.write_log(t('ui.log_monitoring_error', str(e)))
         finally:
             # 只有当自己仍是当前 scan_task 时才更新 UI，防止覆盖快速重启创建的新 task
             if self.scan_task is current_task:
-                self.monitor_btn.setText('▶️ 开始监控')
+                self.monitor_btn.setText(t('ui.start_monitor'))
                 self.scan_task = None
             
     async def queue_send_command(self, cmd_code, struct_name=None, priority=False):
@@ -605,16 +633,63 @@ class EnhancedMainWindow(QMainWindow):
                 self.current_data_source = struct_name
                 
         except Exception as e:
-            self.bluetooth_tool.blue_write_log(f"发送命令失败: {str(e)}")
+            self.logger.write_log(t('ui.log_send_command_failed', str(e)))
             
     def on_factory_mode_changed(self, state):
         """工厂模式checkbox状态改变"""
         is_factory_mode = (state == Qt.CheckState.Checked.value)
-        self.bluetooth_tool.blue_write_log(f"切换到{'工厂' if is_factory_mode else '用户'}模式")
-        
+        is_user_mode = not is_factory_mode  # 用户模式 = 非工厂模式
+
+        mode_name = t('ui.mode_factory') if is_factory_mode else t('ui.mode_user')
+        self.logger.write_log(t('ui.log_mode_switched', mode_name))
+
         # 更新所有数据窗口的写入功能状态
         self.multi_window_manager.set_write_enabled(is_factory_mode)
+
+        # 更新32-cell配置checkbox状态
+        if is_user_mode:
+            # 用户模式：禁用32-cell配置
+            self.cell_32_checkbox.setChecked(False)
+            self.cell_32_checkbox.setEnabled(False)
+        else:
+            # 工厂模式：启用32-cell配置
+            self.cell_32_checkbox.setEnabled(True)
+
+        # 更新数据窗口选择限制
+        self.multi_window_manager.set_user_mode_restrictions(is_user_mode)
         
+    def on_cell_config_changed(self, state):
+        """32电芯配置checkbox状态改变"""
+        is_32_cell = (state == Qt.CheckState.Checked.value)
+        config_name = t('ui.config_32cell_name') if is_32_cell else t('ui.config_16cell_name')
+        self.logger.write_log(t('ui.log_cell_config_switch', config_name))
+        
+        # 同步到bluetooth_tool的配置
+        if hasattr(self, 'bluetooth_tool') and self.bluetooth_tool:
+            # 阻止触发bluetooth_tool的信号，避免循环
+            self.bluetooth_tool.cell_32_checkbox.blockSignals(True)
+            self.bluetooth_tool.cell_32_checkbox.setChecked(is_32_cell)
+            self.bluetooth_tool.cell_32_checkbox.blockSignals(False)
+            
+            # 调用bluetooth_tool的配置切换逻辑
+            self.bluetooth_tool.on_cell_config_changed(state)
+    
+    def sync_cell_config_from_bluetooth_tool(self):
+        """从bluetooth_tool同步32电芯配置到主界面"""
+        if hasattr(self, 'bluetooth_tool') and self.bluetooth_tool:
+            try:
+                # 获取bluetooth_tool的配置状态
+                is_32_cell = self.bluetooth_tool.cell_32_checkbox.isChecked()
+                
+                # 阻止触发主界面的信号，避免循环
+                self.cell_32_checkbox.blockSignals(True)
+                self.cell_32_checkbox.setChecked(is_32_cell)
+                self.cell_32_checkbox.blockSignals(False)
+                
+                config_name = t('ui.config_32cell_name') if is_32_cell else t('ui.config_16cell_name')
+                self.logger.write_log(t('ui.log_cell_config_loaded', config_name))
+            except Exception as e:
+                self.logger.write_log(t('ui.log_cell_config_sync_failed', str(e)))
         
     def query_version(self):
         """查询版本"""
@@ -623,20 +698,39 @@ class EnhancedMainWindow(QMainWindow):
     def clear_send_queue(self):
         """清空发送队列"""
         self.multi_window_manager.clear_send_queue()
-        self.bluetooth_tool.blue_write_log("已清空发送队列")
-        
+        self.logger.write_log(t('ui.log_queue_cleared'))
+    
+    def on_language_changed(self, index):
+        """语言下拉框选择改变 - 切换语言后重启窗口"""
+        if index < 0:
+            return
+        new_language = self.language_combo.itemData(index)
+        current_language = get_current_language()
+        if new_language == current_language:
+            return
+        set_language(new_language)
+        QTimer.singleShot(100, self._restart_window)
+    def _restart_window(self):
+        """重启窗口以应用新语言"""
+        new_window = EnhancedMainWindow()
+        new_window.show()
+        # 挂到 QApplication 防止被垃圾回收
+        QApplication.instance()._keep_window = new_window
+        self._is_restarting = True
+        self.close()
+    
     def update_status_display(self):
         """更新状态显示"""
         # 更新队列状态
         queue_len = self.multi_window_manager.get_queue_length()
-        self.queue_status_label.setText(f'📤 发送队列: {queue_len}')
+        self.queue_status_label.setText(f"{t('ui.send_queue')}: {queue_len}")
         
         # 检查连接状态
         self.check_connection_status()
         
     def on_window_read(self, window_id):
         """处理窗口读取请求（手动点击，优先发送）"""
-        self.bluetooth_tool.blue_write_log(f"🖱️ 收到手动读取请求: {window_id}")
+        self.logger.write_log(t('ui.log_read_request', window_id))
         
         # 根据window_id获取对应的命令码（直接从STRUCT_COMMANDS获取）
         from struct_model import STRUCT_COMMANDS
@@ -646,11 +740,11 @@ class EnhancedMainWindow(QMainWindow):
             # 手动点击的读取指令，使用优先发送
             asyncio.create_task(self.queue_send_command(cmd_code, window_id, priority=True))
         else:
-            self.bluetooth_tool.blue_write_log(f"未找到窗口 {window_id} 对应的读取命令")
+            self.logger.write_log(t('ui.log_read_command_not_found', window_id))
             
     def on_window_write(self, window_id, modified_data):
         """处理窗口写入请求"""
-        self.bluetooth_tool.blue_write_log(f"收到写入请求: {window_id}, 修改项数: {len(modified_data)}")
+        self.logger.write_log(t('ui.log_write_request', window_id, len(modified_data)))
         asyncio.create_task(self.process_write_request(window_id, modified_data))
         
     async def process_write_request(self, window_id, modified_data):
@@ -662,13 +756,13 @@ class EnhancedMainWindow(QMainWindow):
             
             cmd_code = get_write_command_code(window_id)
             if not cmd_code:
-                self.bluetooth_tool.blue_write_log(f"窗口 {window_id} 不支持写入")
+                self.logger.write_log(t('ui.log_write_not_supported', window_id))
                 return
             
             # 获取当前窗口的所有数据
             window = self.multi_window_manager.windows.get(window_id)
             if not window or not window.table_model:
-                self.bluetooth_tool.blue_write_log(f"无法获取窗口数据")
+                self.logger.write_log(t('ui.log_cannot_get_window_data'))
                 return
             
             original_data = window.table_model._original_data
@@ -719,7 +813,7 @@ class EnhancedMainWindow(QMainWindow):
                             value = int(value_str)
                         write_values.append(value)
                     except (ValueError, TypeError):
-                        self.bluetooth_tool.blue_write_log(f"行{row_idx}值转换失败: {value_str}")
+                        self.logger.write_log(t('ui.log_value_convert_failed', row_idx, value_str))
                         write_values.append(0)
             
             # 写入前校验（如有校验函数）
@@ -733,7 +827,7 @@ class EnhancedMainWindow(QMainWindow):
             
             # 根据结构体格式打包
             if window_id not in STRUCT_FORMATS:
-                self.bluetooth_tool.blue_write_log(f"未找到结构体格式: {window_id}")
+                self.logger.write_log(t('ui.log_struct_format_not_found', window_id))
                 return
             
             fmt = STRUCT_FORMATS[window_id]
@@ -741,26 +835,26 @@ class EnhancedMainWindow(QMainWindow):
             try:
                 packed_data = struct.pack(fmt, *write_values)
             except struct.error as e:
-                self.bluetooth_tool.blue_write_log(f"数据打包失败: {str(e)}")
+                self.logger.write_log(t('ui.log_pack_failed', str(e)))
                 return
             
             # 构造完整命令
             try:
                 full_command = self.bluetooth_tool.text_decode.send_hex_fill(cmd_code, packed_data)
             except Exception as e:
-                self.bluetooth_tool.blue_write_log(f"命令构造失败: {str(e)}")
+                self.logger.write_log(t('ui.log_command_construct_failed', str(e)))
                 traceback.print_exc()
                 return
             
             # 通过队列发送
             await self.multi_window_manager.queue_send(full_command, priority=True)
-            self.bluetooth_tool.blue_write_log(f"✅ 写入命令已发送: {window_id}")
+            self.logger.write_log(t('ui.log_write_command_sent', window_id))
             
             # 不清空写入值，保留用户输入
             # self.multi_window_manager.clear_window_write_values(window_id)
             
         except Exception as e:
-            self.bluetooth_tool.blue_write_log(f"处理写入请求失败: {str(e)}")
+            self.bluetooth_tool.blue_write_log(t('ui.log_write_request_failed', str(e)))
             traceback.print_exc()
             
     def custom_process_complete_data(self):
@@ -871,7 +965,7 @@ class EnhancedMainWindow(QMainWindow):
                         
         except Exception as e:
             self.bluetooth_tool.received_data_buffer.clear()
-            self.bluetooth_tool.blue_write_log(f"custom_process_complete_data错误: {str(e)}")
+            self.bluetooth_tool.blue_write_log(t('ui.log_custom_process_error', str(e)))
             traceback.print_exc()
     
     def update_window_data_from_parsed_result(self, struct_name, dict_data):
@@ -895,47 +989,101 @@ class EnhancedMainWindow(QMainWindow):
                 self.multi_window_manager.update_window_data(struct_name, formatted_data)
                 
         except Exception as e:
-            self.bluetooth_tool.blue_write_log(f"更新窗口数据失败: {str(e)}")
+            self.logger.write_log(t('ui.log_update_window_data_failed', str(e)))
             traceback.print_exc()
     
     def update_bit_flags_window(self, dict_data):
         """更新状态位窗口（告警-保护、其他状态信息、电池状态）
         
         Args:
-            dict_data: SBS解析后的字典数据
+            dict_data: SBS解析后的字典数据，格式为 {category: [(name, unit, value), ...]}
         """
         try:
             # 将dict_data转换为flat_dict（需要转换为整数）
             flat_dict = {}
+            
+            # 将dict_data转换为sbs_data_dict格式（键名为翻译后的名称）
+            # dict_data格式: {category: [(name, unit, value), ...]}
+            # 需要转换为: {key_name: integer_value}
+            sbs_data_dict = {}
+            
+            # 获取当前语言下的键名（这些是STRUCT_VARIABLES中使用的键名）
+            alarm_key = t('var_templates.alarm_status')
+            protect_key = t('var_templates.protect_status')
+            fault_key = t('var_templates.fault_status')
+            other_info_key = t('var_templates.other_info')
+            balance_key = t('var_templates.balance_status')
+            battery_key = t('var_templates.battery_status_label')
+            
+            # 遍历dict_data，找到对应的状态位字段并转换为整数
+            # 变量名就是翻译后的名称，直接精确匹配
+            all_names = []
             for category, items in dict_data.items():
                 for item in items:
                     if len(item) >= 3:
                         name, unit, value_str = item[0], item[1], item[2]
-                        # 尝试将字符串转换为整数（对于状态位字段）
-                        try:
-                            # 如果是十六进制字符串
-                            if isinstance(value_str, str) and value_str.startswith('0x'):
-                                flat_dict[name] = int(value_str, 16)
-                            else:
-                                flat_dict[name] = int(value_str)
-                        except (ValueError, TypeError):
-                            # 如果转换失败，保持原值
-                            flat_dict[name] = value_str
+                        all_names.append(name)
+                        
+                        # 精确匹配变量名（name就是翻译后的名称）
+                        if name == alarm_key:
+                            try:
+                                sbs_data_dict[alarm_key] = int(value_str, 16) if isinstance(value_str, str) and value_str.startswith('0x') else int(value_str)
+                            except (ValueError, TypeError):
+                                pass
+                        elif name == protect_key:
+                            try:
+                                sbs_data_dict[protect_key] = int(value_str, 16) if isinstance(value_str, str) and value_str.startswith('0x') else int(value_str)
+                            except (ValueError, TypeError):
+                                pass
+                        elif name == fault_key:
+                            try:
+                                sbs_data_dict[fault_key] = int(value_str, 16) if isinstance(value_str, str) and value_str.startswith('0x') else int(value_str)
+                            except (ValueError, TypeError):
+                                pass
+                        elif name == other_info_key:
+                            try:
+                                sbs_data_dict[other_info_key] = int(value_str, 16) if isinstance(value_str, str) and value_str.startswith('0x') else int(value_str)
+                            except (ValueError, TypeError):
+                                pass
+                        elif name == balance_key:
+                            try:
+                                sbs_data_dict[balance_key] = int(value_str, 16) if isinstance(value_str, str) and value_str.startswith('0x') else int(value_str)
+                            except (ValueError, TypeError):
+                                pass
+                        elif name == battery_key:
+                            try:
+                                sbs_data_dict[battery_key] = int(value_str, 16) if isinstance(value_str, str) and value_str.startswith('0x') else int(value_str)
+                            except (ValueError, TypeError):
+                                pass
             
             # 更新告警-保护信息窗口
-            alarm_protect_data = get_alarm_protect_display_data(flat_dict)
-            if alarm_protect_data and 'ALARM_PROTECT' in self.multi_window_manager.windows:
-                self.multi_window_manager.update_window_data('ALARM_PROTECT', alarm_protect_data)
-            
-            # 更新其他状态信息窗口
-            other_status_data = get_other_status_display_data(flat_dict)
-            if other_status_data and 'OTHER_STATUS' in self.multi_window_manager.windows:
-                self.multi_window_manager.update_window_data('OTHER_STATUS', other_status_data)
-            
-            # 更新电池状态窗口
-            battery_status_data = get_battery_status_display_data(flat_dict)
-            if battery_status_data and 'BATTERY_STATUS' in self.multi_window_manager.windows:
-                self.multi_window_manager.update_window_data('BATTERY_STATUS', battery_status_data)
+            if sbs_data_dict:
+                # 更新告警-保护信息窗口
+                alarm_protect_data = get_alarm_protect_display_data(sbs_data_dict)
+                if alarm_protect_data and 'ALARM_PROTECT' in self.multi_window_manager.windows:
+                    self.multi_window_manager.update_window_data('ALARM_PROTECT', alarm_protect_data)
+                elif not alarm_protect_data:
+                    self.bluetooth_tool.blue_write_log("警告: ALARM_PROTECT 数据为空")
+                elif 'ALARM_PROTECT' not in self.multi_window_manager.windows:
+                    self.bluetooth_tool.blue_write_log("警告: ALARM_PROTECT 窗口未创建")
+                
+                # 更新其他状态信息窗口
+                other_status_data = get_other_status_display_data(sbs_data_dict)
+                if other_status_data and 'OTHER_STATUS' in self.multi_window_manager.windows:
+                    self.multi_window_manager.update_window_data('OTHER_STATUS', other_status_data)
+                elif not other_status_data:
+                    self.bluetooth_tool.blue_write_log("警告: OTHER_STATUS 数据为空")
+                elif 'OTHER_STATUS' not in self.multi_window_manager.windows:
+                    self.bluetooth_tool.blue_write_log("警告: OTHER_STATUS 窗口未创建")
+                
+                # 更新电池状态窗口
+                battery_status_data = get_battery_status_display_data(sbs_data_dict)
+                if battery_status_data and 'BATTERY_STATUS' in self.multi_window_manager.windows:
+                    self.multi_window_manager.update_window_data('BATTERY_STATUS', battery_status_data)
+                elif not battery_status_data:
+                    self.bluetooth_tool.blue_write_log("警告: BATTERY_STATUS 数据为空")
+                elif 'BATTERY_STATUS' not in self.multi_window_manager.windows:
+                    self.bluetooth_tool.blue_write_log("警告: BATTERY_STATUS 窗口未创建")
                 
             # 更新电压参数窗口
             voltage_params_data = get_voltage_params_display_data(flat_dict)
@@ -943,7 +1091,7 @@ class EnhancedMainWindow(QMainWindow):
                 self.multi_window_manager.update_window_data('VOLTAGE_PARAMS', voltage_params_data)
                 
         except Exception as e:
-            self.bluetooth_tool.blue_write_log(f"更新状态位窗口失败: {str(e)}")
+            self.logger.write_log(t('ui.log_update_bit_flags_failed', str(e)))
             traceback.print_exc()
             
     def focusInEvent(self, event):
@@ -963,8 +1111,9 @@ class EnhancedMainWindow(QMainWindow):
         if self.scan_task:
             self.scan_task.cancel()
             
-        # 关闭日志
-        self.logger.close_log()
+        # 关闭日志（重启时不关闭，避免新窗口写日志失败）
+        if not getattr(self, '_is_restarting', False):
+            self.logger.close_log()
         
         # 断开连接
         if self.bluetooth_tool.client and self.bluetooth_tool.client.is_connected:
@@ -980,7 +1129,7 @@ class EnhancedMainWindow(QMainWindow):
             if hasattr(self, 'bluetooth_tool'):
                 self.bluetooth_tool.close()
         except Exception as e:
-            self.bluetooth_tool.blue_write_log(f"关闭蓝牙窗口时出错: {str(e)}")
+            self.logger.write_log(t('ui.log_close_bt_window_error', str(e)))
             
         event.accept()
 
@@ -1006,7 +1155,7 @@ def main():
             loop.run_forever()
             
     except Exception as e:
-        print(f"程序错误: {str(e)}")
+        print(t('ui.program_error', str(e)))
         traceback.print_exc()
         
 
