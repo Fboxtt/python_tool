@@ -752,7 +752,7 @@ class BluetoothTool(QWidget):
         self.test128.setStyleSheet("font-size: 10px;")
         test_row1.addWidget(self.test128)
         test_row1.addWidget(QLabel(t('ui.interval2_label')))
-        self.test512 = QLineEdit('280')
+        self.test512 = QLineEdit('450')
         self.test512.setFixedWidth(50)
         self.test512.setStyleSheet("font-size: 10px;")
         test_row1.addWidget(self.test512)
@@ -2641,6 +2641,7 @@ class BluetoothTool(QWidget):
                 self.download_data.hex_init(self.hex_model.get_data())
                 pass
             hex_packet = 0
+            adaptive_wait = None  # 自适应等待时间，由第一包实测回复时间决定
             while 1:
                 data = self.download_data.get_download_data(BmsCmdType.WRITE_FLASH,hex_packet)
                 if(data == None):
@@ -2651,9 +2652,28 @@ class BluetoothTool(QWidget):
                     while err_count < 5:
                         self.display_send_data(data)
                         await self.byte_send(data)
-                        await asyncio.sleep(time512 * 2)
-                        if not self.text_decode.have_hex:
-                            await asyncio.sleep(time512 * 4)
+                        if adaptive_wait is None:
+                            # 第一包：轮询实测响应时间，20ms粒度，最长等待 time512*6
+                            # 仅当收到正确的WRITE_FLASH响应时才退出，确保时间准确
+                            _t0 = time.monotonic()
+                            _poll = 0.02
+                            _max_wait = time512 * 6
+                            _elapsed = 0.0
+                            _measured = _max_wait  # 默认超时值
+                            while _elapsed < _max_wait:
+                                await asyncio.sleep(_poll)
+                                _elapsed += _poll
+                                if (self.text_decode.have_hex and
+                                        self.text_decode.no80_cmd == BmsCmdType.WRITE_FLASH and
+                                        self.text_decode.cmd_ack == 0x00 and
+                                        self.text_decode.cmd_packet_num == hex_packet + 1):
+                                    _measured = time.monotonic() - _t0
+                                    break
+                        else:
+                            # 后续包：直接用自适应时间等待
+                            await asyncio.sleep(adaptive_wait)
+                            if not self.text_decode.have_hex:
+                                await asyncio.sleep(adaptive_wait * 2)
                         if not self.text_decode.have_hex:
                             self.blue_write_log(f"❌ 包{hex_packet + 1}超时，未收到回复 (第{err_count+1}次)")
                             err_count += 1
@@ -2661,6 +2681,9 @@ class BluetoothTool(QWidget):
                             self.text_decode.cmd_ack == 0x00 and
                             self.text_decode.cmd_packet_num == hex_packet + 1):
                                 self.text_decode.reset()
+                                if adaptive_wait is None:
+                                    adaptive_wait = _measured + 0.1
+                                    self.blue_write_log(f"📊 自适应等待时间: {adaptive_wait:.3f}s (实测响应: {_measured:.3f}s)")
                                 self.blue_write_log(f"✅ 包{hex_packet + 1}发送成功")
                                 self.packet_success_label.setText(f'包号: {hex_packet + 1} 总包数: {self.download_data.packet_num}')
                                 if self.download_data.packet_num > 0:
