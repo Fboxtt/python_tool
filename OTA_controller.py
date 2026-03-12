@@ -177,6 +177,25 @@ class TextDecode:
         self.cmd_packet_num = 0
         self.is_download_cmd = False
 
+    def reset(self):
+        """发送新指令前调用，清空旧响应，确保超时可被正确检测"""
+        self.have_hex = False
+        self.legality = ERR_NO
+        self.actual_len = 0
+        self.address = 0x00
+        self.bms_type = 0
+        self.cmd = 0
+        self.data_len = 0
+        self.check_sum = 0
+        self.cmd_ack = 0
+        self.no80_cmd = 0
+        self.actual_hex = bytearray()
+        self.data_hex = bytearray()
+        self.no_packet_len = 0
+        self.no_packet_hex = bytearray()
+        self.cmd_packet_num = 0
+        self.is_download_cmd = False
+
     def split_data(self, hex_data: bytearray):
         # 重置所有属性
         self.have_hex = False
