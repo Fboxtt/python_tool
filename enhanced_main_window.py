@@ -250,17 +250,6 @@ class EnhancedMainWindow(QMainWindow):
             self.use_simplified_window.setEnabled(True)
         layout.addWidget(self.use_simplified_window)
         
-        # 32电芯配置checkbox
-        self.cell_32_checkbox = QCheckBox(t('ui.cell_32_config'))
-        self.cell_32_checkbox.setToolTip(t('ui.cell_32_tooltip'))
-        self.cell_32_checkbox.stateChanged.connect(self.on_cell_config_changed)
-
-        # 英文用户版：禁用32-cell配置选项
-        if app_mode == 'userApp':
-            self.cell_32_checkbox.setChecked(False)
-            self.cell_32_checkbox.setEnabled(False)
-
-        layout.addWidget(self.cell_32_checkbox)
         
         # 连接控制
         self.connect_btn = QPushButton(t('ui.open_connection'))
@@ -646,50 +635,8 @@ class EnhancedMainWindow(QMainWindow):
         # 更新所有数据窗口的写入功能状态
         self.multi_window_manager.set_write_enabled(is_factory_mode)
 
-        # 更新32-cell配置checkbox状态
-        if is_user_mode:
-            # 用户模式：禁用32-cell配置
-            self.cell_32_checkbox.setChecked(False)
-            self.cell_32_checkbox.setEnabled(False)
-        else:
-            # 工厂模式：启用32-cell配置
-            self.cell_32_checkbox.setEnabled(True)
-
         # 更新数据窗口选择限制
         self.multi_window_manager.set_user_mode_restrictions(is_user_mode)
-        
-    def on_cell_config_changed(self, state):
-        """32电芯配置checkbox状态改变"""
-        is_32_cell = (state == Qt.CheckState.Checked.value)
-        config_name = t('ui.config_32cell_name') if is_32_cell else t('ui.config_16cell_name')
-        self.logger.write_log(t('ui.log_cell_config_switch', config_name))
-        
-        # 同步到bluetooth_tool的配置
-        if hasattr(self, 'bluetooth_tool') and self.bluetooth_tool:
-            # 阻止触发bluetooth_tool的信号，避免循环
-            self.bluetooth_tool.cell_32_checkbox.blockSignals(True)
-            self.bluetooth_tool.cell_32_checkbox.setChecked(is_32_cell)
-            self.bluetooth_tool.cell_32_checkbox.blockSignals(False)
-            
-            # 调用bluetooth_tool的配置切换逻辑
-            self.bluetooth_tool.on_cell_config_changed(state)
-    
-    def sync_cell_config_from_bluetooth_tool(self):
-        """从bluetooth_tool同步32电芯配置到主界面"""
-        if hasattr(self, 'bluetooth_tool') and self.bluetooth_tool:
-            try:
-                # 获取bluetooth_tool的配置状态
-                is_32_cell = self.bluetooth_tool.cell_32_checkbox.isChecked()
-                
-                # 阻止触发主界面的信号，避免循环
-                self.cell_32_checkbox.blockSignals(True)
-                self.cell_32_checkbox.setChecked(is_32_cell)
-                self.cell_32_checkbox.blockSignals(False)
-                
-                config_name = t('ui.config_32cell_name') if is_32_cell else t('ui.config_16cell_name')
-                self.logger.write_log(t('ui.log_cell_config_loaded', config_name))
-            except Exception as e:
-                self.logger.write_log(t('ui.log_cell_config_sync_failed', str(e)))
         
     def query_version(self):
         """查询版本"""
