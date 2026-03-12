@@ -586,6 +586,10 @@ class BluetoothTool(QWidget):
         self.hex_file_button.setFixedHeight(22)
         self.hex_file_button.clicked.connect(self.on_select_hex_file)
         hex_btn_row.addWidget(self.hex_file_button)
+        self.builtin_hex_checkbox = QCheckBox('使用内置固件')
+        self.builtin_hex_checkbox.setStyleSheet("font-size: 9px;")
+        self.builtin_hex_checkbox.stateChanged.connect(self._on_main_builtin_hex_changed)
+        hex_btn_row.addWidget(self.builtin_hex_checkbox)
         hex_btn_row.addStretch()
         hex_layout.addLayout(hex_btn_row)
         
@@ -2172,6 +2176,100 @@ class BluetoothTool(QWidget):
             'unique_id': unique_id
         }
 
+    def _on_main_builtin_hex_changed(self, state):
+        """主窗口内置固件checkbox状态变化"""
+        checked = (state == 2)
+        self.hex_file_button.setEnabled(not checked)
+        if checked:
+            try:
+                import importlib
+                builtin_hex_module = importlib.import_module('builtin_hex')
+                hex_b64_data = builtin_hex_module.BUILTIN_HEX_B64
+                if self.hex_model.load_builtin_hex(hex_b64_data):
+                    ver_info = self.hex_model.get_version_info()
+                    self.hex_file_label.setText('[内置固件]')
+                    self.hex_info_label.setText(f'大小: {self.hex_model.size} 字节')
+                    if ver_info['error']:
+                        self.hex_version_label.setText('版本: 读取失败')
+                    else:
+                        self.hex_version_label.setText(
+                            f'[{ver_info["platform"]}] {ver_info["version_str"]}  UID:{ver_info["uid_str"]}'
+                        )
+                    self.blue_write_log("✅ 内置固件已加载", color='green')
+                    # 同步简化窗口checkbox（如果存在）
+                    simp = getattr(self, '_simplified_window_ref', None)
+                    if simp is not None:
+                        simp.builtin_hex_checkbox.blockSignals(True)
+                        simp.builtin_hex_checkbox.setChecked(True)
+                        simp.simplified_hex_filename_label.setText('[内置固件]')
+                        simp.simplified_hex_button.setEnabled(False)
+                        simp.builtin_hex_checkbox.blockSignals(False)
+                else:
+                    self.builtin_hex_checkbox.blockSignals(True)
+                    self.builtin_hex_checkbox.setChecked(False)
+                    self.builtin_hex_checkbox.blockSignals(False)
+                    self.hex_file_button.setEnabled(True)
+                    self._ota_msgbox(QMessageBox.Icon.Critical, '错误', '内置固件加载失败')
+            except ModuleNotFoundError:
+                self.builtin_hex_checkbox.blockSignals(True)
+                self.builtin_hex_checkbox.setChecked(False)
+                self.builtin_hex_checkbox.blockSignals(False)
+                self.hex_file_button.setEnabled(True)
+                self.blue_write_log("❌ 错误：未找到内置固件文件 'builtin_hex.py'，请确保已正确打包。", color='red')
+                self.blue_write_log("❌ Error: Built-in firmware file 'builtin_hex.py' not found. Please ensure it is correctly packaged.", color='red')
+                self._ota_msgbox(QMessageBox.Icon.Warning, '错误 / Error',
+                                 '未找到内置固件文件 (builtin_hex.py)。\n请确保已正确打包或选择外部HEX文件。\n\n'
+                                 'Built-in firmware file (builtin_hex.py) not found.\nPlease ensure it is correctly packaged or select an external HEX file.')
+            except Exception as e:
+                self.builtin_hex_checkbox.blockSignals(True)
+                self.builtin_hex_checkbox.setChecked(False)
+                self.builtin_hex_checkbox.blockSignals(False)
+                self.hex_file_button.setEnabled(True)
+                self.blue_write_log(f"❌ 加载内置固件失败: {e}", color='red')
+                self._ota_msgbox(QMessageBox.Icon.Critical, '错误', f'内置固件加载失败: {e}')
+        else:
+            self.hex_file_label.setText('未选择文件')
+            self.hex_info_label.setText('大小: 0B')
+            self.hex_version_label.setText('版本: —')
+            self.hex_model.is_file_loaded = False
+            self.hex_model.hex_data = None
+            self.hex_model.filename = ''
+            # 同步简化窗口checkbox（如果存在）
+            simp = getattr(self, '_simplified_window_ref', None)
+            if simp is not None:
+                simp.builtin_hex_checkbox.blockSignals(True)
+                simp.builtin_hex_checkbox.setChecked(False)
+                simp.simplified_hex_filename_label.setText('未选择文件')
+                simp.simplified_hex_button.setEnabled(True)
+                simp.builtin_hex_checkbox.blockSignals(False)
+
+    def _ota_rx_diag(self, expect_cmd=None, expect_packet=None) -> str:
+        """返回当前text_decode状态的诊断字符串，用于OTA日志"""
+        td = self.text_decode
+        legality_map = {
+            ReceveDataStatus.ERR_NO: '无回复(超时)',
+            ReceveDataStatus.ERR_CMD_LEN: '回复长度错误(无法解析)',
+            ReceveDataStatus.ERR_CHKSUM: '回复校验和错误',
+            ReceveDataStatus.ERR_NOTHING: '回复解析成功',
+        }
+        legality_str = legality_map.get(td.legality, f'未知状态({td.legality})')
+        if td.legality == ReceveDataStatus.ERR_NO:
+            return f'⏱ 超时：未收到设备回复'
+        if td.legality in (ReceveDataStatus.ERR_CMD_LEN, ReceveDataStatus.ERR_CHKSUM):
+            raw = td.actual_hex.hex(' ').upper() if td.actual_hex else '—'
+            return f'⚠ 解析失败[{legality_str}] 原始数据: {raw}'
+        # 解析成功，检查命令码和ACK
+        parts = []
+        if expect_cmd is not None and td.no80_cmd != expect_cmd.value:
+            parts.append(f'指令不符(期望 0x{expect_cmd.value:02X} 收到 0x{td.no80_cmd:02X})')
+        if td.cmd_ack != 0x00:
+            parts.append(f'ACK错误(0x{td.cmd_ack:02X})')
+        if expect_packet is not None and td.cmd_packet_num != expect_packet:
+            parts.append(f'包号不符(期望{expect_packet} 收到{td.cmd_packet_num})')
+        if parts:
+            return '❌ ' + ', '.join(parts)
+        return '✅ 正常'
+
     def _ota_msgbox(self, icon, title, text, buttons=QMessageBox.StandardButton.Ok, default=None):
         """同步置顶弹窗（仅在同步上下文中调用，如槽函数）"""
         mb = QMessageBox(icon, title, text, buttons)
@@ -2411,11 +2509,11 @@ class BluetoothTool(QWidget):
                         self.ota_progress_bar.setValue(15)
                         self.ota_step_label.setText('✅ 握手  🔄 擦除中...')
                         break
-                    self.blue_write_log(f"❌ 握手未成功，继续重试 (err_count={err_count})")
+                    self.blue_write_log(f"❌ 握手未成功 (第{err_count+1}次) {self._ota_rx_diag()}")
                     err_count += 1
                 else:
                     if err_count == 3:
-                        self.blue_write_log(f"握手失败")
+                        self.blue_write_log(f"握手失败，最终诊断: {self._ota_rx_diag()}")
                 shake_count += 1
             else:
                 self.packet_success_label.setText(t('ui.handshake_success'))
@@ -2440,10 +2538,10 @@ class BluetoothTool(QWidget):
                     self.ota_step_label.setText('✅ 握手  ✅ 擦除  🔄 写入中...')
                     break
                 else:
-                    self.blue_write_log(f"❌ 擦除未成功，继续重试 (err_count={err_count})")
+                    self.blue_write_log(f"❌ 擦除未成功 (第{err_count+1}次) {self._ota_rx_diag(BmsCmdType.DOWNLOAD_BUFFER)}")
                     err_count += 1
             else:
-                self.blue_write_log(f"擦除失败")
+                self.blue_write_log(f"擦除失败，最终诊断: {self._ota_rx_diag(BmsCmdType.DOWNLOAD_BUFFER)}")
                 raise Exception("擦除失败，终止OTA，请重新连接后再试")
 
 
@@ -2481,11 +2579,11 @@ class BluetoothTool(QWidget):
                                     hex_packet += 1
                                     break
                             else:
-                                self.blue_write_log(f"❌ 包{hex_packet + 1}未成功，重试 (err_count={err_count})")
+                                self.blue_write_log(f"❌ 包{hex_packet + 1}未成功 (第{err_count+1}次) {self._ota_rx_diag(BmsCmdType.WRITE_FLASH, hex_packet + 1)}")
                                 await asyncio.sleep(time512*3)
                                 err_count += 1
                         else:
-                            self.blue_write_log(f"包{hex_packet + 1}发送失败")
+                            self.blue_write_log(f"包{hex_packet + 1}发送失败，最终诊断: {self._ota_rx_diag(BmsCmdType.WRITE_FLASH, hex_packet + 1)}")
                             raise Exception("烧录失败")
 
                     except BleakError:
@@ -2511,9 +2609,10 @@ class BluetoothTool(QWidget):
                     self.ota_step_label.setText('✅ 握手  ✅ 擦除  ✅ 写入  🔄 重启中...')
                     break
                 else:
-                    self.blue_write_log(f"❌ 总校验和未成功，重试 (err_count={err_count})")
+                    self.blue_write_log(f"❌ 总校验和未成功 (第{err_count+1}次) {self._ota_rx_diag(BmsCmdType.REC_TOTAL_CHECKSUM)}")
                     err_count += 1
             if err_count > 0:
+                self.blue_write_log(f"校验和失败，最终诊断: {self._ota_rx_diag(BmsCmdType.REC_TOTAL_CHECKSUM)}")
                 raise ValueError("校验和命令发送错误次数 >= 5")
             self.blue_write_log("烧录完成")
             await asyncio.sleep(6)
@@ -2538,13 +2637,13 @@ class BluetoothTool(QWidget):
                     self.ota_step_label.setStyleSheet("font-size: 9px; color: #27ae60;")
                     break
                 else:
-                    self.blue_write_log(f"❌ 71指令查询失败，重试 (err_count={err_count})")
+                    self.blue_write_log(f"❌ 71指令查询失败 (第{err_count+1}次) {self._ota_rx_diag(BmsCmdType.READ_IC_INF)}")
                     err_count += 1
 
         except Exception as e:
             traceback.print_exc()
             self.blue_write_log(f"烧录失败: {str(e)}")
-            self.ota_step_label.setText('❌ 烧录失败')
+            # self.ota_step_label.setText('❌ 烧录失败')
             self.ota_step_label.setStyleSheet("font-size: 9px; color: #e74c3c;")
             # QMessageBox.critical(self, '错误', f'烧录失败: {str(e)}')
 
@@ -3883,6 +3982,8 @@ class SimplifiedBluetoothTool(QWidget):
         
         # 复用原窗口的核心功能（共享连接状态）
         self.bluetooth_tool = bluetooth_tool
+        # 注册到bluetooth_tool，供主窗口checkbox同步使用
+        bluetooth_tool._simplified_window_ref = self
         
         # 直接引用原窗口的属性（而不是创建新的）
         self.client = bluetooth_tool.client
@@ -4141,6 +4242,11 @@ class SimplifiedBluetoothTool(QWidget):
                             f'[{ver_info["platform"]}] {ver_info["version_str"]}  UID:{ver_info["uid_str"]}'
                         )
                     self.simplified_hex_filename_label.setText('[内置固件]')
+                    # 同步主窗口checkbox
+                    bt.builtin_hex_checkbox.blockSignals(True)
+                    bt.builtin_hex_checkbox.setChecked(True)
+                    bt.hex_file_button.setEnabled(False)
+                    bt.builtin_hex_checkbox.blockSignals(False)
                 else:
                     self.builtin_hex_checkbox.setChecked(False)
                     bt._ota_msgbox(QMessageBox.Icon.Critical, '错误', '内置固件加载失败')
@@ -4165,6 +4271,11 @@ class SimplifiedBluetoothTool(QWidget):
             bt.hex_model.hex_data = None
             bt.hex_model.filename = ''
             self.simplified_hex_filename_label.setText('未选择文件')
+            # 同步主窗口checkbox
+            bt.builtin_hex_checkbox.blockSignals(True)
+            bt.builtin_hex_checkbox.setChecked(False)
+            bt.hex_file_button.setEnabled(True)
+            bt.builtin_hex_checkbox.blockSignals(False)
     
     def focusOutEvent(self, event):
         """失去焦点时隐藏（点击窗口外部）"""
