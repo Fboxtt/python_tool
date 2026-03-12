@@ -906,6 +906,13 @@ class EnhancedMainWindow(QMainWindow):
                     self.bluetooth_tool.last_inf_data_hex = bytearray(self.bluetooth_tool.text_decode.data_hex)
                     # 继续下面的普通数据处理，同时更新显示窗口
                     pass
+                elif cmd_code == 0x16:  # PC_GET_VER
+                    # 先调用split_data，设置no80_cmd和cmd_ack供OTA控制器判断
+                    self.bluetooth_tool.text_decode.split_data(bytearray(data_buffer))
+                    # 保存data_hex供OTA前置检查（版本一致性比较）使用
+                    self.bluetooth_tool.last_ver_data_hex = bytearray(self.bluetooth_tool.text_decode.data_hex)
+                    # 继续下面的普通数据处理，同时更新显示窗口
+                    pass
                 else:
                     # 其他OTA指令正常处理
                     self.bluetooth_tool.text_decode.split_data(bytearray(data_buffer))

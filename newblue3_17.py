@@ -228,6 +228,7 @@ class BluetoothTool(QWidget):
         self.batch_task = None
         # 保存最近一次71指令的data_hex，供OTA前置检查使用
         self.last_inf_data_hex = bytearray()
+        self.last_ver_data_hex = bytearray()
         # 用户主动断开标志，避免断开回调重复弹窗
         self._manual_disconnect = False
         # 响应状态标志（用于test_send_data等功能，基于信号机制）
@@ -2031,6 +2032,7 @@ class BluetoothTool(QWidget):
             0x77,  # 写入Flash
             0x78,  # 总校验和
             0x71,  # 读取IC信息
+            0x16,  # 版本号查询（用于OTA前置一致性检查）
             0x01,  # 注册命令（也用于OTA流程）
         ]
         
@@ -2327,15 +2329,55 @@ class BluetoothTool(QWidget):
                 QMessageBox.StandardButton.No
             )
             return reply == QMessageBox.StandardButton.Yes
-        # 发送71指令查询设备当前信息，先清空上次缓存，防止查询失败时误用旧数据
+        # ======== 步骤1：查询0x16（PC_GET_VER）获取运行版本 ========
+        self.ota_step_label.setText('🔍 查询0x16版本...')
+        self.last_ver_data_hex = bytearray()
+        self.text_decode.reset()
+        data16 = self.text_decode.send_hex_fill(0x16)
+        self.display_send_data(data16)
+        await self.byte_send(data16)
+        await asyncio.sleep(time512 * 2)
+        if not self.text_decode.have_hex:
+            await asyncio.sleep(time512 * 4)
+        ver16 = None
+        if self.text_decode.have_hex and self.text_decode.no80_cmd == 0x16 and len(self.last_ver_data_hex) >= 10:
+            try:
+                major16, minor16, rev16, year16, month16, day16 = struct.unpack_from('<HHHHBB', self.last_ver_data_hex, 0)
+                ver16 = (major16, minor16, rev16, year16, month16, day16)
+                self.blue_write_log(f"🔍 0x16版本: V{major16}.{minor16}.{rev16} ({year16}-{month16:02d}-{day16:02d})")
+            except Exception as e:
+                self.blue_write_log(f"⚠️ 0x16版本解析失败: {e}，原始数据: {self.last_ver_data_hex[:10].hex(' ').upper()}", color='orange')
+        # 检测boot-only：0x16回复了但无法解析出版本（如 cmd_ack=0x23 无app）
+        boot_only = (self.text_decode.have_hex and self.text_decode.no80_cmd == 0x16 and ver16 is None)
+        if boot_only:
+            self.blue_write_log(f"🔍 0x16回复但无版本信息 (cmd_ack=0x{self.text_decode.cmd_ack:02X})，仅有boot固件 (boot-only模式)")
+        elif not self.text_decode.have_hex:
+            # 0x16 完全无回复，与0x71无回复同等对待
+            self.blue_write_log("❌ 未收到0x16版本响应，设备连接不正确或不支持OTA")
+            await self._show_msgbox_async(
+                QMessageBox.Icon.Critical, 'OTA检查 — 无法升级 / Cannot Upgrade',
+                '未收到版本查询(0x16)响应，无法继续OTA。\n\n'
+                '可能原因：\n'
+                '  • 设备连接不正确\n'
+                '  • 设备固件不支持OTA功能\n\n'
+                'No response to version query (0x16).\n\n'
+                'Possible reasons:\n'
+                '  • Device is not connected correctly\n'
+                '  • Device firmware does not support OTA'
+            )
+            return False
+        # ======== 步骤2：查询0x71（PC_GET_INF）获取固件信息 ========
         self.last_inf_data_hex = None
         self.ota_step_label.setText('🔍 查询设备信息...')
+        self.text_decode.reset()
         data = self.text_decode.send_hex_fill(0x71)
         self.display_send_data(data)
         await self.byte_send(data)
-        await asyncio.sleep(time512 * 3)
+        await asyncio.sleep(time512 * 2)
+        if not self.text_decode.have_hex:
+            await asyncio.sleep(time512 * 4)
         # 检查是否收到71响应
-        if self.text_decode.no80_cmd != BmsCmdType.READ_IC_INF or self.text_decode.cmd_ack != 0x00:
+        if not self.text_decode.have_hex or self.text_decode.no80_cmd != BmsCmdType.READ_IC_INF or self.text_decode.cmd_ack != 0x00:
             await self._show_msgbox_async(
                 QMessageBox.Icon.Critical, 'OTA检查 — 无法升级 / Cannot Upgrade',
                 '未收到设备信息响应，无法继续OTA。\n\n'
@@ -2348,6 +2390,54 @@ class BluetoothTool(QWidget):
                 '  • Device firmware does not support OTA'
             )
             return False
+        # ======== 步骤3：比较0x16与0x71的版本号，或处理boot-only情况 ========
+        if boot_only:
+            # 仅有boot固件，无app版本可比较，提示用户是否强制升级
+            dev_inf_boot = self._parse_inf_for_ota()
+            dev_ver_info = ''
+            if dev_inf_boot:
+                dev_ver_info = (
+                    f"\n0x71 app版本: V{dev_inf_boot['app_major']}.{dev_inf_boot['app_minor']}.{dev_inf_boot['app_rev']}"
+                    f"  ({dev_inf_boot['app_year']}-{dev_inf_boot['app_month']:02d}-{dev_inf_boot['app_day']:02d})"
+                )
+            reply = await self._show_msgbox_async(
+                QMessageBox.Icon.Warning,
+                '⚠️ 强制升级确认 / Forced Upgrade Confirm',
+                f'检测到设备处于 boot-only 模式（仅有boot固件，无app固件）。{dev_ver_info}\n'
+                f'之前的OTA可能造成了固件损坏，强制升级可解决此问题。\n'
+                f'需要强制烧录固件以恢复设备功能。\n\n'
+                f'是否继续强制升级？\n\n'
+                f'Device is in boot-only mode (boot firmware only, no app firmware).\n'
+                f'A previous OTA may have corrupted the firmware; a forced upgrade can fix this.\n'
+                f'A forced firmware flash is needed to restore device functionality.\n\n'
+                f'Continue with forced upgrade?',
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.Yes
+            )
+            return reply == QMessageBox.StandardButton.Yes
+        elif ver16 is not None:
+            dev_inf_quick = self._parse_inf_for_ota()
+            if dev_inf_quick is not None:
+                ver71 = (dev_inf_quick['app_major'], dev_inf_quick['app_minor'], dev_inf_quick['app_rev'],
+                         dev_inf_quick['app_year'], dev_inf_quick['app_month'], dev_inf_quick['app_day'])
+                major16, minor16, rev16, year16, month16, day16 = ver16
+                self.blue_write_log(
+                    f"🔍 0x71 app版本: V{ver71[0]}.{ver71[1]}.{ver71[2]} ({ver71[3]}-{ver71[4]:02d}-{ver71[5]:02d})"
+                )
+                if ver16 != ver71:
+                    await self._show_msgbox_async(
+                        QMessageBox.Icon.Critical, 'OTA检查 — 不支持OTA / OTA Not Supported',
+                        f'0x16版本与0x71版本不一致，设备不支持OTA功能。\n\n'
+                        f'0x16运行版本:  V{major16}.{minor16}.{rev16}  {year16}-{month16:02d}-{day16:02d}\n'
+                        f'0x71 app版本: V{ver71[0]}.{ver71[1]}.{ver71[2]}  {ver71[3]}-{ver71[4]:02d}-{ver71[5]:02d}\n\n'
+                        f'Version mismatch between 0x16 and 0x71.\n'
+                        f'Device firmware does not support OTA.\n\n'
+                        f'0x16 running: V{major16}.{minor16}.{rev16}  {year16}-{month16:02d}-{day16:02d}\n'
+                        f'0x71 app:     V{ver71[0]}.{ver71[1]}.{ver71[2]}  {ver71[3]}-{ver71[4]:02d}-{ver71[5]:02d}'
+                    )
+                    return False
+                else:
+                    self.blue_write_log("✅ 0x16与0x71版本一致，设备支持OTA")
         # 解析设备信息
         dev_inf = self._parse_inf_for_ota()
         if dev_inf is None:
