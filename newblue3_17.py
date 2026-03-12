@@ -1929,7 +1929,7 @@ class BluetoothTool(QWidget):
                 if not self.is_serial_connected:
                     raise Exception("串口连接已断开")
                 
-                self.blue_write_log(f"byte_send: 向串口写入 {len(data)} 字节...")
+                # self.blue_write_log(f"byte_send: 向串口写入 {len(data)} 字节...")
                 # 在线程池中执行阻塞的串口写入操作
                 loop = asyncio.get_event_loop()
                 await loop.run_in_executor(None, self.serial_port.write, data)
