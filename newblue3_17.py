@@ -2754,6 +2754,25 @@ class BluetoothTool(QWidget):
                     self.ota_progress_bar.setValue(100)
                     self.ota_step_label.setText('✅ 握手  ✅ 擦除  ✅ 写入  ✅ 重启  ✅ 成功')
                     self.ota_step_label.setStyleSheet("font-size: 9px; color: #27ae60;")
+                    # ── 弹窗显示烧录后版本信息 ──
+                    dev_inf_ok = self._parse_inf_for_ota()
+                    hex_ver_ok = self.hex_model.get_version_info()
+                    if dev_inf_ok:
+                        dev_ver_str = (f"V{dev_inf_ok['app_major']}.{dev_inf_ok['app_minor']}.{dev_inf_ok['app_rev']}"
+                                       f"  ({dev_inf_ok['app_year']}-{dev_inf_ok['app_month']:02d}-{dev_inf_ok['app_day']:02d})")
+                    else:
+                        dev_ver_str = '读取失败 / Read Failed'
+                    hex_ver_str = hex_ver_ok['version_str'] if not hex_ver_ok.get('error') else '读取失败 / Read Failed'
+                    await self._show_msgbox_async(
+                        QMessageBox.Icon.Information,
+                        '✅ OTA烧录成功 / OTA Flash Success',
+                        f'固件烧录成功！设备已恢复正常运行。\n\n'
+                        f'烧录固件版本:  {hex_ver_str}\n'
+                        f'设备当前版本:  {dev_ver_str}\n\n'
+                        f'Firmware flashed successfully! Device is running normally.\n\n'
+                        f'Flashed firmware:  {hex_ver_str}\n'
+                        f'Device version:    {dev_ver_str}'
+                    )
                     break
                 else:
                     self.blue_write_log(f"❌ 71指令回复异常 (第{err_count+1}次) {self._ota_rx_diag(BmsCmdType.READ_IC_INF)}")
