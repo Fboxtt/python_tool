@@ -931,10 +931,10 @@ def _validate_soc_stop_para(write_values, var_names):
         idx_dis = var_names.index("停止放电SOC")
         chg_soc = int(write_values[idx_chg])
         dis_soc = int(write_values[idx_dis])
-        if not (0 <= chg_soc <= 80):
-            return False, f"停止充电SOC值 {chg_soc}% 超出范围(0~80%)"
-        if not (0 <= dis_soc <= 80):
-            return False, f"停止放电SOC值 {dis_soc}% 超出范围(0~80%)"
+        if not (0 <= chg_soc <= 100):
+            return False, f"停止充电SOC值 {chg_soc}% 超出范围(0~100%)"
+        if not (0 <= dis_soc <= 100):
+            return False, f"停止放电SOC值 {dis_soc}% 超出范围(0~100%%)"
         if chg_soc <= dis_soc:
             return False, f"停止充电SOC({chg_soc}%)必须大于停止放电SOC({dis_soc}%)"
         return True, ""
