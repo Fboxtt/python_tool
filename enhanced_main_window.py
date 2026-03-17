@@ -74,7 +74,7 @@ class EnhancedMainWindow(QMainWindow):
             self.bluetooth_tool.data_timer.timeout.disconnect()
         except:
             pass
-        self.bluetooth_tool.data_timer.timeout.connect(self.custom_process_complete_data)
+        self.bluetooth_tool.data_timer.timeout.connect(self.process_received_data_with_split)
         
         # 监控任务
         self.scan_task = None
@@ -818,28 +818,177 @@ class EnhancedMainWindow(QMainWindow):
         except Exception as e:
             self.bluetooth_tool.blue_write_log(t('ui.log_write_request_failed', str(e)))
             traceback.print_exc()
+    
+    # 单条指令最小长度：1(地址) + 2(长度) + 2(单板+命令) + 2(55 AA) + 1(ack) + 0(data) + 1(校验和) = 9
+    MIN_CMD_LEN = 9
+
+    def split_commands_from_buffer(self, data_buffer: bytes) -> list:
+        """根据协议格式拆分多个指令：先用 55 AA 计算数量和定位，再用长度字段校验每条是否合法、是否够长。
+        协议格式（长度 = 1+2+2+2+1+N+1 字节）:
+        [0x00][长度高][长度低][单板类型][命令类型][0x55][0xAA][ack][数据N字节][校验和]
+        长度字段为大端序，表示从「命令类型」到包尾的字节数，总包长 = 4 + 长度。
+        
+        Args:
+            data_buffer: 原始数据缓冲区
             
-    def custom_process_complete_data(self):
-        """自定义数据处理方法（替代bluetooth_tool的原始方法）"""
+        Returns:
+            list: 合法且完整的指令列表，每个元素为一条完整指令的 bytes
+        """
+        commands = []
+        if not data_buffer or len(data_buffer) < self.MIN_CMD_LEN:
+            return commands
+
+        # 1) 用 55 AA 计算指令数量和定位（协议标识在起始后第5、6字节）
+        protocol_markers = []
+        i = 0
+        while i < len(data_buffer) - 1:
+            if data_buffer[i] == 0x55 and data_buffer[i + 1] == 0xAA:
+                if i >= 5 and data_buffer[i - 5] == 0x00:
+                    protocol_markers.append(i - 5)
+            i += 1
+
+        if not protocol_markers:
+            return commands
+
+        protocol_markers = sorted(set(protocol_markers))
+        self.bluetooth_tool.blue_write_log(
+            f"🔍 指令拆分：在缓冲区中找到 {len(protocol_markers)} 个协议标识 (55 AA)"
+        )
+
+        # 2) 用长度计算每条占位是否合法、是否够长，只保留合法指令
+        processed_ranges = []
+        for cmd_idx, start_idx in enumerate(protocol_markers, 1):
+            if start_idx + 2 >= len(data_buffer):
+                continue
+            is_overlap = any(proc_start <= start_idx < proc_end for (proc_start, proc_end) in processed_ranges)
+            if is_overlap:
+                self.bluetooth_tool.blue_write_log(
+                    f"⚠️ 指令拆分：位置 {start_idx} 与已处理指令重叠，跳过"
+                )
+                continue
+
+            length_high = data_buffer[start_idx + 1]
+            length_low = data_buffer[start_idx + 2]
+            payload_len = (length_high << 8) | length_low
+            total_length = 4 + payload_len  # 前4字节 + 长度字段所表示段
+
+            # 合法性：总长 >= 1+2+2+2+1+0+1 = 9
+            if total_length < self.MIN_CMD_LEN:
+                self.bluetooth_tool.blue_write_log(
+                    f"⚠️ 指令拆分：位置 {start_idx} 总长 {total_length} 无效（<{self.MIN_CMD_LEN}），跳过"
+                )
+                continue
+
+            # 是否够长：缓冲区从 start_idx 起至少要有 total_length 字节
+            if start_idx + total_length > len(data_buffer):
+                self.bluetooth_tool.blue_write_log(
+                    f"⚠️ 指令拆分：位置 {start_idx} 指令不完整（需要 {total_length} 字节，剩余 {len(data_buffer) - start_idx} 字节），跳过"
+                )
+                continue
+
+            if start_idx + 6 >= len(data_buffer) or data_buffer[start_idx + 5] != 0x55 or data_buffer[start_idx + 6] != 0xAA:
+                continue
+
+            command = data_buffer[start_idx:start_idx + total_length]
+            processed_ranges.append((start_idx, start_idx + total_length))
+
+            bms_type = data_buffer[start_idx + 3]
+            cmd_code = data_buffer[start_idx + 4] & 0x7F
+            cmd_hex = ' '.join(f'{b:02X}' for b in command[:min(20, len(command))])
+            if len(command) > 20:
+                cmd_hex += '...'
+            self.bluetooth_tool.blue_write_log(
+                f"✅ 指令拆分 #{cmd_idx}：起始={start_idx}, 长度={total_length}, "
+                f"单板=0x{bms_type:02X}, 命令=0x{cmd_code:02X}, 数据={cmd_hex}"
+            )
+            commands.append(command)
+
+        if commands:
+            self.bluetooth_tool.blue_write_log(f"📦 指令拆分完成：成功 {len(commands)} 条合法指令")
+        else:
+            self.bluetooth_tool.blue_write_log("⚠️ 指令拆分：未得到任何合法完整指令")
+
+        return commands
+    
+    def process_received_data_with_split(self):
+        """接收timer信号，拆分多个指令，分别创建task处理"""
         try:
             if not hasattr(self.bluetooth_tool, 'received_data_buffer'):
                 return
+            
             data_buffer = bytes(self.bluetooth_tool.received_data_buffer)
             if not data_buffer:
                 return
+            
+            # 拆分多个指令
+            commands = self.split_commands_from_buffer(data_buffer)
+            
+            if not commands:
+                # 无法拆分，尝试作为单个指令处理
+                self.bluetooth_tool.blue_write_log(f"警告：无法拆分指令，尝试作为单个指令处理 data_buffer = {len(data_buffer)}")
+                asyncio.create_task(self._process_single_command_async(data_buffer))
+                self.bluetooth_tool.received_data_buffer.clear()
+                return
+            
+            if len(commands) > 1:
+                self.bluetooth_tool.blue_write_log(f"检测到 {len(commands)} 条合法指令，依次传递处理")
+            # 把合法指令一步步传递给 custom_process_complete_data（顺序执行，避免并发交叉）
+            asyncio.create_task(self._process_commands_sequential_async(commands))
+
+            # 清空缓冲区
+            self.bluetooth_tool.received_data_buffer.clear()
+            
+        except Exception as e:
+            if hasattr(self.bluetooth_tool, 'received_data_buffer'):
+                self.bluetooth_tool.received_data_buffer.clear()
+            self.bluetooth_tool.blue_write_log(f"拆分指令失败: {str(e)}")
+            traceback.print_exc()
+    
+    async def _process_commands_sequential_async(self, commands: list):
+        """按顺序依次处理多条指令，每条都传递给 custom_process_complete_data。"""
+        for cmd in commands:
+            await self._process_single_command_async(cmd)
+
+    async def _process_single_command_async(self, data_buffer: bytes):
+        """异步处理单个指令，最终调用 custom_process_complete_data。"""
+        try:
+            await asyncio.sleep(0)  # 让出控制权
+            self.custom_process_complete_data(data_buffer)
+        except Exception as e:
+            self.bluetooth_tool.blue_write_log(f"处理指令失败: {str(e)}")
+            traceback.print_exc()
+            
+    def custom_process_complete_data(self, data_buffer: bytes = None):
+        """自定义数据处理方法（替代bluetooth_tool的原始方法）
+        
+        Args:
+            data_buffer: 要处理的指令数据，如果为None则从received_data_buffer读取
+        """
+        try:
+            # 如果没有提供data_buffer，从received_data_buffer读取（兼容旧调用）
+            if data_buffer is None:
+                if not hasattr(self.bluetooth_tool, 'received_data_buffer'):
+                    return
+                data_buffer = bytes(self.bluetooth_tool.received_data_buffer)
+            
+            if not data_buffer:
+                return
+            
             self.bluetooth_tool.display_received_data(data_buffer)
             # 检测特殊指令
             special_cmd = detect_special_command(data_buffer)
             if special_cmd:
                 self.bluetooth_tool.blue_write_log(special_cmd['message'])
                 if special_cmd['clear_buffer']:
-                    self.bluetooth_tool.received_data_buffer.clear()
+                    if hasattr(self.bluetooth_tool, 'received_data_buffer'):
+                        self.bluetooth_tool.received_data_buffer.clear()
                 if special_cmd['stop_processing']:
                     return
             # 检查密码响应
             if self.bluetooth_tool.check_new_password_response(data_buffer):
                 self.bluetooth_tool.handle_new_password_response(data_buffer)
-                self.bluetooth_tool.received_data_buffer.clear()
+                if hasattr(self.bluetooth_tool, 'received_data_buffer'):
+                    self.bluetooth_tool.received_data_buffer.clear()
                 return
 
             # 检查是否是OTA指令
@@ -863,7 +1012,8 @@ class EnhancedMainWindow(QMainWindow):
                 else:
                     # 其他OTA指令正常处理
                     self.bluetooth_tool.text_decode.split_data(bytearray(data_buffer))
-                    self.bluetooth_tool.received_data_buffer.clear()
+                    if hasattr(self.bluetooth_tool, 'received_data_buffer'):
+                        self.bluetooth_tool.received_data_buffer.clear()
                     return
 
             # 特殊处理：PRINT 指令（0x14/0x94）- 不校验，直接转ASCII
@@ -929,11 +1079,11 @@ class EnhancedMainWindow(QMainWindow):
             # 显示接收到的数据（原始逻辑）
             # self.bluetooth_tool.display_received_data(data_buffer)
             
-            # 清空缓冲区
-            self.bluetooth_tool.received_data_buffer.clear()
+            # 注意：不再在这里清空缓冲区，因为拆分逻辑已经处理了
                         
         except Exception as e:
-            self.bluetooth_tool.received_data_buffer.clear()
+            if hasattr(self.bluetooth_tool, 'received_data_buffer'):
+                self.bluetooth_tool.received_data_buffer.clear()
             self.bluetooth_tool.blue_write_log(t('ui.log_custom_process_error', str(e)))
             traceback.print_exc()
     
