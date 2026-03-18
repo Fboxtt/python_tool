@@ -734,7 +734,7 @@ class DataDisplayWindow(QWidget):
         
         # 根据列模式和窗口类型创建不同的数据模型
         if self.window_type == 'alarm_protect':
-            headers = [t('ui.table_header_alarm'), t('ui.table_header_value'), t('ui.table_header_protect'), t('ui.table_header_value')]
+            headers = [t('告警'), t('值'), t('保护'), t('值')]
             self.table_model = BitFlagsTableModel(
                 num_columns=4, 
                 headers=headers, 
@@ -744,7 +744,7 @@ class DataDisplayWindow(QWidget):
             for col, width in enumerate(self.col_widths):
                 self.table_view.setColumnWidth(col, width)
         elif self.window_type == 'other_status':
-            headers = [t('ui.table_header_fault'), t('ui.table_header_value'), t('ui.table_header_info'), t('ui.table_header_value'), t('ui.table_header_balance'), t('ui.table_header_value')]
+            headers = [t('错误'), t('值'), t('信息'), t('值'), t('均衡'), t('值')]
             self.table_model = BitFlagsTableModel(
                 num_columns=6, 
                 headers=headers, 
@@ -754,7 +754,7 @@ class DataDisplayWindow(QWidget):
             for col, width in enumerate(self.col_widths):
                 self.table_view.setColumnWidth(col, width)
         elif self.window_type == 'battery_status':
-            headers = [t('ui.table_header_param_name'), t('ui.table_header_status_value')]
+            headers = [t('参数'), t('状态')]
             self.table_model = BitFlagsTableModel(
                 num_columns=2, 
                 headers=headers, 
@@ -818,7 +818,7 @@ class DataDisplayWindow(QWidget):
             button_layout.setSpacing(3)
             button_layout.setContentsMargins(0, 0, 0, 0)
             
-            self.read_button = QPushButton(t('ui.read'))
+            self.read_button = QPushButton(t('🔄 读取'))
             self.read_button.setMinimumWidth(60)
             self.read_button.setMaximumWidth(60)
             self.read_button.setMinimumHeight(24)
@@ -830,7 +830,7 @@ class DataDisplayWindow(QWidget):
             
             # 3列模式额外添加写入按钮
             if self.column_mode == 3:
-                self.write_button = QPushButton(t('ui.write'))
+                self.write_button = QPushButton(t('✏️ 写入'))
                 self.write_button.setMinimumWidth(60)
                 self.write_button.setMaximumWidth(60)
                 self.write_button.setMinimumHeight(24)
@@ -1042,7 +1042,7 @@ class ThreeColumnTableModel(BatteryTableModel):
     def __init__(self, data=None, parent=None):
         super().__init__(data, parent)
         self._columns = 3
-        self._headers = ['参数名', '读取值', '写入值']
+        self._headers = [t('参数'), t('读取'), t('写入')]
         self._write_enabled = True  # 默认启用写入
         
     def _organize_data(self):
@@ -1411,7 +1411,7 @@ class MultiWindowManager(QWidget):
         left_layout.setContentsMargins(5, 5, 5, 5)
         
         # 标题
-        title_label = QLabel(t('ui.window_control_title'))
+        title_label = QLabel(t('数据窗口控制'))
         font = title_label.font()
         font.setBold(True)
         font.setPointSize(12)
@@ -1434,15 +1434,15 @@ class MultiWindowManager(QWidget):
         # 控制按钮
         button_layout = QVBoxLayout()
         
-        self.select_all_btn = QPushButton(t('ui.select_all'))
+        self.select_all_btn = QPushButton(t('全选'))
         self.select_all_btn.clicked.connect(self.select_all_windows)
         button_layout.addWidget(self.select_all_btn)
 
-        self.deselect_all_btn = QPushButton(t('ui.deselect_all'))
+        self.deselect_all_btn = QPushButton(t('全不选'))
         self.deselect_all_btn.clicked.connect(self.deselect_all_windows)
         button_layout.addWidget(self.deselect_all_btn)
 
-        self.read_all_btn = QPushButton(t('ui.read_all'))
+        self.read_all_btn = QPushButton(t('📖 读取所有'))
         self.read_all_btn.clicked.connect(self.read_all_checked_windows)
         font = self.read_all_btn.font()
         font.setBold(True)
@@ -1473,7 +1473,7 @@ class MultiWindowManager(QWidget):
         right_layout.setContentsMargins(2, 2, 2, 2)
         
         # 窗口显示区域标题
-        display_title = QLabel(t('ui.data_display_title'))
+        display_title = QLabel(t('数据显示窗口'))
         font = display_title.font()
         font.setBold(True)
         font.setPointSize(12)

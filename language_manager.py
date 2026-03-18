@@ -248,100 +248,102 @@ class LanguageManager:
                 'table_header_fault': '错误',
                 'table_header_info': '信息',
                 'table_header_balance': '均衡',
-                'table_header_param_name': '参数名',
-                'table_header_status_value': '状态值',
+                'table_header_param_name': '参数',
+                'table_header_status_value': '状态',
+                'table_header_read_value': '读取',
+                'table_header_write_value': '写入',
             },
             
-            # ========== 状态位名称（struct_model.py） ==========
+            # ========== 状态位名称（struct_model.py，中文做键） ==========
             'status_bits': {
                 'alarm': {
-                    'pack_ov': 'PACK_OV',
-                    'batt_ov': 'BATT_OV',
-                    'cell_ov': 'CELL_OV',
-                    'batt_uv': 'BATT_UV',
-                    'cell_uv': 'CELL_UV',
-                    'chg_oc': 'CHG_OC',
-                    'dis_oc': 'DIS_OC',
-                    'chg_ot': 'CHG_OT',
-                    'dis_ot': 'DIS_OT',
-                    'chg_ut': 'CHG_UT',
-                    'dis_ut': 'DIS_UT',
-                    'soc_l': 'SOC_L',
-                    'end_life': 'END_LIFE',
-                    'mos_ht': 'MOS_HT',
+                    'pack_ov': '总过压',
+                    'batt_ov': '电池过压',
+                    'cell_ov': '电芯过压',
+                    'batt_uv': '电池欠压',
+                    'cell_uv': '电芯欠压',
+                    'chg_oc': '充电过流',
+                    'dis_oc': '放电过流',
+                    'chg_ot': '充电过温',
+                    'dis_ot': '放电过温',
+                    'chg_ut': '充电低温',
+                    'dis_ut': '放电低温',
+                    'soc_l': 'SOC低',
+                    'end_life': '寿命终止',
+                    'mos_ht': 'MOS过温',
                 },
                 'protect': {
-                    'pack_ov': 'PACK_OV',
-                    'batt_ov': 'BATT_OV',
-                    'cell_ov': 'CELL_OV',
-                    'batt_uv': 'BATT_UV',
-                    'cell_uv': 'CELL_UV',
-                    'chg_oc': 'CHG_OC',
-                    'dis_oc': 'DIS_OC',
-                    'chg_ot': 'CHG_OT',
-                    'dis_ot': 'DIS_OT',
-                    'chg_ut': 'CHG_UT',
-                    'dis_ut': 'DIS_UT',
-                    'short': 'SHORT',
-                    'rev': 'REV',
-                    'chg_utoc': 'CHG_UTOC',
-                    'chg_utov': 'CHG_UTOV',
-                    'chg_short': 'CHG_SHORT',
+                    'pack_ov': '总过压',
+                    'batt_ov': '电池过压',
+                    'cell_ov': '电芯过压',
+                    'batt_uv': '电池欠压',
+                    'cell_uv': '电芯欠压',
+                    'chg_oc': '充电过流',
+                    'dis_oc': '放电过流',
+                    'chg_ot': '充电过温',
+                    'dis_ot': '放电过温',
+                    'chg_ut': '充电低温',
+                    'dis_ut': '放电低温',
+                    'short': '短路',
+                    'rev': '反接',
+                    'chg_utoc': '充低温过流',
+                    'chg_utov': '充低温过压',
+                    'chg_short': '充电短路',
                     'psp': 'PSP',
                     'bq_scd': 'BQ_SCD',
                     'bq_ocd': 'BQ_OCD',
-                    'mos_ht': 'MOS_HT',
-                    'chg_ut_limit': 'CHG_UT_LIM',
+                    'mos_ht': 'MOS过温',
+                    'chg_ut_limit': '充低温限',
                 },
                 'fault': {
-                    'v_sensor': 'V_SENSOR',
-                    't_sensor': 'T_SENSOR',
-                    'chg': 'CHG_FAIL',
-                    'dis': 'DIS_FAIL',
-                    'cell_bad': 'CELL_BAD',
-                    'switch_off': 'SW_OFF',
-                    'life_end': 'LIFE_END',
-                    'bq_uv': 'BQ_UV',
-                    'bq_ov': 'BQ_OV',
-                    'bq_device': 'BQ_DEV',
-                    'bq_overwr': 'BQ_OVRW',
-                    'fuse_break': 'FUSE_BRK',
+                    'v_sensor': '电压传感',
+                    't_sensor': '温度传感',
+                    'chg': '充电失效',
+                    'dis': '放电失效',
+                    'cell_bad': '电芯不良',
+                    'switch_off': '开关关断',
+                    'life_end': '寿命终止',
+                    'bq_uv': 'BQ欠压',
+                    'bq_ov': 'BQ过压',
+                    'bq_device': 'BQ设备',
+                    'bq_overwr': 'BQ覆盖',
+                    'fuse_break': '保险丝断',
                 },
                 'info': {
-                    'heater_config': 'HEAT_CFG',
-                    'heater_on': 'HEAT_ON',
-                    'chg_full_t': 'CHG_FULL_T',
-                    'batt_full': 'BATT_FULL',
-                    'chg_limited_on': 'CHG_LIM_ON',
-                    'dis_limited_on': 'DIS_LIM_ON',
-                    'chg_mos_off': 'CHG_MOS_OFF',
-                    'dis_mos_off': 'DIS_MOS_OFF',
-                    'lowvol_limit': 'LOW_V_LIM',
-                    'lowtemp_forcechg': 'LOW_T_CHG',
-                    'mult_batt': 'MULT_BATT',
-                    'can_master': 'CAN_MASTER',
-                    'can_slave': 'CAN_SLAVE',
-                    'calendar_reach': 'CAL_REACH',
-                    'test_kb': 'TEST_KB',
-                    'calibrated_v': 'V_CAL',
-                    'calibrated_c': 'C_CAL',
-                    'lost_canbox': 'CAN_LOST',
-                    'no_inv_timeout': 'NO_INV',
-                    'fuseen_open': 'FUSE_OPEN',
-                    'cell_cto': 'CELL_CTO',
-                    'pswfunction_on': 'PSW_ON',
-                    'powersave_on': 'PSAVE_ON',
-                    'forceddis_on': 'FORCE_DIS',
-                    'heatermode_self': 'SELF_HEAT',
+                    'heater_config': '加热配置',
+                    'heater_on': '加热开',
+                    'chg_full_t': '充饱温',
+                    'batt_full': '满电',
+                    'chg_limited_on': '充限开',
+                    'dis_limited_on': '放限开',
+                    'chg_mos_off': '充MOS关',
+                    'dis_mos_off': '放MOS关',
+                    'lowvol_limit': '低压限',
+                    'lowtemp_forcechg': '低温强充',
+                    'mult_batt': '多电池',
+                    'can_master': 'CAN主',
+                    'can_slave': 'CAN从',
+                    'calendar_reach': '日历到',
+                    'test_kb': '测KB',
+                    'calibrated_v': '电压校准',
+                    'calibrated_c': '电流校准',
+                    'lost_canbox': 'CAN盒丢',
+                    'no_inv_timeout': '无逆变超时',
+                    'fuseen_open': '保险丝开',
+                    'cell_cto': '电芯CTO',
+                    'pswfunction_on': '开关功能开',
+                    'powersave_on': '省电开',
+                    'forceddis_on': '强放开',
+                    'heatermode_self': '自加热',
                 },
                 'balance': {
                     'cell': 'C{0}',  # 格式化字符串，{0}会被替换为01-16
                 },
                 'battery_status': {
-                    'idle': 'IDLE',
-                    'charging': 'CHG',
-                    'discharging': 'DIS',
-                    'full': 'FULL',
+                    'idle': '空闲',
+                    'charging': '充电中',
+                    'discharging': '放电中',
+                    'full': '满电',
                 }
             },
             
@@ -797,8 +799,10 @@ class LanguageManager:
                 'table_header_fault': 'Fault',
                 'table_header_info': 'Info',
                 'table_header_balance': 'Balance',
-                'table_header_param_name': 'Param Name',
-                'table_header_status_value': 'Status Value',
+                'table_header_param_name': 'Param',
+                'table_header_status_value': 'Status',
+                'table_header_read_value': 'Read',
+                'table_header_write_value': 'Write',
             },
             
             # ========== Status Bit Names ==========
@@ -1110,87 +1114,100 @@ class LanguageManager:
             },
         }
     }
-    
+
+    @staticmethod
+    def _flatten(d, prefix=''):
+        """将嵌套 dict 扁平化为 key_path -> 叶子值"""
+        out = {}
+        for k, v in d.items():
+            path = f"{prefix}.{k}" if prefix else k
+            if isinstance(v, dict):
+                out.update(LanguageManager._flatten(v, path))
+            else:
+                out[path] = v
+        return out
+
+    TRANSLATIONS_BY_ZH = {}
+    KEY_PATH_TO_ZH = {}
+
+    @classmethod
+    def _ensure_by_zh_built(cls):
+        """首次使用时从 TRANSLATIONS 构建「中文做键」表"""
+        if cls.TRANSLATIONS_BY_ZH:
+            return
+        kz = cls._flatten(cls.TRANSLATIONS['zh_CN'])
+        ke = cls._flatten(cls.TRANSLATIONS['en_US'])
+        for k in sorted(kz.keys()):
+            zh = kz[k]
+            if zh not in cls.TRANSLATIONS_BY_ZH:
+                cls.TRANSLATIONS_BY_ZH[zh] = {'zh_CN': zh, 'en_US': ke.get(k, zh)}
+        cls.KEY_PATH_TO_ZH.update(kz)
+
     @classmethod
     def get_instance(cls):
         """获取单例"""
         if cls._instance is None:
             cls._instance = cls()
         return cls._instance
-    
+
     def __init__(self):
-        # 从环境变量读取语言设置，默认英文
-        # 注意：如果需要中文，请在程序启动前设置环境变量 APP_LANGUAGE='zh_CN'
+        self.__class__._ensure_by_zh_built()
         self.current_language = os.environ.get('APP_LANGUAGE', 'en_US')
-    
-    def t(self, key_path, *args):
+
+    def t(self, zh_key, *args):
         """
-        翻译函数（简写为t）
-        
-        Args:
-            key_path: 键路径，如 'ui.window_title' 或 'status_bits.alarm.pack_ov'
-            *args: 格式化参数（用于替换 {0}, {1} 等占位符）
-        
-        Returns:
-            str: 翻译后的文本
+        翻译：以中文为键，返回当前语言的文案。
+        zh_key: 中文键（如 '增强版BMS调试工具 - 多窗口管理'）
+        *args: 用于替换 {0}, {1} 等占位符
         """
-        keys = key_path.split('.')
-        data = self.TRANSLATIONS.get(self.current_language, self.TRANSLATIONS['en_US'])
-        
-        for key in keys:
-            if isinstance(data, dict):
-                data = data.get(key, key_path)
-            else:
-                return key_path
-        
-        # 支持格式化（替换 {0}, {1} 等）
+        self.__class__._ensure_by_zh_built()
+        row = self.__class__.TRANSLATIONS_BY_ZH.get(zh_key, {})
+        text = row.get(self.current_language, zh_key)
         if args:
             try:
-                return data.format(*args)
-            except:
-                return data
-        return data
-    
+                return text.format(*args)
+            except Exception:
+                return text
+        return text
+
     def set_language(self, language):
-        """
-        切换语言
-        
-        Args:
-            language: 语言代码，如 'zh_CN', 'en_US'
-        
-        Returns:
-            bool: 切换成功返回 True，否则返回 False
-        """
-        if language in self.TRANSLATIONS:
-            self.current_language = language
-            os.environ['APP_LANGUAGE'] = language
-            return True
-        return False
-    
+        """切换语言。language: 'zh_CN' 或 'en_US' 等"""
+        self.__class__._ensure_by_zh_built()
+        if not self.__class__.TRANSLATIONS_BY_ZH:
+            return False
+        langs = list(next(iter(self.__class__.TRANSLATIONS_BY_ZH.values())).keys())
+        if language not in langs:
+            return False
+        self.current_language = language
+        os.environ['APP_LANGUAGE'] = language
+        return True
+
     def get_current_language(self):
         """获取当前语言"""
         return self.current_language
-    
+
     def get_available_languages(self):
         """获取所有可用语言"""
-        return list(self.TRANSLATIONS.keys())
+        self.__class__._ensure_by_zh_built()
+        if not self.__class__.TRANSLATIONS_BY_ZH:
+            return []
+        return list(next(iter(self.__class__.TRANSLATIONS_BY_ZH.values())).keys())
 
 
 # 全局实例
 _lang = LanguageManager.get_instance()
 
+# 供批量替换使用：key_path -> 中文
+KEY_PATH_TO_ZH = LanguageManager.KEY_PATH_TO_ZH
 
-# 快捷函数
-def t(key_path, *args):
+
+# 快捷函数（参数为中文键）
+def t(zh_key, *args):
     """
-    翻译函数快捷方式
-    
-    用法示例：
-        t('ui.window_title')  # 获取窗口标题
-        t('status_bits.alarm.pack_ov')  # 获取告警状态名称
-        t('var_templates.cell_voltage', 5)  # 获取"第【5】节电压"
+    翻译：以中文为键，返回当前语言文案。
+    示例：t('增强版BMS调试工具 - 多窗口管理')、t('版本号: v{0}', version)
     """
-    return _lang.t(key_path, *args)
+    return _lang.t(zh_key, *args)
 
 
 def set_language(language):

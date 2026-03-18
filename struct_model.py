@@ -104,119 +104,119 @@ STATUS_CHG = 0x01
 STATUS_DIS = 0x02
 STATUS_FULL = 0x04
 
-# 状态位名称映射字典（使用语言管理器）
+# 状态位名称映射字典（使用语言管理器，中文做键）
 STATUS_BIT_NAMES = {
     # 告警状态 (ALARM)
     'ALARM': {
-        ALARM_PACK_OV: t('status_bits.alarm.pack_ov'),
-        ALARM_BATT_OV: t('status_bits.alarm.batt_ov'),
-        ALARM_CELL_OV: t('status_bits.alarm.cell_ov'),
-        ALARM_BATT_UV: t('status_bits.alarm.batt_uv'),
-        ALARM_CELL_UV: t('status_bits.alarm.cell_uv'),
-        ALARM_CHG_OC: t('status_bits.alarm.chg_oc'),
-        ALARM_DIS_OC: t('status_bits.alarm.dis_oc'),
-        ALARM_CHG_OT: t('status_bits.alarm.chg_ot'),
-        ALARM_DIS_OT: t('status_bits.alarm.dis_ot'),
-        ALARM_CHG_UT: t('status_bits.alarm.chg_ut'),
-        ALARM_DIS_UT: t('status_bits.alarm.dis_ut'),
-        ALARM_SOC_L: t('status_bits.alarm.soc_l'),
-        ALARM_END_LIFE: t('status_bits.alarm.end_life'),
-        ALARM_MOS_HT: t('status_bits.alarm.mos_ht'),
+        ALARM_PACK_OV: t('总过压'),
+        ALARM_BATT_OV: t('电池过压'),
+        ALARM_CELL_OV: t('电芯过压'),
+        ALARM_BATT_UV: t('电池欠压'),
+        ALARM_CELL_UV: t('电芯欠压'),
+        ALARM_CHG_OC: t('充电过流'),
+        ALARM_DIS_OC: t('放电过流'),
+        ALARM_CHG_OT: t('充电过温'),
+        ALARM_DIS_OT: t('放电过温'),
+        ALARM_CHG_UT: t('充电低温'),
+        ALARM_DIS_UT: t('放电低温'),
+        ALARM_SOC_L: t('SOC低'),
+        ALARM_END_LIFE: t('寿命终止'),
+        ALARM_MOS_HT: t('MOS过温'),
     },
     # 保护状态 (PROTECT)
     'PROTECT': {
-        PROTECT_PACK_OV: t('status_bits.protect.pack_ov'),
-        PROTECT_BATT_OV: t('status_bits.protect.batt_ov'),
-        PROTECT_CELL_OV: t('status_bits.protect.cell_ov'),
-        PROTECT_BATT_UV: t('status_bits.protect.batt_uv'),
-        PROTECT_CELL_UV: t('status_bits.protect.cell_uv'),
-        PROTECT_CHG_OC: t('status_bits.protect.chg_oc'),
-        PROTECT_DIS_OC: t('status_bits.protect.dis_oc'),
-        PROTECT_CHG_OT: t('status_bits.protect.chg_ot'),
-        PROTECT_DIS_OT: t('status_bits.protect.dis_ot'),
-        PROTECT_CHG_UT: t('status_bits.protect.chg_ut'),
-        PROTECT_DIS_UT: t('status_bits.protect.dis_ut'),
-        PROTECT_SHORT: t('status_bits.protect.short'),
-        PROTECT_REV: t('status_bits.protect.rev'),
-        PROTECT_CHG_UTOC: t('status_bits.protect.chg_utoc'),
-        PROTECT_CHG_UTOV: t('status_bits.protect.chg_utov'),
-        PROTECT_CHG_SHORT: t('status_bits.protect.chg_short'),
-        PROTECT_PSP: t('status_bits.protect.psp'),
-        PROTECT_BQ_SCD: t('status_bits.protect.bq_scd'),
-        PROTECT_BQ_OCD: t('status_bits.protect.bq_ocd'),
-        PROTECT_MOS_HT: t('status_bits.protect.mos_ht'),
-        PROTECT_CHG_UT_LIMIT: t('status_bits.protect.chg_ut_limit'),
+        PROTECT_PACK_OV: t('总过压'),
+        PROTECT_BATT_OV: t('电池过压'),
+        PROTECT_CELL_OV: t('电芯过压'),
+        PROTECT_BATT_UV: t('电池欠压'),
+        PROTECT_CELL_UV: t('电芯欠压'),
+        PROTECT_CHG_OC: t('充电过流'),
+        PROTECT_DIS_OC: t('放电过流'),
+        PROTECT_CHG_OT: t('充电过温'),
+        PROTECT_DIS_OT: t('放电过温'),
+        PROTECT_CHG_UT: t('充电低温'),
+        PROTECT_DIS_UT: t('放电低温'),
+        PROTECT_SHORT: t('短路'),
+        PROTECT_REV: t('反接'),
+        PROTECT_CHG_UTOC: t('充低温过流'),
+        PROTECT_CHG_UTOV: t('充低温过压'),
+        PROTECT_CHG_SHORT: t('充电短路'),
+        PROTECT_PSP: t('PSP'),
+        PROTECT_BQ_SCD: t('BQ_SCD'),
+        PROTECT_BQ_OCD: t('BQ_OCD'),
+        PROTECT_MOS_HT: t('MOS过温'),
+        PROTECT_CHG_UT_LIMIT: t('充低温限'),
     },
     # 失效状态 (FAULT)
     'FAULT': {
-        FAULT_V_SENSOR: t('status_bits.fault.v_sensor'),
-        FAULT_T_SENSOR: t('status_bits.fault.t_sensor'),
-        FAULT_CHG: t('status_bits.fault.chg'),
-        FAULT_DIS: t('status_bits.fault.dis'),
-        FAULT_CELL_BAD: t('status_bits.fault.cell_bad'),
-        FAULT_SWITCH_OFF: t('status_bits.fault.switch_off'),
-        FAULT_LIFE_END: t('status_bits.fault.life_end'),
-        FAULT_BQ_UV: t('status_bits.fault.bq_uv'),
-        FAULT_BQ_OV: t('status_bits.fault.bq_ov'),
-        FAULT_BQ_DEVIECE: t('status_bits.fault.bq_device'),
-        FAULT_BQ_OVERWR: t('status_bits.fault.bq_overwr'),
-        FAULT_FUSE_BREAK: t('status_bits.fault.fuse_break'),
+        FAULT_V_SENSOR: t('电压传感'),
+        FAULT_T_SENSOR: t('温度传感'),
+        FAULT_CHG: t('充电失效'),
+        FAULT_DIS: t('放电失效'),
+        FAULT_CELL_BAD: t('电芯不良'),
+        FAULT_SWITCH_OFF: t('开关关断'),
+        FAULT_LIFE_END: t('寿命终止'),
+        FAULT_BQ_UV: t('BQ欠压'),
+        FAULT_BQ_OV: t('BQ过压'),
+        FAULT_BQ_DEVIECE: t('BQ设备'),
+        FAULT_BQ_OVERWR: t('BQ覆盖'),
+        FAULT_FUSE_BREAK: t('保险丝断'),
     },
     # 其他信息 (INFO)
     'INFO': {
-        INFO_HEAETER_CONFIG: t('status_bits.info.heater_config'),
-        INFO_HEATER_ON: t('status_bits.info.heater_on'),
-        INFO_CHG_FULL_T: t('status_bits.info.chg_full_t'),
-        INFO_BATT_FULL: t('status_bits.info.batt_full'),
-        INFO_CHG_LIMITED_ON: t('status_bits.info.chg_limited_on'),
-        INFO_DIS_LIMITED_ON: t('status_bits.info.dis_limited_on'),
-        INFO_CHG_MOS_OFF: t('status_bits.info.chg_mos_off'),
-        INFO_DIS_MOS_OFF: t('status_bits.info.dis_mos_off'),
-        INFO_LOWVOL_LIMIT: t('status_bits.info.lowvol_limit'),
-        INFO_LOWTEMP_FORCECHG: t('status_bits.info.lowtemp_forcechg'),
-        INFO_MULT_BATT: t('status_bits.info.mult_batt'),
-        INFO_CAN_MASTER: t('status_bits.info.can_master'),
-        INFO_CAN_SLAVE: t('status_bits.info.can_slave'),
-        INFO_CALENDAR_REACH: t('status_bits.info.calendar_reach'),
-        INFO_TEST_KB: t('status_bits.info.test_kb'),
-        INFO_CALIBRATED_V: t('status_bits.info.calibrated_v'),
-        INFO_CALIBRATED_C: t('status_bits.info.calibrated_c'),
-        INFO_LOST_CANBOX: t('status_bits.info.lost_canbox'),
-        INFO_NO_INV_TIMEOUTE: t('status_bits.info.no_inv_timeout'),
-        INFO_FUSEEN_OPEN: t('status_bits.info.fuseen_open'),
-        INFO_CELL_CTO: t('status_bits.info.cell_cto'),
-        INFO_PSWFUNCTION_ON: t('status_bits.info.pswfunction_on'),
-        INFO_POWERSAVE_ON: t('status_bits.info.powersave_on'),
-        INFO_FORCEDDIS_ON: t('status_bits.info.forceddis_on'),
-        INFO_HEATERMODE_SELF: t('status_bits.info.heatermode_self'),
+        INFO_HEAETER_CONFIG: t('加热配置'),
+        INFO_HEATER_ON: t('加热开'),
+        INFO_CHG_FULL_T: t('充饱温'),
+        INFO_BATT_FULL: t('满电'),
+        INFO_CHG_LIMITED_ON: t('充限开'),
+        INFO_DIS_LIMITED_ON: t('放限开'),
+        INFO_CHG_MOS_OFF: t('充MOS关'),
+        INFO_DIS_MOS_OFF: t('放MOS关'),
+        INFO_LOWVOL_LIMIT: t('低压限'),
+        INFO_LOWTEMP_FORCECHG: t('低温强充'),
+        INFO_MULT_BATT: t('多电池'),
+        INFO_CAN_MASTER: t('CAN主'),
+        INFO_CAN_SLAVE: t('CAN从'),
+        INFO_CALENDAR_REACH: t('日历到'),
+        INFO_TEST_KB: t('测KB'),
+        INFO_CALIBRATED_V: t('电压校准'),
+        INFO_CALIBRATED_C: t('电流校准'),
+        INFO_LOST_CANBOX: t('CAN盒丢'),
+        INFO_NO_INV_TIMEOUTE: t('无逆变超时'),
+        INFO_FUSEEN_OPEN: t('保险丝开'),
+        INFO_CELL_CTO: t('电芯CTO'),
+        INFO_PSWFUNCTION_ON: t('开关功能开'),
+        INFO_POWERSAVE_ON: t('省电开'),
+        INFO_FORCEDDIS_ON: t('强放开'),
+        INFO_HEATERMODE_SELF: t('自加热'),
     },
     # 均衡状态 (BALANCE) - 每一位代表一个电芯的均衡状态
     'BALANCE': {
-        0x00000001: t('status_bits.balance.cell', '01'),
-        0x00000002: t('status_bits.balance.cell', '02'),
-        0x00000004: t('status_bits.balance.cell', '03'),
-        0x00000008: t('status_bits.balance.cell', '04'),
-        0x00000010: t('status_bits.balance.cell', '05'),
-        0x00000020: t('status_bits.balance.cell', '06'),
-        0x00000040: t('status_bits.balance.cell', '07'),
-        0x00000080: t('status_bits.balance.cell', '08'),
-        0x00000100: t('status_bits.balance.cell', '09'),
-        0x00000200: t('status_bits.balance.cell', '10'),
-        0x00000400: t('status_bits.balance.cell', '11'),
-        0x00000800: t('status_bits.balance.cell', '12'),
-        0x00001000: t('status_bits.balance.cell', '13'),
-        0x00002000: t('status_bits.balance.cell', '14'),
-        0x00004000: t('status_bits.balance.cell', '15'),
-        0x00008000: t('status_bits.balance.cell', '16'),
+        0x00000001: t('C{0}', '01'),
+        0x00000002: t('C{0}', '02'),
+        0x00000004: t('C{0}', '03'),
+        0x00000008: t('C{0}', '04'),
+        0x00000010: t('C{0}', '05'),
+        0x00000020: t('C{0}', '06'),
+        0x00000040: t('C{0}', '07'),
+        0x00000080: t('C{0}', '08'),
+        0x00000100: t('C{0}', '09'),
+        0x00000200: t('C{0}', '10'),
+        0x00000400: t('C{0}', '11'),
+        0x00000800: t('C{0}', '12'),
+        0x00001000: t('C{0}', '13'),
+        0x00002000: t('C{0}', '14'),
+        0x00004000: t('C{0}', '15'),
+        0x00008000: t('C{0}', '16'),
     }
 }
 
 # 充放电状态名称
 BATTERY_STATUS_NAMES = {
-    STATUS_IDLE: t('status_bits.battery_status.idle'),
-    STATUS_CHG: t('status_bits.battery_status.charging'),
-    STATUS_DIS: t('status_bits.battery_status.discharging'),
-    STATUS_FULL: t('status_bits.battery_status.full')
+    STATUS_IDLE: t('空闲'),
+    STATUS_CHG: t('充电中'),
+    STATUS_DIS: t('放电中'),
+    STATUS_FULL: t('满电')
 }
 
 
@@ -275,12 +275,12 @@ def parse_all_status_from_sbs(sbs_data_dict):
     result = {}
 
     # 获取当前语言下的键名（支持中英文切换）
-    alarm_key = t('var_templates.alarm_status')
-    protect_key = t('var_templates.protect_status')
-    fault_key = t('var_templates.fault_status')
-    other_info_key = t('var_templates.other_info')
-    balance_key = t('var_templates.balance_status')
-    battery_key = t('var_templates.battery_status_label')
+    alarm_key = t('告警状态')
+    protect_key = t('保护状态')
+    fault_key = t('失效状态')
+    other_info_key = t('其他信息')
+    balance_key = t('均衡状态')
+    battery_key = t('电池状态')
 
     # 解析告警状态（避免值为0时被or运算符误判）
     alarm_value = sbs_data_dict.get(alarm_key)
@@ -554,15 +554,15 @@ def get_battery_status_display_data(sbs_data_dict):
     
     # 添加电池状态（使用2列格式，返回元组而不是列表）
     if 'battery_status' in all_status:
-        result.append((t('var_templates.battery_status_label'), all_status['battery_status']))
+        result.append((t('电池状态'), all_status['battery_status']))
     else:
         # 如果 all_status 中没有 battery_status，尝试直接从 sbs_data_dict 获取
-        battery_key = t('var_templates.battery_status_label')
+        battery_key = t('电池状态')
         battery_value = sbs_data_dict.get(battery_key) or sbs_data_dict.get('电池状态')
         if battery_value is not None:
             # 直接使用 BATTERY_STATUS_NAMES 转换（BATTERY_STATUS_NAMES 在同一文件中定义）
             batt_status_str = BATTERY_STATUS_NAMES.get(battery_value, f'未知({battery_value})')
-            result.append((t('var_templates.battery_status_label'), batt_status_str))
+            result.append((t('电池状态'), batt_status_str))
     
     return result
 
@@ -708,126 +708,126 @@ STRUCT_ADDRESSES = {
 
 STRUCT_VARIABLES = {
     "PC_GET_BMS": [
-        t('var_templates.chg_power_voltage'), t('var_templates.chg_power_diff'),
-        t('var_templates.chg_full_start'), t('var_templates.chg_full_stop'),
-        t('var_templates.pack_ov_warn'), t('var_templates.pack_ov_warn_resume'),
-        t('var_templates.pack_ov_protect'), t('var_templates.pack_ov_protect_resume'),
-        t('var_templates.batt_ov_warn'), t('var_templates.batt_ov_warn_resume'),
-        t('var_templates.batt_ov_protect'), t('var_templates.batt_ov_protect_resume'),
-        t('var_templates.cell_ov_warn'), t('var_templates.cell_ov_warn_resume'),
-        t('var_templates.cell_ov_protect'), t('var_templates.cell_ov_protect_resume'),
-        t('var_templates.batt_uv_warn'), t('var_templates.batt_uv_warn_resume'),
-        t('var_templates.batt_uv_protect'), t('var_templates.batt_uv_protect_resume'),
-        t('var_templates.cell_uv_warn'), t('var_templates.cell_uv_warn_resume'),
-        t('var_templates.cell_uv_protect'), t('var_templates.cell_uv_protect_resume'),
-        t('var_templates.chg_oc_warn'), t('var_templates.chg_oc_warn_resume'), t('var_templates.chg_oc_protect'),
-        t('var_templates.dis_oc_warn'), t('var_templates.dis_oc_warn_resume'), t('var_templates.dis_oc_protect'),
-        t('var_templates.chg_ot_warn'), t('var_templates.chg_ot_warn_resume'), t('var_templates.chg_ot_protect'), t('var_templates.chg_ot_protect_resume'),
-        t('var_templates.dis_ot_warn'), t('var_templates.dis_ot_warn_resume'), t('var_templates.dis_ot_protect'), t('var_templates.dis_ot_protect_resume'),
-        t('var_templates.chg_ut_warn'), t('var_templates.chg_ut_warn_resume'), t('var_templates.chg_ut_protect'), t('var_templates.chg_ut_protect_resume'),
-        t('var_templates.dis_ut_warn'), t('var_templates.dis_ut_warn_resume'), t('var_templates.dis_ut_protect'), t('var_templates.dis_ut_protect_resume'),
-        t('var_templates.heater_start_temp'), t('var_templates.heater_stop_temp'),
+        t('充电功耗电压值'), t('充电功耗Pack与Batt压差'),
+        t('充电功满开启电压值'), t('充电功满停止电压值'),
+        t('Pack过充-警限值'), t('Pack过充-警恢复值'),
+        t('Pack过充-保限值'), t('Pack过充-保恢复值'),
+        t('Batt过充-警限值'), t('Batt过充-警恢复值'),
+        t('Batt过充-保限值'), t('Batt过充-保恢复值'),
+        t('Cell过充-警限值'), t('Cell过充-警恢复值'),
+        t('Cell过充-保限值'), t('Cell过充-保恢复值'),
+        t('Batt欠压-警限值'), t('Batt欠压-警恢复值'),
+        t('Batt欠压-保限值'), t('Batt欠压-保恢复值'),
+        t('Cell欠压-警限值'), t('Cell欠压-警恢复值'),
+        t('Cell欠压-保限值'), t('Cell欠压-保恢复值'),
+        t('充-过流-警限值'), t('充-过流-警恢复值'), t('充-过流-保护限值'),
+        t('放-过流-警限值'), t('放-过流-警恢复值'), t('放-过流-保护限值'),
+        t('充-过温-警限值'), t('充-过温-警恢复值'), t('充-过温-保护限值'), t('充-过温-保护恢复值'),
+        t('放-过温-警限值'), t('放-过温-警恢复值'), t('放-过温-保护限值'), t('放-过温-保护恢复值'),
+        t('充-低温-警限值'), t('充-低温-警恢复值'), t('充-低温-保护限值'), t('充-低温-保护恢复值'),
+        t('放-低温-警限值'), t('放-低温-警恢复值'), t('放-低温-保护限值'), t('放-低温-保护恢复值'),
+        t('加热器启动温度'), t('加热器关闭温度'),
     ],
     "PC_GET_KB": [
-        t('var_templates.pack_voltage_k'), t('var_templates.batt_voltage_k'),
-        *[t('var_templates.cell_voltage_k', i+1) for i in range(16)],
-        t('var_templates.500a_k'), t('var_templates.500a_b'),
-        t('var_templates.n500a_k'), t('var_templates.n500a_b'),
-        t('var_templates.50a_sk'), t('var_templates.50a_sb'),
-        t('var_templates.n50a_sk'), t('var_templates.n50a_sb'),
-        t('var_templates.10a_ssk'), t('var_templates.10a_ssb'),
-        t('var_templates.n10a_ssk'), t('var_templates.n10a_ssb'),
-        *[t('var_templates.temp_k', i+1) for i in range(8)]
+        t('Pack电压K'), t('Batt电压K'),
+        *[t('第【{0}】节电压K', i+1) for i in range(16)],
+        t('50-500安K(注，不同电池，电流范围不同，谨慎参考)'), t('50-500安B'),
+        t('-(50-500)安K'), t('-(50-500)安B'),
+        t('10-50安SK'), t('10-50安SB'),
+        t('-10-50安SK'), t('-10-50安SB'),
+        t('0-10安SSK'), t('0-10安SSB'),
+        t('-(0-10)安SSK'), t('-(0-10)安SSB'),
+        *[t('温度{0}K', i+1) for i in range(8)]
     ],
     "PC_GET_OCP_DELAYTIME": [
-        t('var_templates.ocp_delay_1c_chg'), t('var_templates.ocp_delay_2c_chg'),
-        t('var_templates.ocp_delay_1c_dis'), t('var_templates.ocp_delay_2c_dis')
+        t('1C充电过流保护延时'), t('2C充电过流保护延时'),
+        t('1C放电过流保护延时'), t('2C放电过流保护延时')
     ],
     "PC_GET_CELL_CAP_PARA": [
-        t('var_templates.rated_cap'), t('var_templates.factory_cap')
+        t('额定容量'), t('出厂容量')
     ],
     "PC_GET_MOSHTDATA": [
-        t('var_templates.mos_temp_warn'), t('var_templates.mos_temp_warn_resume'), 
-        t('var_templates.mos_temp_protect'), t('var_templates.mos_temp_protect_resume')
+        t('MOS温度告警'), t('MOS温度告警恢复'), 
+        t('MOS温度保护'), t('MOS温度保护恢复')
     ],
     "PC_GET_LIFE_PARA": [
-        t('var_templates.soc'), t('var_templates.reserve', ''), t('var_templates.cap_health'),
-        t('var_templates.cycle_time'), t('var_templates.single_chg_cap')
+        t('SOC'), t('保留{0}', ''), t('容量保持率'),
+        t('循环时间累计'), t('单次充电结合容量')
     ],
     "PC_GET_SBS": [
-        t('var_templates.pack_voltage'), t('var_templates.batt_voltage'),
-        *[t('var_templates.cell_voltage', i+1) for i in range(16)],
-        t('var_templates.current'),
-        *[t('var_templates.temp', i+1) for i in range(5)],
-        t('var_templates.remain_cap'), t('var_templates.full_cap'), t('var_templates.design_cap'),
-        t('var_templates.other_info'), t('var_templates.alarm_status'), t('var_templates.protect_status'), 
-        t('var_templates.fault_status'), t('var_templates.balance_status'),
-        t('var_templates.battery_status_label'), t('var_templates.soc'),
-        t('var_templates.cap_health'), t('var_templates.discharge_count'), t('var_templates.total_discharge_cap')
+        t('PACK电压'), t('BATT电压'),
+        *[t('第【{0}】节电压', i+1) for i in range(16)],
+        t('电流'),
+        *[t('环境温度{0}', i+1) for i in range(5)],
+        t('剩余容量'), t('满充容量'), t('设计容量'),
+        t('其他信息'), t('告警状态'), t('保护状态'), 
+        t('失效状态'), t('均衡状态'),
+        t('电池状态'), t('SOC'),
+        t('容量保持率'), t('放电次数'), t('总放电容量')
     ],
     "PC_GET_VER": [
-        t('var_templates.main_version'), t('var_templates.minor_version'), t('var_templates.revision_version'), t('var_templates.compile_year'),
-        t('var_templates.compile_month'), t('var_templates.compile_date'),
-        t('var_templates.hardware_version'),
-        t('var_templates.function_version')
+        t('主版本号'), t('次版本号'), t('修订版本号'), t('编译年份'),
+        t('编译月份'), t('编译日期'),
+        t('硬件版本'),
+        t('功能版本')
     ],
     "PC_GET_INF": [
-        t('var_templates.boot_main'), t('var_templates.boot_minor'), t('var_templates.boot_revision'), 
-        t('var_templates.boot_year'), t('var_templates.boot_month'), t('var_templates.boot_date'),
-        t('var_templates.boot_reserve1'), t('var_templates.boot_reserve2'),
-        t('var_templates.app_main'), t('var_templates.app_minor'), t('var_templates.app_revision'), 
-        t('var_templates.app_year'), t('var_templates.app_month'), t('var_templates.app_date'), 
-        t('var_templates.app_reserve1'), t('var_templates.app_reserve2'),
-        t('var_templates.buff_main'), t('var_templates.buff_minor'), t('var_templates.buff_revision'), 
-        t('var_templates.buff_year'), t('var_templates.buff_month'), t('var_templates.buff_date'),
-        t('var_templates.buff_reserve1'), t('var_templates.buff_reserve2'),
-        t('var_templates.back_main'), t('var_templates.back_minor'), t('var_templates.back_revision'), 
-        t('var_templates.back_year'), t('var_templates.back_month'), t('var_templates.back_date'),
-        t('var_templates.back_reserve1'), t('var_templates.back_reserve2'),
-        t('var_templates.chip_name'),
-        t('var_templates.writable_area'),
-        t('var_templates.pc_addr'),
-        t('var_templates.unique_id')
+        t('boot主版本号'), t('boot次版本号'), t('boot修订版本号'), 
+        t('boot年份'), t('boot月份'), t('boot日期'),
+        t('boot保留1'), t('boot保留2'),
+        t('app主版本号'), t('app次版本号'), t('app修订版本号'), 
+        t('app年份'), t('app月份'), t('app日期'), 
+        t('app保留1'), t('app保留2'),
+        t('buff主版本号'), t('buff次版本号'), t('buff修订版本号'), 
+        t('buff年份'), t('buff月份'), t('buff日期'),
+        t('buff保留1'), t('buff保留2'),
+        t('back主版本号'), t('back次版本号'), t('back修订版本号'), 
+        t('back年份'), t('back月份'), t('back日期'),
+        t('back保留1'), t('back保留2'),
+        t('芯片名称'),
+        t('可写区域'),
+        t('PC地址'),
+        t('唯一ID')
     ],
     "PC_GET_SERIALNUM": [
-        t('var_templates.serial_number')
+        t('序列号')
     ],
     "PC_SET_SERIALNUM": [
-        t('var_templates.serial_number')
+        t('序列号')
     ],
     "PC_GET_FUSESTATE": [
-        t('var_templates.fuse_enable'),
-        t('var_templates.fuse_status')
+        t('保险丝使能'),
+        t('保险丝状态')
     ],
     "PC_SET_FUSESTATE": [
-        t('var_templates.fuse_enable'),
-        t('var_templates.fuse_status')
+        t('保险丝使能'),
+        t('保险丝状态')
     ],
     "PC_GET_SOC_STOP_PARA": [
         "停止充电SOC", "停止放电SOC", "预留1", "预留2"
     ],
     "PC_GET_CLUSTER_SBS": [
-        t('var_templates.brand'), t('var_templates.current_rate'),
-        t('var_templates.batt_module_cap'),
-        t('var_templates.cluster_cap'),
-        t('var_templates.total_batt_num'), t('var_templates.comm_fail_count'),
-        t('var_templates.bms_fail_count'), t('var_templates.cell_fail_count'),
-        t('var_templates.chg_mos_off_count'), t('var_templates.dis_mos_off_count'),
-        t('var_templates.sys_max_cell_temp'), t('var_templates.sys_min_cell_temp'),
-        t('var_templates.sys_max_cell_volt'), t('var_templates.sys_min_cell_volt'),
-        t('var_templates.sys_max_batt_volt'), t('var_templates.sys_min_batt_volt'),
-        t('var_templates.sys_max_current'), t('var_templates.sys_min_current'),
-        t('var_templates.sys_max_soc'), t('var_templates.sys_min_soc'),
-        t('var_templates.sys_max_soh'), t('var_templates.sys_min_soh'),
-        t('var_templates.cluster_chg_volt_limit'), t('var_templates.cluster_dis_volt_limit'),
-        t('var_templates.cluster_chg_cur_limit'), t('var_templates.cluster_dis_cur_limit'),
-        t('var_templates.cluster_temp'),
-        t('var_templates.cluster_volt_v'),
-        t('var_templates.cluster_curr_a'),
-        t('var_templates.cluster_soc'), t('var_templates.cluster_soh'),
-        t('var_templates.cluster_protect_stat'), t('var_templates.cluster_fault_stat'),
-        t('var_templates.cluster_cycles'),
-        *[t('var_templates.reserve', i+1) for i in range(10)]
+        t('品牌'), t('当前倍率'),
+        t('电池模块容量'),
+        t('集群容量'),
+        t('总电池数量'), t('通信失败次数'),
+        t('BMS失败次数'), t('电芯失败次数'),
+        t('充电MOS关次数'), t('放电MOS关次数'),
+        t('系统最高电芯温度'), t('系统最低电芯温度'),
+        t('系统最高电芯电压'), t('系统最低电芯电压'),
+        t('系统最高电池电压'), t('系统最低电池电压'),
+        t('系统最大电流'), t('系统最小电流'),
+        t('系统最高SOC'), t('系统最低SOC'),
+        t('系统最高SOH'), t('系统最低SOH'),
+        t('集群充电电压限制'), t('集群放电电压限制'),
+        t('集群充电电流限制'), t('集群放电电流限制'),
+        t('集群温度'),
+        t('集群电压(V)'),
+        t('集群电流(A)'),
+        t('集群SOC'), t('集群SOH'),
+        t('集群保护状态'), t('集群故障状态'),
+        t('集群循环次数'),
+        *[t('保留{0}', i+1) for i in range(10)]
     ]
 }
 
@@ -1106,277 +1106,277 @@ def reload_struct_variables(cell_config=None):
     STATUS_BIT_NAMES = {
         # 告警状态 (ALARM)
         'ALARM': {
-            ALARM_PACK_OV: t('status_bits.alarm.pack_ov'),
-            ALARM_BATT_OV: t('status_bits.alarm.batt_ov'),
-            ALARM_CELL_OV: t('status_bits.alarm.cell_ov'),
-            ALARM_BATT_UV: t('status_bits.alarm.batt_uv'),
-            ALARM_CELL_UV: t('status_bits.alarm.cell_uv'),
-            ALARM_CHG_OC: t('status_bits.alarm.chg_oc'),
-            ALARM_DIS_OC: t('status_bits.alarm.dis_oc'),
-            ALARM_CHG_OT: t('status_bits.alarm.chg_ot'),
-            ALARM_DIS_OT: t('status_bits.alarm.dis_ot'),
-            ALARM_CHG_UT: t('status_bits.alarm.chg_ut'),
-            ALARM_DIS_UT: t('status_bits.alarm.dis_ut'),
-            ALARM_SOC_L: t('status_bits.alarm.soc_l'),
-            ALARM_END_LIFE: t('status_bits.alarm.end_life'),
-            ALARM_MOS_HT: t('status_bits.alarm.mos_ht'),
+            ALARM_PACK_OV: t('总过压'),
+            ALARM_BATT_OV: t('电池过压'),
+            ALARM_CELL_OV: t('电芯过压'),
+            ALARM_BATT_UV: t('电池欠压'),
+            ALARM_CELL_UV: t('电芯欠压'),
+            ALARM_CHG_OC: t('充电过流'),
+            ALARM_DIS_OC: t('放电过流'),
+            ALARM_CHG_OT: t('充电过温'),
+            ALARM_DIS_OT: t('放电过温'),
+            ALARM_CHG_UT: t('充电低温'),
+            ALARM_DIS_UT: t('放电低温'),
+            ALARM_SOC_L: t('SOC低'),
+            ALARM_END_LIFE: t('寿命终止'),
+            ALARM_MOS_HT: t('MOS过温'),
         },
         # 保护状态 (PROTECT)
         'PROTECT': {
-            PROTECT_PACK_OV: t('status_bits.protect.pack_ov'),
-            PROTECT_BATT_OV: t('status_bits.protect.batt_ov'),
-            PROTECT_CELL_OV: t('status_bits.protect.cell_ov'),
-            PROTECT_BATT_UV: t('status_bits.protect.batt_uv'),
-            PROTECT_CELL_UV: t('status_bits.protect.cell_uv'),
-            PROTECT_CHG_OC: t('status_bits.protect.chg_oc'),
-            PROTECT_DIS_OC: t('status_bits.protect.dis_oc'),
-            PROTECT_CHG_OT: t('status_bits.protect.chg_ot'),
-            PROTECT_DIS_OT: t('status_bits.protect.dis_ot'),
-            PROTECT_CHG_UT: t('status_bits.protect.chg_ut'),
-            PROTECT_DIS_UT: t('status_bits.protect.dis_ut'),
-            PROTECT_SHORT: t('status_bits.protect.short'),
-            PROTECT_REV: t('status_bits.protect.rev'),
-            PROTECT_CHG_UTOC: t('status_bits.protect.chg_utoc'),
-            PROTECT_CHG_UTOV: t('status_bits.protect.chg_utov'),
-            PROTECT_CHG_SHORT: t('status_bits.protect.chg_short'),
-            PROTECT_PSP: t('status_bits.protect.psp'),
-            PROTECT_BQ_SCD: t('status_bits.protect.bq_scd'),
-            PROTECT_BQ_OCD: t('status_bits.protect.bq_ocd'),
-            PROTECT_MOS_HT: t('status_bits.protect.mos_ht'),
-            PROTECT_CHG_UT_LIMIT: t('status_bits.protect.chg_ut_limit'),
+            PROTECT_PACK_OV: t('总过压'),
+            PROTECT_BATT_OV: t('电池过压'),
+            PROTECT_CELL_OV: t('电芯过压'),
+            PROTECT_BATT_UV: t('电池欠压'),
+            PROTECT_CELL_UV: t('电芯欠压'),
+            PROTECT_CHG_OC: t('充电过流'),
+            PROTECT_DIS_OC: t('放电过流'),
+            PROTECT_CHG_OT: t('充电过温'),
+            PROTECT_DIS_OT: t('放电过温'),
+            PROTECT_CHG_UT: t('充电低温'),
+            PROTECT_DIS_UT: t('放电低温'),
+            PROTECT_SHORT: t('短路'),
+            PROTECT_REV: t('反接'),
+            PROTECT_CHG_UTOC: t('充低温过流'),
+            PROTECT_CHG_UTOV: t('充低温过压'),
+            PROTECT_CHG_SHORT: t('充电短路'),
+            PROTECT_PSP: t('PSP'),
+            PROTECT_BQ_SCD: t('BQ_SCD'),
+            PROTECT_BQ_OCD: t('BQ_OCD'),
+            PROTECT_MOS_HT: t('MOS过温'),
+            PROTECT_CHG_UT_LIMIT: t('充低温限'),
         },
         # 失效状态 (FAULT)
         'FAULT': {
-            FAULT_V_SENSOR: t('status_bits.fault.v_sensor'),
-            FAULT_T_SENSOR: t('status_bits.fault.t_sensor'),
-            FAULT_CHG: t('status_bits.fault.chg'),
-            FAULT_DIS: t('status_bits.fault.dis'),
-            FAULT_CELL_BAD: t('status_bits.fault.cell_bad'),
-            FAULT_SWITCH_OFF: t('status_bits.fault.switch_off'),
-            FAULT_LIFE_END: t('status_bits.fault.life_end'),
-            FAULT_BQ_UV: t('status_bits.fault.bq_uv'),
-            FAULT_BQ_OV: t('status_bits.fault.bq_ov'),
-            FAULT_BQ_DEVIECE: t('status_bits.fault.bq_device'),
-            FAULT_BQ_OVERWR: t('status_bits.fault.bq_overwr'),
-            FAULT_FUSE_BREAK: t('status_bits.fault.fuse_break'),
+            FAULT_V_SENSOR: t('电压传感'),
+            FAULT_T_SENSOR: t('温度传感'),
+            FAULT_CHG: t('充电失效'),
+            FAULT_DIS: t('放电失效'),
+            FAULT_CELL_BAD: t('电芯不良'),
+            FAULT_SWITCH_OFF: t('开关关断'),
+            FAULT_LIFE_END: t('寿命终止'),
+            FAULT_BQ_UV: t('BQ欠压'),
+            FAULT_BQ_OV: t('BQ过压'),
+            FAULT_BQ_DEVIECE: t('BQ设备'),
+            FAULT_BQ_OVERWR: t('BQ覆盖'),
+            FAULT_FUSE_BREAK: t('保险丝断'),
         },
         # 其他信息 (INFO)
         'INFO': {
-            INFO_HEAETER_CONFIG: t('status_bits.info.heater_config'),
-            INFO_HEATER_ON: t('status_bits.info.heater_on'),
-            INFO_CHG_FULL_T: t('status_bits.info.chg_full_t'),
-            INFO_BATT_FULL: t('status_bits.info.batt_full'),
-            INFO_CHG_LIMITED_ON: t('status_bits.info.chg_limited_on'),
-            INFO_DIS_LIMITED_ON: t('status_bits.info.dis_limited_on'),
-            INFO_CHG_MOS_OFF: t('status_bits.info.chg_mos_off'),
-            INFO_DIS_MOS_OFF: t('status_bits.info.dis_mos_off'),
-            INFO_LOWVOL_LIMIT: t('status_bits.info.lowvol_limit'),
-            INFO_LOWTEMP_FORCECHG: t('status_bits.info.lowtemp_forcechg'),
-            INFO_MULT_BATT: t('status_bits.info.mult_batt'),
-            INFO_CAN_MASTER: t('status_bits.info.can_master'),
-            INFO_CAN_SLAVE: t('status_bits.info.can_slave'),
-            INFO_CALENDAR_REACH: t('status_bits.info.calendar_reach'),
-            INFO_TEST_KB: t('status_bits.info.test_kb'),
-            INFO_CALIBRATED_V: t('status_bits.info.calibrated_v'),
-            INFO_CALIBRATED_C: t('status_bits.info.calibrated_c'),
-            INFO_LOST_CANBOX: t('status_bits.info.lost_canbox'),
-            INFO_NO_INV_TIMEOUTE: t('status_bits.info.no_inv_timeout'),
-            INFO_FUSEEN_OPEN: t('status_bits.info.fuseen_open'),
-            INFO_CELL_CTO: t('status_bits.info.cell_cto'),
-            INFO_PSWFUNCTION_ON: t('status_bits.info.pswfunction_on'),
-            INFO_POWERSAVE_ON: t('status_bits.info.powersave_on'),
-            INFO_FORCEDDIS_ON: t('status_bits.info.forceddis_on'),
-            INFO_HEATERMODE_SELF: t('status_bits.info.heatermode_self'),
+            INFO_HEAETER_CONFIG: t('加热配置'),
+            INFO_HEATER_ON: t('加热开'),
+            INFO_CHG_FULL_T: t('充饱温'),
+            INFO_BATT_FULL: t('满电'),
+            INFO_CHG_LIMITED_ON: t('充限开'),
+            INFO_DIS_LIMITED_ON: t('放限开'),
+            INFO_CHG_MOS_OFF: t('充MOS关'),
+            INFO_DIS_MOS_OFF: t('放MOS关'),
+            INFO_LOWVOL_LIMIT: t('低压限'),
+            INFO_LOWTEMP_FORCECHG: t('低温强充'),
+            INFO_MULT_BATT: t('多电池'),
+            INFO_CAN_MASTER: t('CAN主'),
+            INFO_CAN_SLAVE: t('CAN从'),
+            INFO_CALENDAR_REACH: t('日历到'),
+            INFO_TEST_KB: t('测KB'),
+            INFO_CALIBRATED_V: t('电压校准'),
+            INFO_CALIBRATED_C: t('电流校准'),
+            INFO_LOST_CANBOX: t('CAN盒丢'),
+            INFO_NO_INV_TIMEOUTE: t('无逆变超时'),
+            INFO_FUSEEN_OPEN: t('保险丝开'),
+            INFO_CELL_CTO: t('电芯CTO'),
+            INFO_PSWFUNCTION_ON: t('开关功能开'),
+            INFO_POWERSAVE_ON: t('省电开'),
+            INFO_FORCEDDIS_ON: t('强放开'),
+            INFO_HEATERMODE_SELF: t('自加热'),
         },
         # 均衡状态 (BALANCE)
         'BALANCE': {
-            0x00000001: t('status_bits.balance.cell', '01'),
-            0x00000002: t('status_bits.balance.cell', '02'),
-            0x00000004: t('status_bits.balance.cell', '03'),
-            0x00000008: t('status_bits.balance.cell', '04'),
-            0x00000010: t('status_bits.balance.cell', '05'),
-            0x00000020: t('status_bits.balance.cell', '06'),
-            0x00000040: t('status_bits.balance.cell', '07'),
-            0x00000080: t('status_bits.balance.cell', '08'),
-            0x00000100: t('status_bits.balance.cell', '09'),
-            0x00000200: t('status_bits.balance.cell', '10'),
-            0x00000400: t('status_bits.balance.cell', '11'),
-            0x00000800: t('status_bits.balance.cell', '12'),
-            0x00001000: t('status_bits.balance.cell', '13'),
-            0x00002000: t('status_bits.balance.cell', '14'),
-            0x00004000: t('status_bits.balance.cell', '15'),
-            0x00008000: t('status_bits.balance.cell', '16'),
+            0x00000001: t('C{0}', '01'),
+            0x00000002: t('C{0}', '02'),
+            0x00000004: t('C{0}', '03'),
+            0x00000008: t('C{0}', '04'),
+            0x00000010: t('C{0}', '05'),
+            0x00000020: t('C{0}', '06'),
+            0x00000040: t('C{0}', '07'),
+            0x00000080: t('C{0}', '08'),
+            0x00000100: t('C{0}', '09'),
+            0x00000200: t('C{0}', '10'),
+            0x00000400: t('C{0}', '11'),
+            0x00000800: t('C{0}', '12'),
+            0x00001000: t('C{0}', '13'),
+            0x00002000: t('C{0}', '14'),
+            0x00004000: t('C{0}', '15'),
+            0x00008000: t('C{0}', '16'),
         }
     }
     
     # 重新加载电池状态名称
     BATTERY_STATUS_NAMES = {
-        STATUS_IDLE: t('status_bits.battery_status.idle'),
-        STATUS_CHG: t('status_bits.battery_status.charging'),
-        STATUS_DIS: t('status_bits.battery_status.discharging'),
-        STATUS_FULL: t('status_bits.battery_status.full')
+        STATUS_IDLE: t('空闲'),
+        STATUS_CHG: t('充电中'),
+        STATUS_DIS: t('放电中'),
+        STATUS_FULL: t('满电')
     }
     
     # ========== 以下是 STRUCT_VARIABLES 重新加载代码 ==========
     STRUCT_VARIABLES["PC_GET_BMS"] = [
-        t('var_templates.chg_power_voltage'), t('var_templates.chg_power_diff'),
-        t('var_templates.chg_full_start'), t('var_templates.chg_full_stop'),
-        t('var_templates.pack_ov_warn'), t('var_templates.pack_ov_warn_resume'),
-        t('var_templates.pack_ov_protect'), t('var_templates.pack_ov_protect_resume'),
-        t('var_templates.batt_ov_warn'), t('var_templates.batt_ov_warn_resume'),
-        t('var_templates.batt_ov_protect'), t('var_templates.batt_ov_protect_resume'),
-        t('var_templates.cell_ov_warn'), t('var_templates.cell_ov_warn_resume'),
-        t('var_templates.cell_ov_protect'), t('var_templates.cell_ov_protect_resume'),
-        t('var_templates.batt_uv_warn'), t('var_templates.batt_uv_warn_resume'),
-        t('var_templates.batt_uv_protect'), t('var_templates.batt_uv_protect_resume'),
-        t('var_templates.cell_uv_warn'), t('var_templates.cell_uv_warn_resume'),
-        t('var_templates.cell_uv_protect'), t('var_templates.cell_uv_protect_resume'),
-        t('var_templates.chg_oc_warn'), t('var_templates.chg_oc_warn_resume'), t('var_templates.chg_oc_protect'),
-        t('var_templates.dis_oc_warn'), t('var_templates.dis_oc_warn_resume'), t('var_templates.dis_oc_protect'),
-        t('var_templates.chg_ot_warn'), t('var_templates.chg_ot_warn_resume'), t('var_templates.chg_ot_protect'), t('var_templates.chg_ot_protect_resume'),
-        t('var_templates.dis_ot_warn'), t('var_templates.dis_ot_warn_resume'), t('var_templates.dis_ot_protect'), t('var_templates.dis_ot_protect_resume'),
-        t('var_templates.chg_ut_warn'), t('var_templates.chg_ut_warn_resume'), t('var_templates.chg_ut_protect'), t('var_templates.chg_ut_protect_resume'),
-        t('var_templates.dis_ut_warn'), t('var_templates.dis_ut_warn_resume'), t('var_templates.dis_ut_protect'), t('var_templates.dis_ut_protect_resume'),
-        t('var_templates.heater_start_temp'), t('var_templates.heater_stop_temp'),
+        t('充电功耗电压值'), t('充电功耗Pack与Batt压差'),
+        t('充电功满开启电压值'), t('充电功满停止电压值'),
+        t('Pack过充-警限值'), t('Pack过充-警恢复值'),
+        t('Pack过充-保限值'), t('Pack过充-保恢复值'),
+        t('Batt过充-警限值'), t('Batt过充-警恢复值'),
+        t('Batt过充-保限值'), t('Batt过充-保恢复值'),
+        t('Cell过充-警限值'), t('Cell过充-警恢复值'),
+        t('Cell过充-保限值'), t('Cell过充-保恢复值'),
+        t('Batt欠压-警限值'), t('Batt欠压-警恢复值'),
+        t('Batt欠压-保限值'), t('Batt欠压-保恢复值'),
+        t('Cell欠压-警限值'), t('Cell欠压-警恢复值'),
+        t('Cell欠压-保限值'), t('Cell欠压-保恢复值'),
+        t('充-过流-警限值'), t('充-过流-警恢复值'), t('充-过流-保护限值'),
+        t('放-过流-警限值'), t('放-过流-警恢复值'), t('放-过流-保护限值'),
+        t('充-过温-警限值'), t('充-过温-警恢复值'), t('充-过温-保护限值'), t('充-过温-保护恢复值'),
+        t('放-过温-警限值'), t('放-过温-警恢复值'), t('放-过温-保护限值'), t('放-过温-保护恢复值'),
+        t('充-低温-警限值'), t('充-低温-警恢复值'), t('充-低温-保护限值'), t('充-低温-保护恢复值'),
+        t('放-低温-警限值'), t('放-低温-警恢复值'), t('放-低温-保护限值'), t('放-低温-保护恢复值'),
+        t('加热器启动温度'), t('加热器关闭温度'),
     ]
     
     STRUCT_VARIABLES["PC_GET_OCP_DELAYTIME"] = [
-        t('var_templates.ocp_delay_1c_chg'), t('var_templates.ocp_delay_2c_chg'),
-        t('var_templates.ocp_delay_1c_dis'), t('var_templates.ocp_delay_2c_dis')
+        t('1C充电过流保护延时'), t('2C充电过流保护延时'),
+        t('1C放电过流保护延时'), t('2C放电过流保护延时')
     ]
     
     STRUCT_VARIABLES["PC_GET_CELL_CAP_PARA"] = [
-        t('var_templates.rated_cap'), t('var_templates.factory_cap')
+        t('额定容量'), t('出厂容量')
     ]
     
     STRUCT_VARIABLES["PC_GET_MOSHTDATA"] = [
-        t('var_templates.mos_temp_warn'), t('var_templates.mos_temp_warn_resume'), 
-        t('var_templates.mos_temp_protect'), t('var_templates.mos_temp_protect_resume')
+        t('MOS温度告警'), t('MOS温度告警恢复'), 
+        t('MOS温度保护'), t('MOS温度保护恢复')
     ]
     
     STRUCT_VARIABLES["PC_GET_LIFE_PARA"] = [
-        t('var_templates.soc'), t('var_templates.reserve', ''), t('var_templates.cap_health'),
-        t('var_templates.cycle_time'), t('var_templates.single_chg_cap')
+        t('SOC'), t('保留{0}', ''), t('容量保持率'),
+        t('循环时间累计'), t('单次充电结合容量')
     ]
     
     STRUCT_VARIABLES["PC_GET_VER"] = [
-        t('var_templates.main_version'), t('var_templates.minor_version'), t('var_templates.revision_version'), t('var_templates.compile_year'),
-        t('var_templates.compile_month'), t('var_templates.compile_date'),
-        t('var_templates.hardware_version'),
-        t('var_templates.function_version')
+        t('主版本号'), t('次版本号'), t('修订版本号'), t('编译年份'),
+        t('编译月份'), t('编译日期'),
+        t('硬件版本'),
+        t('功能版本')
     ]
     
     STRUCT_VARIABLES["PC_GET_INF"] = [
-        t('var_templates.boot_main'), t('var_templates.boot_minor'), t('var_templates.boot_revision'), 
-        t('var_templates.boot_year'), t('var_templates.boot_month'), t('var_templates.boot_date'),
-        t('var_templates.boot_reserve1'), t('var_templates.boot_reserve2'),
-        t('var_templates.app_main'), t('var_templates.app_minor'), t('var_templates.app_revision'), 
-        t('var_templates.app_year'), t('var_templates.app_month'), t('var_templates.app_date'), 
-        t('var_templates.app_reserve1'), t('var_templates.app_reserve2'),
-        t('var_templates.buff_main'), t('var_templates.buff_minor'), t('var_templates.buff_revision'), 
-        t('var_templates.buff_year'), t('var_templates.buff_month'), t('var_templates.buff_date'),
-        t('var_templates.buff_reserve1'), t('var_templates.buff_reserve2'),
-        t('var_templates.back_main'), t('var_templates.back_minor'), t('var_templates.back_revision'), 
-        t('var_templates.back_year'), t('var_templates.back_month'), t('var_templates.back_date'),
-        t('var_templates.back_reserve1'), t('var_templates.back_reserve2'),
-        t('var_templates.chip_name'),
-        t('var_templates.writable_area'),
-        t('var_templates.pc_addr'),
-        t('var_templates.unique_id')
+        t('boot主版本号'), t('boot次版本号'), t('boot修订版本号'), 
+        t('boot年份'), t('boot月份'), t('boot日期'),
+        t('boot保留1'), t('boot保留2'),
+        t('app主版本号'), t('app次版本号'), t('app修订版本号'), 
+        t('app年份'), t('app月份'), t('app日期'), 
+        t('app保留1'), t('app保留2'),
+        t('buff主版本号'), t('buff次版本号'), t('buff修订版本号'), 
+        t('buff年份'), t('buff月份'), t('buff日期'),
+        t('buff保留1'), t('buff保留2'),
+        t('back主版本号'), t('back次版本号'), t('back修订版本号'), 
+        t('back年份'), t('back月份'), t('back日期'),
+        t('back保留1'), t('back保留2'),
+        t('芯片名称'),
+        t('可写区域'),
+        t('PC地址'),
+        t('唯一ID')
     ]
     
     STRUCT_VARIABLES["PC_GET_SERIALNUM"] = [
-        t('var_templates.serial_number')
+        t('序列号')
     ]
     
     STRUCT_VARIABLES["PC_SET_SERIALNUM"] = [
-        t('var_templates.serial_number')
+        t('序列号')
     ]
     
     STRUCT_VARIABLES["PC_GET_FUSESTATE"] = [
-        t('var_templates.fuse_enable'),
-        t('var_templates.fuse_status')
+        t('保险丝使能'),
+        t('保险丝状态')
     ]
     
     STRUCT_VARIABLES["PC_SET_FUSESTATE"] = [
-        t('var_templates.fuse_enable'),
-        t('var_templates.fuse_status')
+        t('保险丝使能'),
+        t('保险丝状态')
     ]
     
     STRUCT_VARIABLES["PC_GET_CLUSTER_SBS"] = [
-        t('var_templates.brand'), t('var_templates.current_rate'),
-        t('var_templates.batt_module_cap'),
-        t('var_templates.cluster_cap'),
-        t('var_templates.total_batt_num'), t('var_templates.comm_fail_count'),
-        t('var_templates.bms_fail_count'), t('var_templates.cell_fail_count'),
-        t('var_templates.chg_mos_off_count'), t('var_templates.dis_mos_off_count'),
-        t('var_templates.sys_max_cell_temp'), t('var_templates.sys_min_cell_temp'),
-        t('var_templates.sys_max_cell_volt'), t('var_templates.sys_min_cell_volt'),
-        t('var_templates.sys_max_batt_volt'), t('var_templates.sys_min_batt_volt'),
-        t('var_templates.sys_max_current'), t('var_templates.sys_min_current'),
-        t('var_templates.sys_max_soc'), t('var_templates.sys_min_soc'),
-        t('var_templates.sys_max_soh'), t('var_templates.sys_min_soh'),
-        t('var_templates.cluster_chg_volt_limit'), t('var_templates.cluster_dis_volt_limit'),
-        t('var_templates.cluster_chg_cur_limit'), t('var_templates.cluster_dis_cur_limit'),
-        t('var_templates.cluster_temp'),
-        t('var_templates.cluster_volt_v'),
-        t('var_templates.cluster_curr_a'),
-        t('var_templates.cluster_soc'), t('var_templates.cluster_soh'),
-        t('var_templates.cluster_protect_stat'), t('var_templates.cluster_fault_stat'),
-        t('var_templates.cluster_cycles'),
-        *[t('var_templates.reserve', i+1) for i in range(10)]
+        t('品牌'), t('当前倍率'),
+        t('电池模块容量'),
+        t('集群容量'),
+        t('总电池数量'), t('通信失败次数'),
+        t('BMS失败次数'), t('电芯失败次数'),
+        t('充电MOS关次数'), t('放电MOS关次数'),
+        t('系统最高电芯温度'), t('系统最低电芯温度'),
+        t('系统最高电芯电压'), t('系统最低电芯电压'),
+        t('系统最高电池电压'), t('系统最低电池电压'),
+        t('系统最大电流'), t('系统最小电流'),
+        t('系统最高SOC'), t('系统最低SOC'),
+        t('系统最高SOH'), t('系统最低SOH'),
+        t('集群充电电压限制'), t('集群放电电压限制'),
+        t('集群充电电流限制'), t('集群放电电流限制'),
+        t('集群温度'),
+        t('集群电压(V)'),
+        t('集群电流(A)'),
+        t('集群SOC'), t('集群SOH'),
+        t('集群保护状态'), t('集群故障状态'),
+        t('集群循环次数'),
+        *[t('保留{0}', i+1) for i in range(10)]
     ]
     
     # 根据cell_config设置PC_GET_KB和PC_GET_SBS
     if cell_config == 32:
         STRUCT_VARIABLES["PC_GET_KB"] = [
-            t('var_templates.pack_voltage_k'), t('var_templates.batt_voltage_k'),
-            *[t('var_templates.cell_voltage_k', i+1) for i in range(32)],
-            t('var_templates.500a_k'), t('var_templates.500a_b'),
-            t('var_templates.n500a_k'), t('var_templates.n500a_b'),
-            t('var_templates.50a_sk'), t('var_templates.50a_sb'),
-            t('var_templates.n50a_sk'), t('var_templates.n50a_sb'),
-            t('var_templates.10a_ssk'), t('var_templates.10a_ssb'),
-            t('var_templates.n10a_ssk'), t('var_templates.n10a_ssb'),
-            *[t('var_templates.temp_k', i+1) for i in range(16)]
+            t('Pack电压K'), t('Batt电压K'),
+            *[t('第【{0}】节电压K', i+1) for i in range(32)],
+            t('50-500安K(注，不同电池，电流范围不同，谨慎参考)'), t('50-500安B'),
+            t('-(50-500)安K'), t('-(50-500)安B'),
+            t('10-50安SK'), t('10-50安SB'),
+            t('-10-50安SK'), t('-10-50安SB'),
+            t('0-10安SSK'), t('0-10安SSB'),
+            t('-(0-10)安SSK'), t('-(0-10)安SSB'),
+            *[t('温度{0}K', i+1) for i in range(16)]
         ]
         STRUCT_VARIABLES["PC_GET_SBS"] = [
-            t('var_templates.pack_voltage'), t('var_templates.batt_voltage'),
-            *[t('var_templates.cell_voltage', i+1) for i in range(32)],
-            t('var_templates.current'),
-            *[t('var_templates.temp', i+1) for i in range(13)],
-            t('var_templates.remain_cap'), t('var_templates.full_cap'), t('var_templates.design_cap'),
-            t('var_templates.other_info'), t('var_templates.alarm_status'), 
-            t('var_templates.protect_status'), t('var_templates.fault_status'), 
-            t('var_templates.balance_status'),
-            t('var_templates.battery_status_label'), t('var_templates.soc'),
-            t('var_templates.cap_health'), t('var_templates.discharge_count'), 
-            t('var_templates.total_discharge_cap')
+            t('PACK电压'), t('BATT电压'),
+            *[t('第【{0}】节电压', i+1) for i in range(32)],
+            t('电流'),
+            *[t('环境温度{0}', i+1) for i in range(13)],
+            t('剩余容量'), t('满充容量'), t('设计容量'),
+            t('其他信息'), t('告警状态'), 
+            t('保护状态'), t('失效状态'), 
+            t('均衡状态'),
+            t('电池状态'), t('SOC'),
+            t('容量保持率'), t('放电次数'), 
+            t('总放电容量')
         ]
     else:  # 16-cell config
         STRUCT_VARIABLES["PC_GET_KB"] = [
-            t('var_templates.pack_voltage_k'), t('var_templates.batt_voltage_k'),
-            *[t('var_templates.cell_voltage_k', i+1) for i in range(16)],
-            t('var_templates.500a_k'), t('var_templates.500a_b'),
-            t('var_templates.n500a_k'), t('var_templates.n500a_b'),
-            t('var_templates.50a_sk'), t('var_templates.50a_sb'),
-            t('var_templates.n50a_sk'), t('var_templates.n50a_sb'),
-            t('var_templates.10a_ssk'), t('var_templates.10a_ssb'),
-            t('var_templates.n10a_ssk'), t('var_templates.n10a_ssb'),
-            *[t('var_templates.temp_k', i+1) for i in range(8)]
+            t('Pack电压K'), t('Batt电压K'),
+            *[t('第【{0}】节电压K', i+1) for i in range(16)],
+            t('50-500安K(注，不同电池，电流范围不同，谨慎参考)'), t('50-500安B'),
+            t('-(50-500)安K'), t('-(50-500)安B'),
+            t('10-50安SK'), t('10-50安SB'),
+            t('-10-50安SK'), t('-10-50安SB'),
+            t('0-10安SSK'), t('0-10安SSB'),
+            t('-(0-10)安SSK'), t('-(0-10)安SSB'),
+            *[t('温度{0}K', i+1) for i in range(8)]
         ]
         STRUCT_VARIABLES["PC_GET_SBS"] = [
-            t('var_templates.pack_voltage'), t('var_templates.batt_voltage'),
-            *[t('var_templates.cell_voltage', i+1) for i in range(16)],
-            t('var_templates.current'),
-            *[t('var_templates.temp', i+1) for i in range(5)],
-            t('var_templates.remain_cap'), t('var_templates.full_cap'), t('var_templates.design_cap'),
-            t('var_templates.other_info'), t('var_templates.alarm_status'), 
-            t('var_templates.protect_status'), t('var_templates.fault_status'), 
-            t('var_templates.balance_status'),
-            t('var_templates.battery_status_label'), t('var_templates.soc'),
-            t('var_templates.cap_health'), t('var_templates.discharge_count'), 
-            t('var_templates.total_discharge_cap')
+            t('PACK电压'), t('BATT电压'),
+            *[t('第【{0}】节电压', i+1) for i in range(16)],
+            t('电流'),
+            *[t('环境温度{0}', i+1) for i in range(5)],
+            t('剩余容量'), t('满充容量'), t('设计容量'),
+            t('其他信息'), t('告警状态'), 
+            t('保护状态'), t('失效状态'), 
+            t('均衡状态'),
+            t('电池状态'), t('SOC'),
+            t('容量保持率'), t('放电次数'), 
+            t('总放电容量')
         ]
     
     # 输出调试信息
@@ -1431,19 +1431,19 @@ def get_all_display_windows():
 
         # 根据名称添加图标和国际化描述
         title_map = {
-            'SBS': t('windows.sbs'),
-            'BMS': t('windows.bms'),
-            'KB': t('windows.kb'),
-            'OCP_DELAYTIME': t('windows.ocp_delay'),
-            'CELL_CAP_PARA': t('windows.cell_cap'),
-            'MOSHTDATA': t('windows.mos_temp'),
-            'LIFE_PARA': t('windows.life'),
-            'VER': t('windows.version'),
-            'INF': t('windows.info'),
-            'SERIALNUM': t('windows.serial'),
-            'FUSESTATE': t('windows.fuse'),
-            'CLUSTER_SBS': t('windows.cluster'),
-            'SOC_STOP_PARA': t('windows.soc_stop_para'),
+            'SBS': t('📊 SBS数据'),
+            'BMS': t('⚙️ BMS参数'),
+            'KB': t('📐 校准参数'),
+            'OCP_DELAYTIME': t('⏱️ 过流延时'),
+            'CELL_CAP_PARA': t('🔋 电芯容量'),
+            'MOSHTDATA': t('🌡️ MOS温度'),
+            'LIFE_PARA': t('📅 生命周期'),
+            'VER': t('📋 版本信息'),
+            'INF': t('ℹ️ 系统信息'),
+            'SERIALNUM': t('🔢 序列号'),
+            'FUSESTATE': t('🔌 保险丝信息'),
+            'CLUSTER_SBS': t('🔗 并机信息'),
+            'SOC_STOP_PARA': t('🔋 保电SOC设置'),
         }
 
         title = title_map.get(display_name, f'📄 {display_name}')
@@ -1475,7 +1475,7 @@ def get_all_display_windows():
     if not allowed_windows or 'ALARM_PROTECT' in allowed_windows:
         windows.append({
             'window_id': 'ALARM_PROTECT',
-            'title': t('windows.alarm_protect'),
+            'title': t('⚠️ 告警-保护信息'),
             'column_mode': 2,
             'default_visible': True,
             'cmd_code': 0,
@@ -1488,7 +1488,7 @@ def get_all_display_windows():
     if not allowed_windows or 'OTHER_STATUS' in allowed_windows:
         windows.append({
             'window_id': 'OTHER_STATUS',
-            'title': t('windows.other_status'),
+            'title': t('ℹ️ 其他状态信息'),
             'column_mode': 2,
             'default_visible': True,
             'cmd_code': 0,
@@ -1500,7 +1500,7 @@ def get_all_display_windows():
     if not allowed_windows or 'BATTERY_STATUS' in allowed_windows:
         windows.append({
             'window_id': 'BATTERY_STATUS',
-            'title': t('windows.battery_status'),
+            'title': t('🔋 电池状态'),
             'column_mode': 2,
             'default_visible': True,
             'cmd_code': 0,
