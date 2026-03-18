@@ -13,6 +13,7 @@ from PyQt6.QtGui import QFont, QColor
 from PyQt6.QtWidgets import QStyledItemDelegate
 from PyQt6.QtGui import QPainter
 from PyQt6.QtWidgets import QStyle
+from language_manager import t
 
 # Windows 注册表检测（优先方案）
 if sys.platform == 'win32':
@@ -1005,14 +1006,14 @@ class BitFlagsWidget(QWidget):
     def init_ui(self):
         """初始化UI组件"""
         # 创建标题标签
-        self.title_label = QLabel('位标志监控（绿=0正常 红=1告警 灰=未刷新）')
+        self.title_label = QLabel(t('位标志监控（绿=0正常 红=1告警 灰=未刷新）'))
         self.title_label.setStyleSheet("QLabel { color: blue; font-weight: bold; font-size: 8px; }")
 
         # 创建按钮布局
         button_layout = QHBoxLayout()
-        self.refresh_button = QPushButton('刷新')
-        self.clear_button = QPushButton('清空')
-        self.test_button = QPushButton('测试')
+        self.refresh_button = QPushButton(t('刷新'))
+        self.clear_button = QPushButton(t('清空'))
+        self.test_button = QPushButton(t('测试'))
 
         # 设置按钮字体大小
         button_font = QFont()
@@ -1137,11 +1138,11 @@ class MultiColumnBitFlagsWidget(QWidget):
 
     def init_ui(self):
         """初始化UI组件"""
-        self.title_label = QLabel('位标志监控 - 分类显示（绿=0正常 红=1告警 灰=未刷新）')
+        self.title_label = QLabel(t('位标志监控 - 分类显示（绿=0正常 红=1告警 灰=未刷新）'))
         self.title_label.setStyleSheet("QLabel { color: blue; font-weight: bold; font-size: 9px; }")
         button_layout = QHBoxLayout()
-        self.clear_button = QPushButton('清空')
-        self.test_button = QPushButton('测试')
+        self.clear_button = QPushButton(t('清空'))
+        self.test_button = QPushButton(t('测试'))
         button_font = QFont()
         button_font.setPointSize(7)
         self.clear_button.setFont(button_font)

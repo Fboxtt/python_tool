@@ -1604,7 +1604,7 @@ class HexParserApp(QMainWindow):
         #     traceback.print_exc()
         #     print(f"写入配置文件失败: {e}")
     def initUI(self):
-        self.setWindowTitle("HEX 文件解析器")
+        self.setWindowTitle(t("HEX 文件解析器"))
         self.setGeometry(100, 100, 800, 600)
 
         # 创建主布局
@@ -1617,7 +1617,7 @@ class HexParserApp(QMainWindow):
         layout.addWidget(self.text_edit)
 
         # 创建按钮用于加载 HEX 文件
-        self.load_button = QPushButton("加载 HEX 文件")
+        self.load_button = QPushButton(t("加载 HEX 文件"))
         self.load_button.clicked.connect(self.load_hex_file)
         layout.addWidget(self.load_button)
 

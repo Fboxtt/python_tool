@@ -279,7 +279,7 @@ class EnhancedMainWindow(QMainWindow):
         
         # 语言选择下拉框
         self.language_combo = QComboBox()
-        self.language_combo.addItem('language: 中文', 'zh_CN')
+        self.language_combo.addItem(t('language: 中文'), 'zh_CN')
         self.language_combo.addItem('language: English', 'en_US')
         
         # 设置当前语言
@@ -512,7 +512,7 @@ class EnhancedMainWindow(QMainWindow):
         if self.scan_task:
             self.scan_task.cancel()
             self.scan_task = None
-            self.monitor_btn.setText('▶️ 开始监控')
+            self.monitor_btn.setText(t('▶️ 开始监控'))
         self.multi_window_manager.clear_send_queue()
         self.bluetooth_tool.blue_write_log("🧹 监控已停止，发送队列已清空")
         self.check_connection_status()  # 立即更新按钮状态
@@ -522,7 +522,7 @@ class EnhancedMainWindow(QMainWindow):
         if self.scan_task:
             self.scan_task.cancel()
             self.scan_task = None
-            self.monitor_btn.setText('▶️ 开始监控')
+            self.monitor_btn.setText(t('▶️ 开始监控'))
         try:
             if self.bluetooth_tool.client and self.bluetooth_tool.client.is_connected:
                 asyncio.create_task(self.bluetooth_tool.disconnect_device())
@@ -565,7 +565,7 @@ class EnhancedMainWindow(QMainWindow):
             self._ota_paused_monitoring = True
             self.scan_task.cancel()
             self.scan_task = None
-            self.monitor_btn.setText('▶️ 开始监控')
+            self.monitor_btn.setText(t('▶️ 开始监控'))
             self.bluetooth_tool.blue_write_log("⏸️ OTA开始，监控已暂停")
         else:
             self._ota_paused_monitoring = False

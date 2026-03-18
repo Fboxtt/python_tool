@@ -482,13 +482,13 @@ class BluetoothTool(QWidget):
         control_layout.addWidget(store_group)
         
         # 限流控制（仅工厂模式下显示）
-        chglimit_group = self._create_compact_group("限流控制")
+        chglimit_group = self._create_compact_group(t('限流控制'))
         chglimit_layout = QHBoxLayout()
         chglimit_layout.setSpacing(2)
 
-        self.open_chglimit_button = self._create_compact_button('限流开', '#27ae60')
+        self.open_chglimit_button = self._create_compact_button(t('限流开'), '#27ae60')
         self.open_chglimit_button.clicked.connect(self.on_open_chglimit_clicked)
-        self.close_chglimit_button = self._create_compact_button('限流关', '#e74c3c')
+        self.close_chglimit_button = self._create_compact_button(t('限流关'), '#e74c3c')
         self.close_chglimit_button.clicked.connect(self.on_close_chglimit_clicked)
 
         chglimit_layout.addWidget(self.open_chglimit_button)
@@ -583,11 +583,11 @@ class BluetoothTool(QWidget):
         
         # 选择按钮单独一行
         hex_btn_row = QHBoxLayout()
-        self.hex_file_button = QPushButton(t('选择HEX文件'))
+        self.hex_file_button = QPushButton(t('select OTA File'))
         self.hex_file_button.setFixedHeight(22)
         self.hex_file_button.clicked.connect(self.on_select_hex_file)
         hex_btn_row.addWidget(self.hex_file_button)
-        self.builtin_hex_checkbox = QCheckBox('使用内置固件')
+        self.builtin_hex_checkbox = QCheckBox(t('使用内置固件'))
         self.builtin_hex_checkbox.setStyleSheet("font-size: 9px;")
         self.builtin_hex_checkbox.stateChanged.connect(self._on_main_builtin_hex_changed)
         hex_btn_row.addWidget(self.builtin_hex_checkbox)
@@ -597,7 +597,7 @@ class BluetoothTool(QWidget):
         # 文件名标签单独一行，支持换行
         self.hex_file_label = QLabel(t('未选择文件'))
         self.hex_file_label.setStyleSheet("font-size: 10px; color: #333; padding: 2px;")
-        self.hex_file_label = QLabel('未选择文件')
+        self.hex_file_label = QLabel(t('未选择文件'))
         self.hex_file_label.setStyleSheet("font-size: 10px; padding: 2px;")
         self.hex_file_label.setWordWrap(True)  # 允许自动换行
         self.hex_file_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
@@ -609,7 +609,7 @@ class BluetoothTool(QWidget):
         self.hex_info_label.setStyleSheet("font-size: 9px;")
         hex_layout.addWidget(self.hex_info_label)
         # 固件版本信息
-        self.hex_version_label = QLabel('版本: —')
+        self.hex_version_label = QLabel(t('版本: —'))
         self.hex_version_label.setStyleSheet("font-size: 9px;")
         self.hex_version_label.setWordWrap(True)
         hex_layout.addWidget(self.hex_version_label)
@@ -657,7 +657,7 @@ class BluetoothTool(QWidget):
         program_group = self._create_compact_group(t('烧录控制'))
         program_layout = QVBoxLayout()
         program_layout.setSpacing(2)
-        self.ota_step_label = QLabel('— 等待开始 —')
+        self.ota_step_label = QLabel(t('— 等待开始 —'))
         self.ota_step_label.setStyleSheet("font-size: 9px;")
         self.ota_step_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         program_layout.addWidget(self.ota_step_label)
@@ -2131,9 +2131,9 @@ class BluetoothTool(QWidget):
         """选择HEX文件并解析"""
         filename, _ = QFileDialog.getOpenFileName(
             self,
-            "选择HEX文件",
+            "Select HEX File",
             "",
-            "HEX文件 (*.hex);;所有文件 (*.*)"
+            "HEX Files (*.hex);;All Files (*.*)"
         )
         if filename:
             if self.hex_model.parse_hex_file(filename):
@@ -2155,8 +2155,8 @@ class BluetoothTool(QWidget):
                     )
                 self.blue_write_log(f"已选择HEX文件: {file_info['filename']}")
             else:
-                self.hex_file_label.setText('❌ 文件解析失败')
-                self.hex_version_label.setText('版本: —')
+                self.hex_file_label.setText(t('❌ 文件解析失败'))
+                self.hex_version_label.setText(t('版本: —'))
                 QMessageBox.warning(self, '警告', 'HEX文件解析失败')
 
     def _parse_inf_for_ota(self):
@@ -2189,10 +2189,10 @@ class BluetoothTool(QWidget):
                 hex_b64_data = builtin_hex_module.BUILTIN_HEX_B64
                 if self.hex_model.load_builtin_hex(hex_b64_data):
                     ver_info = self.hex_model.get_version_info()
-                    self.hex_file_label.setText('[内置固件]')
+                    self.hex_file_label.setText(t('[内置固件]'))
                     self.hex_info_label.setText(f'大小: {self.hex_model.size} 字节')
                     if ver_info['error']:
-                        self.hex_version_label.setText('版本: 读取失败')
+                        self.hex_version_label.setText(t('版本: 读取失败'))
                     else:
                         self.hex_version_label.setText(
                             f'[{ver_info["platform"]}] {ver_info["version_str"]}  UID:{ver_info["uid_str"]}'
@@ -2203,7 +2203,7 @@ class BluetoothTool(QWidget):
                     if simp is not None:
                         simp.builtin_hex_checkbox.blockSignals(True)
                         simp.builtin_hex_checkbox.setChecked(True)
-                        simp.simplified_hex_filename_label.setText('[内置固件]')
+                        simp.simplified_hex_filename_label.setText(t('[内置固件]'))
                         simp.simplified_hex_button.setEnabled(False)
                         simp.builtin_hex_checkbox.blockSignals(False)
                 else:
@@ -2230,9 +2230,9 @@ class BluetoothTool(QWidget):
                 self.blue_write_log(f"❌ 加载内置固件失败: {e}", color='red')
                 self._ota_msgbox(QMessageBox.Icon.Critical, '错误', f'内置固件加载失败: {e}')
         else:
-            self.hex_file_label.setText('未选择文件')
-            self.hex_info_label.setText('大小: 0B')
-            self.hex_version_label.setText('版本: —')
+            self.hex_file_label.setText(t('未选择文件'))
+            self.hex_info_label.setText(t('大小: 0B'))
+            self.hex_version_label.setText(t('版本: —'))
             self.hex_model.is_file_loaded = False
             self.hex_model.hex_data = None
             self.hex_model.filename = ''
@@ -2241,7 +2241,7 @@ class BluetoothTool(QWidget):
             if simp is not None:
                 simp.builtin_hex_checkbox.blockSignals(True)
                 simp.builtin_hex_checkbox.setChecked(False)
-                simp.simplified_hex_filename_label.setText('未选择文件')
+                simp.simplified_hex_filename_label.setText(t('未选择文件'))
                 simp.simplified_hex_button.setEnabled(True)
                 simp.builtin_hex_checkbox.blockSignals(False)
 
@@ -2330,7 +2330,7 @@ class BluetoothTool(QWidget):
             )
             return reply == QMessageBox.StandardButton.Yes
         # ======== 步骤1：查询0x16（PC_GET_VER）获取运行版本 ========
-        self.ota_step_label.setText('🔍 查询0x16版本...')
+        self.ota_step_label.setText(t('🔍 查询0x16版本...'))
         self.last_ver_data_hex = bytearray()
         self.text_decode.reset()
         data16 = self.text_decode.send_hex_fill(0x16)
@@ -2368,7 +2368,7 @@ class BluetoothTool(QWidget):
             return False
         # ======== 步骤2：查询0x71（PC_GET_INF）获取固件信息 ========
         self.last_inf_data_hex = None
-        self.ota_step_label.setText('🔍 查询设备信息...')
+        self.ota_step_label.setText(t('🔍 查询设备信息...'))
         self.text_decode.reset()
         data = self.text_decode.send_hex_fill(0x71)
         self.display_send_data(data)
@@ -2541,7 +2541,7 @@ class BluetoothTool(QWidget):
                 return
             # 点击即重置进度条和状态
             self.ota_progress_bar.setValue(0)
-            self.ota_step_label.setText('🔍 查询设备信息...')
+            self.ota_step_label.setText(t('🔍 查询设备信息...'))
             self.ota_step_label.setStyleSheet("font-size: 9px;")
             # 创建烧录任务
             self.program_task = asyncio.create_task(self.start_programming())
@@ -2554,10 +2554,10 @@ class BluetoothTool(QWidget):
             if hasattr(self, '_enhanced_window_ref') and self._enhanced_window_ref:
                 self._enhanced_window_ref.pause_monitoring_for_ota()
             # ======== OTA前置检查（版本&唯一ID验证）========
-            self.ota_step_label.setText('🔍 查询设备信息...')
+            self.ota_step_label.setText(t('🔍 查询设备信息...'))
             can_proceed = await self._pre_ota_check()
             if not can_proceed:
-                self.ota_step_label.setText('— 等待开始 —')
+                self.ota_step_label.setText(t('— 等待开始 —'))
                 self.ota_step_label.setStyleSheet("font-size: 9px;")
                 return
             self.ota_start_count += 1
@@ -2566,7 +2566,7 @@ class BluetoothTool(QWidget):
             self.program_button.setText(t('再点击即停止'))
             # 重置进度条和状态标签
             self.ota_progress_bar.setValue(0)
-            self.ota_step_label.setText('🔄 握手中...')
+            self.ota_step_label.setText(t('🔄 握手中...'))
             self.ota_step_label.setStyleSheet("font-size: 9px; color: #e67e22;")
             err_count = 0
 
@@ -2589,7 +2589,7 @@ class BluetoothTool(QWidget):
                         self.blue_write_log(f"✅ 握手命令发送成功")
                         shake_success = True
                         self.ota_progress_bar.setValue(15)
-                        self.ota_step_label.setText('✅ 握手  🔄 擦除中...')
+                        self.ota_step_label.setText(t('✅ 握手  🔄 擦除中...'))
                         break
                     else:
                         self.blue_write_log(f"❌ 握手回复异常 (第{err_count+1}次) {self._ota_rx_diag()}")
@@ -2622,7 +2622,7 @@ class BluetoothTool(QWidget):
                     self.blue_write_log(f"✅ 擦除命令发送成功")
                     self.packet_success_label.setText(t('擦除成功'))
                     self.ota_progress_bar.setValue(30)
-                    self.ota_step_label.setText('✅ 握手  ✅ 擦除  🔄 写入中...')
+                    self.ota_step_label.setText(t('✅ 握手  ✅ 擦除  🔄 写入中...'))
                     break
                 else:
                     self.blue_write_log(f"❌ 擦除回复异常 (第{err_count+1}次) {self._ota_rx_diag(BmsCmdType.DOWNLOAD_BUFFER)}")
@@ -2635,7 +2635,7 @@ class BluetoothTool(QWidget):
 
             # 发送下载命令并等待响应
             if not self.hex_model.is_file_loaded:
-                self.hex_file_label.setText('HEX文件：未加载')
+                self.hex_file_label.setText(t('HEX文件：未加载'))
                 # raise Exception("HEX文件未加载")
             else:
                 self.download_data.hex_init(self.hex_model.get_data())
@@ -2718,7 +2718,7 @@ class BluetoothTool(QWidget):
                     self.text_decode.reset()
                     err_count = 0
                     self.ota_progress_bar.setValue(80)
-                    self.ota_step_label.setText('✅ 握手  ✅ 擦除  ✅ 写入  🔄 重启中...')
+                    self.ota_step_label.setText(t('✅ 握手  ✅ 擦除  ✅ 写入  🔄 重启中...'))
                     break
                 else:
                     self.blue_write_log(f"❌ 总校验和回复异常 (第{err_count+1}次) {self._ota_rx_diag(BmsCmdType.REC_TOTAL_CHECKSUM)}")
@@ -2735,7 +2735,7 @@ class BluetoothTool(QWidget):
             if self.text_decode.no80_cmd == BmsCmdType.BMS_MCU_OPEN  and self.text_decode.cmd_ack == 0x00:
                 self.blue_write_log("电池重启")
             self.ota_progress_bar.setValue(90)
-            self.ota_step_label.setText('✅ 握手  ✅ 擦除  ✅ 写入  ✅ 重启  🔄 验证...')
+            self.ota_step_label.setText(t('✅ 握手  ✅ 擦除  ✅ 写入  ✅ 重启  🔄 验证...'))
             await asyncio.sleep(3)
             while err_count < 5:
                 data = self.download_data.get_download_data(BmsCmdType.READ_IC_INF)
@@ -2752,7 +2752,7 @@ class BluetoothTool(QWidget):
                     self.blue_write_log(f"✅ 71指令查询成功，烧录完成")
                     self.ota_ok_count += 1
                     self.ota_progress_bar.setValue(100)
-                    self.ota_step_label.setText('✅ 握手  ✅ 擦除  ✅ 写入  ✅ 重启  ✅ 成功')
+                    self.ota_step_label.setText(t('✅ 握手  ✅ 擦除  ✅ 写入  ✅ 重启  ✅ 成功'))
                     self.ota_step_label.setStyleSheet("font-size: 9px; color: #27ae60;")
                     # ── 弹窗显示烧录后版本信息 ──
                     dev_inf_ok = self._parse_inf_for_ota()
@@ -3807,11 +3807,11 @@ class load_ui_dynamically(QMainWindow):
         """启动扫描任务"""
         if not self.scan_task:
             self.bluetooth_tool.blue_write_log("启动扫描任务")
-            widgets.pushButton_4.setText("停止监控")
+            widgets.pushButton_4.setText(t('停止监控'))
             self.scan_task = asyncio.create_task(self.get_data_from_device(0.5))
         else:
             self.scan_task.cancel()
-            widgets.pushButton_4.setText("开始监控")
+            widgets.pushButton_4.setText(t('开始监控'))
             self.scan_task = None
 
     # get_dict_from_receive_data 已删除，由 data_display_mgr 内部处理
@@ -3827,7 +3827,7 @@ class load_ui_dynamically(QMainWindow):
             except Exception as e:
                 if str(e) == "未连接到设备":
                     self.bluetooth_tool.blue_write_log(f"获取数据失败: {e}")
-                    widgets.pushButton_4.setText("开始监控")
+                    widgets.pushButton_4.setText(t('开始监控'))
                     traceback.print_exc()
                     break
                 else:
@@ -4198,7 +4198,7 @@ class SimplifiedBluetoothTool(QWidget):
         
         # ========== 右侧：串口 ==========
         serial_layout = QVBoxLayout()
-        serial_title = QLabel('🔌 串口连接')
+        serial_title = QLabel(t('🔌 串口连接'))
         serial_title.setFont(QFont('Arial', 11, QFont.Weight.Bold))
         serial_layout.addWidget(serial_title)
         
@@ -4321,23 +4321,23 @@ class SimplifiedBluetoothTool(QWidget):
         main_layout.addLayout(heating_layout)
         
         # ========== OTA 烧录 ==========
-        ota_title = QLabel('OTA 烧录')
+        ota_title = QLabel(t('OTA 烧录'))
         ota_title.setFont(QFont('Arial', 10, QFont.Weight.Bold))
         main_layout.addWidget(ota_title)
         # HEX文件选择行（独立按钮 + checkbox内置固件 + 独立标签）
         hex_row = QHBoxLayout()
         hex_row.setSpacing(5)
-        self.simplified_hex_button = QPushButton('📂 选择HEX')
+        self.simplified_hex_button = QPushButton(t('📂 选择HEX'))
         self.simplified_hex_button.setFixedHeight(22)
         self.simplified_hex_button.setStyleSheet(
             "QPushButton { font-size: 10px; padding: 2px 6px; border: 1px solid #ccc; border-radius: 3px; }"
             "QPushButton:hover { background-color: #e8e8e8; }"
         )
         self.simplified_hex_button.clicked.connect(self._on_simplified_hex_select)
-        self.builtin_hex_checkbox = QCheckBox('使用内置固件')
+        self.builtin_hex_checkbox = QCheckBox(t('使用内置固件'))
         self.builtin_hex_checkbox.setStyleSheet("font-size: 9px;")
         self.builtin_hex_checkbox.stateChanged.connect(self._on_builtin_hex_changed)
-        self.simplified_hex_filename_label = QLabel('未选择文件')
+        self.simplified_hex_filename_label = QLabel(t('未选择文件'))
         self.simplified_hex_filename_label.setStyleSheet("font-size: 9px;")
         hex_row.addWidget(self.simplified_hex_button)
         hex_row.addWidget(self.builtin_hex_checkbox)
@@ -4380,12 +4380,12 @@ class SimplifiedBluetoothTool(QWidget):
                     bt.hex_file_label.setText('[内置固件]')
                     bt.hex_info_label.setText(f'大小: {bt.hex_model.size} 字节')
                     if ver_info['error']:
-                        bt.hex_version_label.setText('版本: 读取失败')
+                        bt.hex_version_label.setText(t('版本: 读取失败'))
                     else:
                         bt.hex_version_label.setText(
                             f'[{ver_info["platform"]}] {ver_info["version_str"]}  UID:{ver_info["uid_str"]}'
                         )
-                    self.simplified_hex_filename_label.setText('[内置固件]')
+                    self.simplified_hex_filename_label.setText(t('[内置固件]'))
                     # 同步主窗口checkbox
                     bt.builtin_hex_checkbox.blockSignals(True)
                     bt.builtin_hex_checkbox.setChecked(True)
@@ -4408,13 +4408,13 @@ class SimplifiedBluetoothTool(QWidget):
         else:
             # 取消勾选时清空
             bt = self.bluetooth_tool
-            bt.hex_file_label.setText('未选择文件')
-            bt.hex_info_label.setText('大小: 0B')
-            bt.hex_version_label.setText('版本: —')
+            bt.hex_file_label.setText(t('未选择文件'))
+            bt.hex_info_label.setText(t('大小: 0B'))
+            bt.hex_version_label.setText(t('版本: —'))
             bt.hex_model.is_file_loaded = False
             bt.hex_model.hex_data = None
             bt.hex_model.filename = ''
-            self.simplified_hex_filename_label.setText('未选择文件')
+            self.simplified_hex_filename_label.setText(t('未选择文件'))
             # 同步主窗口checkbox
             bt.builtin_hex_checkbox.blockSignals(True)
             bt.builtin_hex_checkbox.setChecked(False)

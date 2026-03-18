@@ -1451,7 +1451,7 @@ class MultiWindowManager(QWidget):
         
         # 通讯状态指示器
         status_layout = QHBoxLayout()
-        status_label = QLabel('通讯状态:')
+        status_label = QLabel(t('通讯状态:'))
         font = status_label.font()
         font.setPointSize(10)
         status_label.setFont(font)

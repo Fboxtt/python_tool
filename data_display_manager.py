@@ -27,6 +27,7 @@ from struct_model import (
     get_all_status_bits_for_display, parse_all_status_from_sbs,
     HexParserApp, STRUCT_COMMANDS, reload_struct_variables
 )
+from language_manager import t
 # SN码解析规则映射表
 SN_PRODUCT_TYPE = {'B': '电池', 'C': '充电器', 'M': 'MPPT', 'D': 'DCDC', 'H': '逆充控', 'A': '逆充', 'I': '纯逆变器'}
 SN_FACTORY = {'A': '安培时代新能源', 'D': '安培时代数字能源', 'S': '坪山一厂', 'H': '坪山二厂', 'W': '东莞一厂'}
@@ -464,7 +465,7 @@ class BatteryWindowManager:
         layout = QVBoxLayout()
 
         # 创建标题
-        title_label = QLabel('电池参数配置窗口')
+        title_label = QLabel(t('电池参数配置窗口'))
         font = title_label.font()
         font.setBold(True)
         font.setPointSize(12)
@@ -473,8 +474,8 @@ class BatteryWindowManager:
 
         # 创建按钮
         button_layout = QHBoxLayout()
-        self.send_button = QPushButton('发送修改')
-        self.clear_button = QPushButton('清空修改')
+        self.send_button = QPushButton(t('发送修改'))
+        self.clear_button = QPushButton(t('清空修改'))
         button_layout.addWidget(self.send_button)
         button_layout.addWidget(self.clear_button)
         button_layout.addStretch()
@@ -497,7 +498,7 @@ class BatteryWindowManager:
 
             layout.addWidget(self.table_view)
         else:
-            error_label = QLabel('错误：无法加载BatteryTableModel')
+            error_label = QLabel(t('错误：无法加载BatteryTableModel'))
             font = error_label.font()
             font.setBold(True)
             error_label.setFont(font)
@@ -554,7 +555,7 @@ class BitWindowManager:
             # 备用方案：创建简单的错误显示
             self.widget = QWidget(parent)
             layout = QVBoxLayout()
-            error_label = QLabel('错误：无法加载BitFlagsWidget')
+            error_label = QLabel(t('错误：无法加载BitFlagsWidget'))
             font = error_label.font()
             font.setBold(True)
             error_label.setFont(font)
@@ -626,7 +627,7 @@ class DataDisplayManager(QMainWindow):
 
     def init_standalone_ui(self):
         """初始化独立窗口UI"""
-        self.setWindowTitle('数据显示管理器 - 调试模式（支持数据解析）')
+        self.setWindowTitle(t('数据显示管理器 - 调试模式（支持数据解析）'))
         self.setGeometry(100, 100, 1400, 800)
 
         # 创建中心部件
@@ -687,14 +688,14 @@ class DataDisplayManager(QMainWindow):
         layout = QHBoxLayout()
 
         # 标题
-        title_label = QLabel('🎛️ 数据显示管理器控制面板')
+        title_label = QLabel(t('🎛️ 数据显示管理器控制面板'))
         font = title_label.font()
         font.setBold(True)
         font.setPointSize(14)
         title_label.setFont(font)
         layout.addWidget(title_label)
         # 联系信息
-        contact_label = QLabel('有疑问请联系郭学成')
+        contact_label = QLabel(t('有疑问请联系郭学成'))
         font = contact_label.font()
         font.setPointSize(11)
         contact_label.setFont(font)
@@ -704,15 +705,15 @@ class DataDisplayManager(QMainWindow):
         layout.addStretch()
 
         # 测试按钮
-        test_bit_btn = QPushButton('📊 测试位标志')
+        test_bit_btn = QPushButton(t('📊 测试位标志'))
         test_bit_btn.clicked.connect(self.test_bit_data)
         layout.addWidget(test_bit_btn)
 
-        test_status_btn = QPushButton('🚦 测试状态位')
+        test_status_btn = QPushButton(t('🚦 测试状态位'))
         test_status_btn.clicked.connect(self.test_status_data)
         layout.addWidget(test_status_btn)
 
-        clear_all_btn = QPushButton('🗑️ 清空所有')
+        clear_all_btn = QPushButton(t('🗑️ 清空所有'))
         clear_all_btn.clicked.connect(self.clear_all)
         layout.addWidget(clear_all_btn)
 
@@ -733,12 +734,12 @@ class DataDisplayManager(QMainWindow):
 
         # 输入区域
         input_layout = QHBoxLayout()
-        input_label = QLabel('输入数据 (十六进制):')
+        input_label = QLabel(t('输入数据 (十六进制):'))
         input_layout.addWidget(input_label)
 
         self.hex_input = QTextEdit()
         self.hex_input.setMaximumHeight(80)
-        self.hex_input.setPlaceholderText("输入十六进制字符串，例如：\n00 00 0C 01 93 55 AA 86 00 00 00 00 00 02 00 B4")
+        self.hex_input.setPlaceholderText(t("输入十六进制字符串，例如：\n00 00 0C 01 93 55 AA 86 00 00 00 00 00 02 00 B4"))
         font = self.hex_input.font()
         font.setFamily('Consolas, Courier New, monospace')
         font.setPointSize(11)
@@ -746,7 +747,7 @@ class DataDisplayManager(QMainWindow):
         input_layout.addWidget(self.hex_input)
 
         # 解析按钮
-        parse_btn = QPushButton('🔍 解析数据')
+        parse_btn = QPushButton(t('🔍 解析数据'))
         parse_btn.setMinimumWidth(120)
         font = parse_btn.font()
         font.setBold(True)
@@ -758,16 +759,16 @@ class DataDisplayManager(QMainWindow):
 
         # 快捷示例按钮
         example_layout = QHBoxLayout()
-        example_label = QLabel('快捷示例:')
+        example_label = QLabel(t('快捷示例:'))
         example_layout.addWidget(example_label)
 
         # PC_GET_BMS示例
-        bms_btn = QPushButton('BMS数据')
+        bms_btn = QPushButton(t('BMS数据'))
         bms_btn.clicked.connect(lambda: self.hex_input.setText('00 00 0C 01 93 55 AA 86 00 00 00 00 00 02 00 B4'))
         example_layout.addWidget(bms_btn)
 
         # PC_GET_SBS示例
-        sbs_btn = QPushButton('SBS数据')
+        sbs_btn = QPushButton(t('SBS数据'))
         sbs_btn.clicked.connect(lambda: self.hex_input.setText('00 00 1A 01 B3 55 AA A6 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 1D'))
         example_layout.addWidget(sbs_btn)
 
@@ -775,7 +776,7 @@ class DataDisplayManager(QMainWindow):
         layout.addLayout(example_layout)
 
         # 输出区域
-        output_label = QLabel('解析结果:')
+        output_label = QLabel(t('解析结果:'))
         layout.addWidget(output_label)
 
         self.parse_output = QTextEdit()
@@ -798,7 +799,7 @@ class DataDisplayManager(QMainWindow):
         group_box.setFont(font)
         layout = QVBoxLayout()
         input_layout = QVBoxLayout()
-        input_label = QLabel('输入SN码:')
+        input_label = QLabel(t('输入SN码:'))
         input_label_font = input_label.font()
         input_label_font.setPointSize(10)
         input_label_font.setBold(True)
@@ -806,7 +807,7 @@ class DataDisplayManager(QMainWindow):
         input_layout.addWidget(input_label)
         self.sn_input = QTextEdit()
         self.sn_input.setMaximumHeight(60)
-        self.sn_input.setPlaceholderText("输入SN码（自动识别电池或核心部件）\n例如：BALP12100-NNN-A110001A-100Y")
+        self.sn_input.setPlaceholderText(t("输入SN码（自动识别电池或核心部件）\n例如：BALP12100-NNN-A110001A-100Y"))
         font = self.sn_input.font()
         font.setFamily('Consolas, Courier New, monospace')
         font.setPointSize(12)
@@ -825,23 +826,23 @@ class DataDisplayManager(QMainWindow):
         button_layout.addStretch()
         input_layout.addLayout(button_layout)
         example_layout = QHBoxLayout()
-        example_label = QLabel('电池示例:')
+        example_label = QLabel(t('电池示例:'))
         example_layout.addWidget(example_label)
         example1_btn = QPushButton('12V100Ah')
         example1_btn.clicked.connect(lambda: self.sn_input.setText('BALP12100-NNN-A110001A-100Y'))
         example_layout.addWidget(example1_btn)
-        example2_btn = QPushButton('蓝牙款')
+        example2_btn = QPushButton(t('蓝牙款'))
         example2_btn.clicked.connect(lambda: self.sn_input.setText('BALP12100-BNN-A110001A-100Y'))
         example_layout.addWidget(example2_btn)
         example_layout.addStretch()
         input_layout.addLayout(example_layout)
         example_layout2 = QHBoxLayout()
-        example_label2 = QLabel('核心部件示例:')
+        example_label2 = QLabel(t('核心部件示例:'))
         example_layout2.addWidget(example_label2)
-        example3_btn = QPushButton('充电器')
+        example3_btn = QPushButton(t('充电器'))
         example3_btn.clicked.connect(lambda: self.sn_input.setText('CHLRA2030B-PFN-A110001R-NNN'))
         example_layout2.addWidget(example3_btn)
-        example4_btn = QPushButton('逆变器')
+        example4_btn = QPushButton(t('逆变器'))
         example4_btn.clicked.connect(lambda: self.sn_input.setText('IHLRA3000N-HEN-A110001R-NNN'))
         example_layout2.addWidget(example4_btn)
         example5_btn = QPushButton('DC-DC')
@@ -853,7 +854,7 @@ class DataDisplayManager(QMainWindow):
         example_layout2.addStretch()
         input_layout.addLayout(example_layout2)
         layout.addLayout(input_layout)
-        output_label = QLabel('解析结果:')
+        output_label = QLabel(t('解析结果:'))
         output_label_font = output_label.font()
         output_label_font.setPointSize(10)
         output_label_font.setBold(True)
@@ -873,7 +874,7 @@ class DataDisplayManager(QMainWindow):
         """解析SN码"""
         sn_code = self.sn_input.toPlainText().strip()
         if not sn_code:
-            self.sn_output.setText("❌ 错误：输入为空")
+            self.sn_output.setText(t("❌ 错误：输入为空"))
             return
         self.sn_output.append(f"\n{'='*60}")
         self.sn_output.append(f"⏳ 开始解析SN码...")
@@ -917,7 +918,7 @@ class DataDisplayManager(QMainWindow):
         hex_string = self.hex_input.toPlainText()
 
         if not hex_string.strip():
-            self.parse_output.setText("❌ 错误：输入为空")
+            self.parse_output.setText(t("❌ 错误：输入为空"))
             return
 
         self.parse_output.append(f"\n{'='*60}")
@@ -1176,7 +1177,7 @@ class DataDisplayManager(QMainWindow):
         """发送修改值按钮回调"""
         modified = self.get_modified_values()
         if not modified:
-            QMessageBox.information(self, '提示', '没有修改的数据')
+            QMessageBox.information(self, t('提示'), t('没有修改的数据'))
             return
 
         msg = f"准备发送 {len(modified)} 个修改的参数：\n\n"
@@ -1185,7 +1186,7 @@ class DataDisplayManager(QMainWindow):
         if len(modified) > 5:
             msg += f"\n... 还有 {len(modified) - 5} 个参数"
 
-        QMessageBox.information(self, '修改的参数', msg)
+        QMessageBox.information(self, t('修改的参数'), msg)
 
     # ==================== 测试功能（独立模式使用）====================
 
