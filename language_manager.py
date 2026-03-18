@@ -2066,7 +2066,7 @@ class LanguageManager:
 
     def __init__(self):
         self.__class__._ensure_by_zh_built()
-        self.current_language = os.environ.get('APP_LANGUAGE', 'en_US')
+        self.current_language = os.environ.get('APP_LANGUAGE', 'zh_CN')
 
     def t(self, zh_key, *args):
         """
