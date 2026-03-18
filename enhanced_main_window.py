@@ -26,7 +26,7 @@ from struct_model import (
     get_voltage_params_display_data,
     detect_special_command
 )
-from language_manager import t, set_language, get_current_language
+from language_manager import t, set_language, get_current_language, get_available_languages
 
 # 尝试导入版本信息
 try:
@@ -277,17 +277,14 @@ class EnhancedMainWindow(QMainWindow):
         self.clear_queue_btn.clicked.connect(self.clear_send_queue)
         layout.addWidget(self.clear_queue_btn)
         
-        # 语言选择下拉框
+        # 语言选择下拉框（根据 language_manager 可用语言动态生成）
         self.language_combo = QComboBox()
-        self.language_combo.addItem(t('language: 中文'), 'zh_CN')
-        self.language_combo.addItem('language: English', 'en_US')
-        
-        # 设置当前语言
+        _lang_display = {'zh_CN': '简体中文', 'en_US': 'English', 'ja_JP': '日本語'}
+        for lang in get_available_languages():
+            self.language_combo.addItem(_lang_display.get(lang, lang), lang)
         current_lang = get_current_language()
-        if current_lang == 'zh_CN':
-            self.language_combo.setCurrentIndex(0)
-        else:
-            self.language_combo.setCurrentIndex(1)
+        idx = next((i for i in range(self.language_combo.count()) if self.language_combo.itemData(i) == current_lang), 0)
+        self.language_combo.setCurrentIndex(idx)
         
         self.language_combo.setToolTip('选择界面语言 / Select Language')
         self.language_combo.currentIndexChanged.connect(self.on_language_changed)
