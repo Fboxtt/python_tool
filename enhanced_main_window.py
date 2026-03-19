@@ -811,9 +811,8 @@ class EnhancedMainWindow(QMainWindow):
             return commands
 
         protocol_markers = sorted(set(protocol_markers))
-        self.bluetooth_tool.blue_write_log(
-            f"🔍 指令拆分：在缓冲区中找到 {len(protocol_markers)} 个协议标识 (55 AA)"
-        )
+        # 仅当最终拆出多于 1 条合法指令时才打 log，先暂存
+        split_logs = []
 
         # 2) 用长度计算每条占位是否合法、是否够长，只保留合法指令
         processed_ranges = []
@@ -822,7 +821,7 @@ class EnhancedMainWindow(QMainWindow):
                 continue
             is_overlap = any(proc_start <= start_idx < proc_end for (proc_start, proc_end) in processed_ranges)
             if is_overlap:
-                self.bluetooth_tool.blue_write_log(
+                split_logs.append(
                     f"⚠️ 指令拆分：位置 {start_idx} 与已处理指令重叠，跳过"
                 )
                 continue
@@ -834,14 +833,14 @@ class EnhancedMainWindow(QMainWindow):
 
             # 合法性：总长 >= 1+2+2+2+1+0+1 = 9
             if total_length < self.MIN_CMD_LEN:
-                self.bluetooth_tool.blue_write_log(
+                split_logs.append(
                     f"⚠️ 指令拆分：位置 {start_idx} 总长 {total_length} 无效（<{self.MIN_CMD_LEN}），跳过"
                 )
                 continue
 
             # 是否够长：缓冲区从 start_idx 起至少要有 total_length 字节
             if start_idx + total_length > len(data_buffer):
-                self.bluetooth_tool.blue_write_log(
+                split_logs.append(
                     f"⚠️ 指令拆分：位置 {start_idx} 指令不完整（需要 {total_length} 字节，剩余 {len(data_buffer) - start_idx} 字节），跳过"
                 )
                 continue
@@ -857,16 +856,19 @@ class EnhancedMainWindow(QMainWindow):
             cmd_hex = ' '.join(f'{b:02X}' for b in command[:min(20, len(command))])
             if len(command) > 20:
                 cmd_hex += '...'
-            self.bluetooth_tool.blue_write_log(
+            split_logs.append(
                 f"✅ 指令拆分 #{cmd_idx}：起始={start_idx}, 长度={total_length}, "
                 f"单板=0x{bms_type:02X}, 命令=0x{cmd_code:02X}, 数据={cmd_hex}"
             )
             commands.append(command)
 
-        if commands:
+        if len(commands) > 1:
+            self.bluetooth_tool.blue_write_log(
+                f"🔍 指令拆分：在缓冲区中找到 {len(protocol_markers)} 个协议标识 (55 AA)"
+            )
+            for msg in split_logs:
+                self.bluetooth_tool.blue_write_log(msg)
             self.bluetooth_tool.blue_write_log(f"📦 指令拆分完成：成功 {len(commands)} 条合法指令")
-        else:
-            self.bluetooth_tool.blue_write_log("⚠️ 指令拆分：未得到任何合法完整指令")
 
         return commands
     
