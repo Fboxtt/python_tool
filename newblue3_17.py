@@ -434,20 +434,10 @@ class BluetoothTool(QWidget):
         serial_group.setLayout(serial_layout)
         connection_layout.addWidget(serial_group)
 
-        connection_layout.addStretch()
-        left_tabs.addTab(connection_tab, t('连接'))
-        
-        # ==================== Tab 2: 设备控制 ====================
-        control_tab = QWidget()
-        control_layout = QVBoxLayout(control_tab)
-        control_layout.setSpacing(3)
-        control_layout.setContentsMargins(5, 5, 5, 5)
-        
-        # 充放电控制
+        # Tab1 续：充放电、关机、加热（与连接合并为「连接与控制」）
         mos_group = self._create_compact_group(t('MOS控制'))
         mos_layout = QGridLayout()
         mos_layout.setSpacing(2)
-        
         self.open_charge_button = self._create_compact_button(t('充电开'), '#27ae60')
         self.open_charge_button.clicked.connect(self.on_open_charge_clicked)
         self.close_charge_button = self._create_compact_button(t('充电关'), '#e74c3c')
@@ -456,14 +446,151 @@ class BluetoothTool(QWidget):
         self.open_discharge_button.clicked.connect(self.on_open_discharge_clicked)
         self.close_discharge_button = self._create_compact_button(t('放电关'), '#e74c3c')
         self.close_discharge_button.clicked.connect(self.on_close_discharge_clicked)
-        
         mos_layout.addWidget(self.open_charge_button, 0, 0)
         mos_layout.addWidget(self.close_charge_button, 0, 1)
         mos_layout.addWidget(self.open_discharge_button, 1, 0)
         mos_layout.addWidget(self.close_discharge_button, 1, 1)
-        
         mos_group.setLayout(mos_layout)
-        control_layout.addWidget(mos_group)
+        connection_layout.addWidget(mos_group)
+        shutdown_row = QHBoxLayout()
+        self.shutdown_button = self._create_compact_button(t('🔌 设备关机'), '#95a5a6')
+        self.shutdown_button.clicked.connect(self.on_shutdown_clicked)
+        shutdown_row.addWidget(self.shutdown_button)
+        shutdown_row.addStretch()
+        connection_layout.addLayout(shutdown_row)
+        heating_group = self._create_compact_group(t('加热模式'))
+        heating_layout = QHBoxLayout()
+        heating_layout.setSpacing(2)
+        self.self_heating_button = self._create_compact_button(t('自加热'), '#e74c3c')
+        self.self_heating_button.clicked.connect(self.on_self_heating_clicked)
+        self.charger_heating_button = self._create_compact_button(t('充电器加热'), '#3498db')
+        self.charger_heating_button.clicked.connect(self.on_charger_heating_clicked)
+        heating_layout.addWidget(self.self_heating_button)
+        heating_layout.addWidget(self.charger_heating_button)
+        heating_group.setLayout(heating_layout)
+        connection_layout.addWidget(heating_group)
+
+        # 简化模式：隐藏右侧接收区
+        simple_row = QHBoxLayout()
+        self.simplified_mode_checkbox = QCheckBox(t('简化模式（隐藏接收区）'))
+        self.simplified_mode_checkbox.setStyleSheet("font-size: 10px;")
+        self.simplified_mode_checkbox.stateChanged.connect(
+            lambda s: self.set_simplified_mode(s == Qt.CheckState.Checked)
+        )
+        simple_row.addWidget(self.simplified_mode_checkbox)
+        simple_row.addStretch()
+        connection_layout.addLayout(simple_row)
+
+        connection_layout.addStretch()
+        left_tabs.addTab(connection_tab, t('连接与控制'))
+        
+        # ==================== Tab 2: OTA与密码（原高级） ====================
+        advanced_tab = QWidget()
+        advanced_layout = QVBoxLayout(advanced_tab)
+        advanced_layout.setSpacing(3)
+        advanced_layout.setContentsMargins(5, 5, 5, 5)
+        
+        # HEX文件部分（紧凑）
+        hex_group = self._create_compact_group(t('HEX文件'))
+        hex_layout = QVBoxLayout()
+        hex_layout.setSpacing(2)
+        hex_btn_row = QHBoxLayout()
+        self.hex_file_button = QPushButton(t('select OTA File'))
+        self.hex_file_button.setFixedHeight(22)
+        self.hex_file_button.clicked.connect(self.on_select_hex_file)
+        hex_btn_row.addWidget(self.hex_file_button)
+        self.builtin_hex_checkbox = QCheckBox(t('使用内置固件'))
+        self.builtin_hex_checkbox.setStyleSheet("font-size: 9px;")
+        self.builtin_hex_checkbox.stateChanged.connect(self._on_main_builtin_hex_changed)
+        hex_btn_row.addWidget(self.builtin_hex_checkbox)
+        hex_btn_row.addStretch()
+        hex_layout.addLayout(hex_btn_row)
+        self.hex_file_label = QLabel(t('未选择文件'))
+        self.hex_file_label.setStyleSheet("font-size: 10px; padding: 2px;")
+        self.hex_file_label.setWordWrap(True)
+        self.hex_file_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
+        self.hex_file_label.setMaximumWidth(400)
+        hex_layout.addWidget(self.hex_file_label)
+        self.hex_info_label = QLabel(t('大小: {0} 字节', '0'))
+        self.hex_info_label.setStyleSheet("font-size: 9px;")
+        hex_layout.addWidget(self.hex_info_label)
+        self.hex_version_label = QLabel(t('版本: —'))
+        self.hex_version_label.setStyleSheet("font-size: 9px;")
+        self.hex_version_label.setWordWrap(True)
+        hex_layout.addWidget(self.hex_version_label)
+        hex_group.setLayout(hex_layout)
+        advanced_layout.addWidget(hex_group)
+        
+        # 密码管理
+        password_group = self._create_compact_group(t('密码管理'))
+        password_layout = QVBoxLayout()
+        password_layout.setSpacing(2)
+        pwd_input_row = QHBoxLayout()
+        pwd_input_row.addWidget(QLabel(t('密码:')))
+        self.password_input = QLineEdit()
+        self.password_input.setPlaceholderText(t('6位密码'))
+        self.password_input.setMaxLength(6)
+        self.password_input.setStyleSheet("font-size: 10px;")
+        pwd_input_row.addWidget(self.password_input)
+        password_layout.addLayout(pwd_input_row)
+        pwd_btn_layout = QGridLayout()
+        pwd_btn_layout.setSpacing(2)
+        self.query_lock_button = self._create_compact_button(t('查询'), '#3498db')
+        self.query_lock_button.clicked.connect(self.on_query_lock_clicked)
+        self.login_button = self._create_compact_button(t('验证'), '#27ae60')
+        self.login_button.clicked.connect(self.on_login_clicked)
+        self.set_password_button = self._create_compact_button(t('设置'), '#f39c12')
+        self.set_password_button.clicked.connect(self.on_set_password_clicked)
+        self.reset_password_button = self._create_compact_button(t('取消'), '#e74c3c')
+        self.reset_password_button.clicked.connect(self.on_reset_password_clicked)
+        pwd_btn_layout.addWidget(self.query_lock_button, 0, 0)
+        pwd_btn_layout.addWidget(self.login_button, 0, 1)
+        pwd_btn_layout.addWidget(self.set_password_button, 1, 0)
+        pwd_btn_layout.addWidget(self.reset_password_button, 1, 1)
+        password_layout.addLayout(pwd_btn_layout)
+        password_group.setLayout(password_layout)
+        advanced_layout.addWidget(password_group)
+        
+        # 烧录控制
+        program_group = self._create_compact_group(t('烧录控制'))
+        program_layout = QVBoxLayout()
+        program_layout.setSpacing(2)
+        self.ota_step_label = QLabel(t('— 等待开始 —'))
+        self.ota_step_label.setStyleSheet("font-size: 9px;")
+        self.ota_step_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        program_layout.addWidget(self.ota_step_label)
+        self.ota_progress_bar = QProgressBar()
+        self.ota_progress_bar.setRange(0, 100)
+        self.ota_progress_bar.setValue(0)
+        self.ota_progress_bar.setFixedHeight(12)
+        self.ota_progress_bar.setTextVisible(False)
+        self.ota_progress_bar.setStyleSheet("""
+            QProgressBar { border: 1px solid #ccc; border-radius: 3px; background: #f0f0f0; }
+            QProgressBar::chunk { background: #27ae60; border-radius: 2px; }
+        """)
+        program_layout.addWidget(self.ota_progress_bar)
+        self.program_button = self._create_compact_button(t('开始烧录'), '#e67e22')
+        self.program_button.clicked.connect(self.on_program_clicked)
+        program_layout.addWidget(self.program_button)
+        self.packet_success_label = QLabel(t('包号: {0} / {1}', '0', '0'))
+        self.packet_success_label.setStyleSheet("font-size: 9px;")
+        program_layout.addWidget(self.packet_success_label)
+        self.batch_program_button = self._create_compact_button(t('批量烧录'), '#d35400')
+        self.batch_program_button.clicked.connect(self.on_batch_program_clicked)
+        program_layout.addWidget(self.batch_program_button)
+        self.batch_success_label = QLabel(t('成功: {0}', '0'))
+        self.batch_success_label.setStyleSheet("font-size: 9px")
+        program_layout.addWidget(self.batch_success_label)
+        program_group.setLayout(program_layout)
+        advanced_layout.addWidget(program_group)
+        advanced_layout.addStretch()
+        left_tabs.addTab(advanced_tab, t('OTA与密码'))
+        
+        # ==================== Tab 3: 其他（保电/限流/RT/蓝牙名/测试） ====================
+        control_tab = QWidget()
+        control_layout = QVBoxLayout(control_tab)
+        control_layout.setSpacing(3)
+        control_layout.setContentsMargins(5, 5, 5, 5)
         
         # 保电控制
         store_group = self._create_compact_group(t('保电控制'))
@@ -496,22 +623,6 @@ class BluetoothTool(QWidget):
 
         chglimit_group.setLayout(chglimit_layout)
         control_layout.addWidget(chglimit_group)
-
-        # 加热模式
-        heating_group = self._create_compact_group(t('加热模式'))
-        heating_layout = QHBoxLayout()
-        heating_layout.setSpacing(2)
-        
-        self.self_heating_button = self._create_compact_button(t('自加热'), '#e74c3c')
-        self.self_heating_button.clicked.connect(self.on_self_heating_clicked)
-        self.charger_heating_button = self._create_compact_button(t('充电器加热'), '#3498db')
-        self.charger_heating_button.clicked.connect(self.on_charger_heating_clicked)
-        
-        heating_layout.addWidget(self.self_heating_button)
-        heating_layout.addWidget(self.charger_heating_button)
-        
-        heating_group.setLayout(heating_layout)
-        control_layout.addWidget(heating_group)
         
         # RT控制
         rt_group = self._create_compact_group(t('RT控制'))
@@ -541,15 +652,10 @@ class BluetoothTool(QWidget):
         rt_group.setLayout(rt_layout)
         control_layout.addWidget(rt_group)
         
-        # 其他控制
+        # 其他控制（蓝牙名称）
         other_group = self._create_compact_group(t('其他控制'))
         other_layout = QVBoxLayout()
         other_layout.setSpacing(2)
-        
-        self.shutdown_button = self._create_compact_button(t('🔌 设备关机'), '#95a5a6')
-        self.shutdown_button.clicked.connect(self.on_shutdown_clicked)
-        other_layout.addWidget(self.shutdown_button)
-        
         # 蓝牙名称修改
         bt_name_row = QHBoxLayout()
         bt_name_row.addWidget(QLabel(t('名称:')))
@@ -567,139 +673,7 @@ class BluetoothTool(QWidget):
         other_group.setLayout(other_layout)
         control_layout.addWidget(other_group)
         
-        control_layout.addStretch()
-        left_tabs.addTab(control_tab, t('控制'))
-        
-        # ==================== Tab 3: 密码&烧录 ====================
-        advanced_tab = QWidget()
-        advanced_layout = QVBoxLayout(advanced_tab)
-        advanced_layout.setSpacing(3)
-        advanced_layout.setContentsMargins(5, 5, 5, 5)
-        
-        # HEX文件部分（紧凑）
-        hex_group = self._create_compact_group(t('HEX文件'))
-        hex_layout = QVBoxLayout()
-        hex_layout.setSpacing(2)
-        
-        # 选择按钮单独一行
-        hex_btn_row = QHBoxLayout()
-        self.hex_file_button = QPushButton(t('select OTA File'))
-        self.hex_file_button.setFixedHeight(22)
-        self.hex_file_button.clicked.connect(self.on_select_hex_file)
-        hex_btn_row.addWidget(self.hex_file_button)
-        self.builtin_hex_checkbox = QCheckBox(t('使用内置固件'))
-        self.builtin_hex_checkbox.setStyleSheet("font-size: 9px;")
-        self.builtin_hex_checkbox.stateChanged.connect(self._on_main_builtin_hex_changed)
-        hex_btn_row.addWidget(self.builtin_hex_checkbox)
-        hex_btn_row.addStretch()
-        hex_layout.addLayout(hex_btn_row)
-        
-        # 文件名标签单独一行，支持换行
-        self.hex_file_label = QLabel(t('未选择文件'))
-        self.hex_file_label.setStyleSheet("font-size: 10px; color: #333; padding: 2px;")
-        self.hex_file_label = QLabel(t('未选择文件'))
-        self.hex_file_label.setStyleSheet("font-size: 10px; padding: 2px;")
-        self.hex_file_label.setWordWrap(True)  # 允许自动换行
-        self.hex_file_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
-        self.hex_file_label.setMaximumWidth(400)  # 限制最大宽度，确保换行
-        hex_layout.addWidget(self.hex_file_label)
-        
-        # 文件大小信息
-        self.hex_info_label = QLabel(t('大小: {0} 字节', '0'))
-        self.hex_info_label.setStyleSheet("font-size: 9px;")
-        hex_layout.addWidget(self.hex_info_label)
-        # 固件版本信息
-        self.hex_version_label = QLabel(t('版本: —'))
-        self.hex_version_label.setStyleSheet("font-size: 9px;")
-        self.hex_version_label.setWordWrap(True)
-        hex_layout.addWidget(self.hex_version_label)
-
-        
-        hex_group.setLayout(hex_layout)
-        advanced_layout.addWidget(hex_group)
-        
-        # 密码管理
-        password_group = self._create_compact_group(t('密码管理'))
-        password_layout = QVBoxLayout()
-        password_layout.setSpacing(2)
-        
-        pwd_input_row = QHBoxLayout()
-        pwd_input_row.addWidget(QLabel(t('密码:')))
-        self.password_input = QLineEdit()
-        self.password_input.setPlaceholderText(t('6位密码'))
-        self.password_input.setMaxLength(6)
-        self.password_input.setStyleSheet("font-size: 10px;")
-        pwd_input_row.addWidget(self.password_input)
-        password_layout.addLayout(pwd_input_row)
-        
-        pwd_btn_layout = QGridLayout()
-        pwd_btn_layout.setSpacing(2)
-        
-        self.query_lock_button = self._create_compact_button(t('查询'), '#3498db')
-        self.query_lock_button.clicked.connect(self.on_query_lock_clicked)
-        self.login_button = self._create_compact_button(t('验证'), '#27ae60')
-        self.login_button.clicked.connect(self.on_login_clicked)
-        self.set_password_button = self._create_compact_button(t('设置'), '#f39c12')
-        self.set_password_button.clicked.connect(self.on_set_password_clicked)
-        self.reset_password_button = self._create_compact_button(t('取消'), '#e74c3c')
-        self.reset_password_button.clicked.connect(self.on_reset_password_clicked)
-        
-        pwd_btn_layout.addWidget(self.query_lock_button, 0, 0)
-        pwd_btn_layout.addWidget(self.login_button, 0, 1)
-        pwd_btn_layout.addWidget(self.set_password_button, 1, 0)
-        pwd_btn_layout.addWidget(self.reset_password_button, 1, 1)
-        password_layout.addLayout(pwd_btn_layout)
-        
-        password_group.setLayout(password_layout)
-        advanced_layout.addWidget(password_group)
-        
-        # 烧录控制
-        program_group = self._create_compact_group(t('烧录控制'))
-        program_layout = QVBoxLayout()
-        program_layout.setSpacing(2)
-        self.ota_step_label = QLabel(t('— 等待开始 —'))
-        self.ota_step_label.setStyleSheet("font-size: 9px;")
-        self.ota_step_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        program_layout.addWidget(self.ota_step_label)
-        self.ota_progress_bar = QProgressBar()
-        self.ota_progress_bar.setRange(0, 100)
-        self.ota_progress_bar.setValue(0)
-        self.ota_progress_bar.setFixedHeight(12)
-        self.ota_progress_bar.setTextVisible(False)
-        self.ota_progress_bar.setStyleSheet("""
-            QProgressBar { border: 1px solid #ccc; border-radius: 3px; background: #f0f0f0; }
-            QProgressBar::chunk { background: #27ae60; border-radius: 2px; }
-        """)
-        program_layout.addWidget(self.ota_progress_bar)
-        self.program_button = self._create_compact_button(t('开始烧录'), '#e67e22')
-        self.program_button.clicked.connect(self.on_program_clicked)
-        program_layout.addWidget(self.program_button)
-        
-        self.packet_success_label = QLabel(t('包号: {0} / {1}', '0', '0'))
-        self.packet_success_label.setStyleSheet("font-size: 9px;")
-        program_layout.addWidget(self.packet_success_label)
-        
-        self.batch_program_button = self._create_compact_button(t('批量烧录'), '#d35400')
-        self.batch_program_button.clicked.connect(self.on_batch_program_clicked)
-        program_layout.addWidget(self.batch_program_button)
-        
-        self.batch_success_label = QLabel(t('成功: {0}', '0'))
-        self.batch_success_label.setStyleSheet("font-size: 9px")
-        program_layout.addWidget(self.batch_success_label)
-        
-        program_group.setLayout(program_layout)
-        advanced_layout.addWidget(program_group)
-        
-        advanced_layout.addStretch()
-        left_tabs.addTab(advanced_tab, t('高级'))
-        
-        # ==================== Tab 4: 测试 ====================
-        test_tab = QWidget()
-        test_layout = QVBoxLayout(test_tab)
-        test_layout.setSpacing(3)
-        test_layout.setContentsMargins(5, 5, 5, 5)
-        
-        # 数据发送测试
+        # 发送测试、连续发送（并入 Tab 其他）
         send_test_group = self._create_compact_group(t('发送测试'))
         send_test_layout = QVBoxLayout()
         send_test_layout.setSpacing(2)
@@ -738,7 +712,7 @@ class BluetoothTool(QWidget):
         send_test_layout.addLayout(send_row3)
         
         send_test_group.setLayout(send_test_layout)
-        test_layout.addWidget(send_test_group)
+        control_layout.addWidget(send_test_group)
         
         # 连续发送测试
         continuous_group = self._create_compact_group(t('连续发送'))
@@ -781,13 +755,15 @@ class BluetoothTool(QWidget):
         continuous_layout.addWidget(self.total_send_label)
         
         continuous_group.setLayout(continuous_layout)
-        test_layout.addWidget(continuous_group)
+        control_layout.addWidget(continuous_group)
         
-        test_layout.addStretch()
-        left_tabs.addTab(test_tab, t('测试'))
+        control_layout.addStretch()
+        left_tabs.addTab(control_tab, t('其他'))
         
-        # ==================== 右侧：接收窗口 ====================
-        right_layout = QVBoxLayout()
+        # ==================== 右侧：接收窗口（简化模式下可隐藏） ====================
+        self._simplified_mode = False
+        right_panel = QWidget()
+        right_layout = QVBoxLayout(right_panel)
         right_layout.setSpacing(3)
         right_layout.setContentsMargins(5, 5, 5, 5)
         
@@ -813,9 +789,9 @@ class BluetoothTool(QWidget):
         rx_control_layout.addStretch()
         right_layout.addLayout(rx_control_layout)
         
-        # 添加到主布局
+        self._right_panel = right_panel
         main_layout.addWidget(left_tabs)
-        main_layout.addLayout(right_layout, 1)
+        main_layout.addWidget(right_panel, 1)
         
         self.setLayout(main_layout)
         self.resize(850, 550)  # 紧凑的窗口尺寸
@@ -1241,6 +1217,22 @@ class BluetoothTool(QWidget):
             self.display_send_data(data_bytes)
         except Exception as e:
             QMessageBox.critical(self, '发送失败', str(e))
+
+    def set_simplified_mode(self, is_simplified: bool):
+        """简化模式：隐藏/显示右侧接收区，用固定宽度切换，避免恢复时宽度不对"""
+        self._simplified_mode = bool(is_simplified)
+        win = self.window()
+        if hasattr(self, '_right_panel') and self._right_panel:
+            if self._simplified_mode:
+                self._right_panel.setVisible(False)
+                win.resize(420, win.height())
+            else:
+                self._right_panel.setVisible(True)
+                win.resize(850, win.height())
+        if hasattr(self, 'simplified_mode_checkbox') and self.simplified_mode_checkbox:
+            self.simplified_mode_checkbox.blockSignals(True)
+            self.simplified_mode_checkbox.setChecked(self._simplified_mode)
+            self.simplified_mode_checkbox.blockSignals(False)
 
     def on_hex_display_changed(self, state):
         """当16进制显示选项改变时，重新显示接收到的数据"""
@@ -4117,429 +4109,7 @@ class load_ui_dynamically(QMainWindow):
             return False
 
 
-# ============== 简化版蓝牙连接窗口 ==============
-class SimplifiedBluetoothTool(QWidget):
-    """简化版蓝牙连接窗口 - 复用原窗口的核心功能"""
-    
-    def __init__(self, bluetooth_tool):
-        super().__init__()
-        
-        # 复用原窗口的核心功能（共享连接状态）
-        self.bluetooth_tool = bluetooth_tool
-        # 注册到bluetooth_tool，供主窗口checkbox同步使用
-        bluetooth_tool._simplified_window_ref = self
-        
-        # 直接引用原窗口的属性（而不是创建新的）
-        self.client = bluetooth_tool.client
-        self.serial_port = bluetooth_tool.serial_port
-        self.device_name_to_address = bluetooth_tool.device_name_to_address
-        
-        # 初始化简化UI
-        self.initSimplifiedUI()
-        
-        # 设置窗口属性：无边框、置顶、Window类型（能接收焦点）
-        self.setWindowFlags(
-            Qt.WindowType.FramelessWindowHint |
-            Qt.WindowType.WindowStaysOnTopHint |
-            Qt.WindowType.Window  # 使用Window类型，能够接收焦点事件
-        )
-        
-        # 设置焦点策略，确保窗口能获得焦点
-        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
-        self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating, False)  # 显示时激活窗口
-        
-        # 安装事件过滤器，监听全局鼠标点击
-        from PyQt6.QtWidgets import QApplication
-        QApplication.instance().installEventFilter(self)
-        
-    def initSimplifiedUI(self):
-        """初始化简化UI"""
-        self.setWindowTitle(t('蓝牙/串口连接'))
-        
-        main_layout = QVBoxLayout()
-        main_layout.setContentsMargins(10, 10, 10, 10)
-        main_layout.setSpacing(5)
-        
-        # 蓝牙和串口水平布局
-        connection_layout = QHBoxLayout()
-        
-        # ========== 左侧：蓝牙 ==========
-        bluetooth_layout = QVBoxLayout()
-        bluetooth_layout.setSpacing(2)
-        bluetooth_title = QLabel(t('蓝牙连接'))
-        bluetooth_title.setFont(QFont('Arial', 11, QFont.Weight.Bold))
-        bluetooth_layout.addWidget(bluetooth_title)
-        
-        # 直接使用原窗口的设备列表
-        self.device_list = self.bluetooth_tool.device_list
-        self.device_list.setMinimumHeight(175)
-        bluetooth_layout.addWidget(self.device_list)
-        
-        # 保存布局引用，用于后续动态添加/移除device_list
-        self.simplified_bluetooth_layout = bluetooth_layout
-        self.device_list_position = bluetooth_layout.count() - 1
-        
-        # 使用原窗口的RSSI筛选输入
-        rssi_layout = QHBoxLayout()
-        rssi_layout.addWidget(QLabel('RSSI >:'))
-        self.rssi_threshold_input = self.bluetooth_tool.rssi_threshold_input
-        self.rssi_threshold_input.setMaximumWidth(60)
-        rssi_layout.addWidget(self.rssi_threshold_input)
-        rssi_layout.addStretch()
-        bluetooth_layout.addLayout(rssi_layout)
-        
-        # 使用原窗口的连接/断开按钮
-        self.bt_connect_button = self.bluetooth_tool.bt_connect_button
-        bluetooth_layout.addWidget(self.bt_connect_button)
-        
-        # 使用原窗口的蓝牙状态标签
-        self.bluetooth_status_label = self.bluetooth_tool.bluetooth_status_label
-        bluetooth_layout.addWidget(self.bluetooth_status_label)
-        
-        # ========== 右侧：串口 ==========
-        serial_layout = QVBoxLayout()
-        serial_title = QLabel(t('🔌 串口连接'))
-        serial_title.setFont(QFont('Arial', 11, QFont.Weight.Bold))
-        serial_layout.addWidget(serial_title)
-        
-        # 使用原窗口的串口参数控件
-        param_grid = QGridLayout()
-        param_grid.setSpacing(3)
-        
-        self.port_combo = self.bluetooth_tool.port_combo
-        self.baud_combo = self.bluetooth_tool.baud_combo
-        self.data_bits_combo = self.bluetooth_tool.data_bits_combo
-        self.stop_bits_combo = self.bluetooth_tool.stop_bits_combo
-        self.parity_combo = self.bluetooth_tool.parity_combo
-        
-        param_grid.addWidget(QLabel(t('串口:')), 0, 0)
-        param_grid.addWidget(self.port_combo, 0, 1)
-        param_grid.addWidget(QLabel(t('波特率:')), 1, 0)
-        param_grid.addWidget(self.baud_combo, 1, 1)
-        param_grid.addWidget(QLabel(t('数据位:')), 2, 0)
-        param_grid.addWidget(self.data_bits_combo, 2, 1)
-        param_grid.addWidget(QLabel(t('停止位:')), 3, 0)
-        param_grid.addWidget(self.stop_bits_combo, 3, 1)
-        param_grid.addWidget(QLabel(t('校验位:')), 4, 0)
-        param_grid.addWidget(self.parity_combo, 4, 1)
-        
-        serial_layout.addLayout(param_grid)
-        
-        # 使用原窗口的串口连接/断开按钮
-        self.serial_connect_button = self.bluetooth_tool.serial_connect_button
-        serial_layout.addWidget(self.serial_connect_button)
-        
-        serial_layout.addStretch()
-        
-        connection_layout.addLayout(bluetooth_layout, 1)
-        connection_layout.addLayout(serial_layout, 1)
-        main_layout.addLayout(connection_layout)
-        
-        # ========== 扫描按钮 ==========
-        self.scan_button = self.bluetooth_tool.scan_button
-        self.scan_button.setStyleSheet("""
-            QPushButton {
-                background-color: #27ae60;
-                color: white;
-                border: none;
-                padding: 8px;
-                border-radius: 4px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #229954;
-            }
-        """)
-        main_layout.addWidget(self.scan_button)
-        
-        # ========== 连接测试按钮和状态指示灯 ==========
-        test_layout = QHBoxLayout()
-        test_layout.setSpacing(5)
-        
-        self.register_button = self.bluetooth_tool.register_button
-        self.register_button.setText(t('连接测试'))
-        test_layout.addWidget(self.register_button)
-        
-        self.status_indicator = self.bluetooth_tool.status_indicator
-        test_layout.addWidget(self.status_indicator)
-        
-        test_layout.addStretch()
-        main_layout.addLayout(test_layout)
-        
-        # ========== 充放电 & 保电控制（网格紧凑布局）==========
-        ctrl_grid = QGridLayout()
-        ctrl_grid.setSpacing(3)
-        ctrl_grid.setContentsMargins(0, 0, 0, 0)
-
-        self.open_charge_button = self.bluetooth_tool.open_charge_button
-        self.close_charge_button = self.bluetooth_tool.close_charge_button
-        self.open_discharge_button = self.bluetooth_tool.open_discharge_button
-        self.close_discharge_button = self.bluetooth_tool.close_discharge_button
-        self.open_store_power_button = self.bluetooth_tool.open_store_power_button
-        self.close_store_power_button = self.bluetooth_tool.close_store_power_button
-
-        for btn in [self.open_charge_button, self.close_charge_button,
-                    self.open_discharge_button, self.close_discharge_button,
-                    self.open_store_power_button, self.close_store_power_button]:
-            btn.setMinimumWidth(0)
-            btn.setMaximumWidth(16777215)
-
-        ctrl_grid.addWidget(self.open_charge_button, 0, 0)
-        ctrl_grid.addWidget(self.close_charge_button, 0, 1)
-        ctrl_grid.addWidget(self.open_discharge_button, 1, 0)
-        ctrl_grid.addWidget(self.close_discharge_button, 1, 1)
-        ctrl_grid.addWidget(self.open_store_power_button, 2, 0)
-        ctrl_grid.addWidget(self.close_store_power_button, 2, 1)
-
-        main_layout.addLayout(ctrl_grid)
-
-        # ========== 关机控制 ==========
-        shutdown_layout = QHBoxLayout()
-        self.shutdown_button = self.bluetooth_tool.shutdown_button
-        shutdown_layout.addWidget(self.shutdown_button)
-        main_layout.addLayout(shutdown_layout)
-
-        # ========== 加热模式控制 ==========
-        heating_layout = QVBoxLayout()
-        heating_title = QLabel(t('加热模式'))
-        heating_title.setFont(QFont('Arial', 11, QFont.Weight.Bold))
-        heating_layout.addWidget(heating_title)
-
-        heating_buttons_layout = QHBoxLayout()
-        heating_buttons_layout.setSpacing(3)
-
-        self.self_heating_button = self.bluetooth_tool.self_heating_button
-        self.charger_heating_button = self.bluetooth_tool.charger_heating_button
-
-        for btn in [self.self_heating_button, self.charger_heating_button]:
-            btn.setMaximumWidth(140)
-
-        heating_buttons_layout.addWidget(self.self_heating_button)
-        heating_buttons_layout.addWidget(self.charger_heating_button)
-
-        heating_layout.addLayout(heating_buttons_layout)
-        main_layout.addLayout(heating_layout)
-        
-        # ========== OTA 烧录 ==========
-        ota_title = QLabel(t('OTA 烧录'))
-        ota_title.setFont(QFont('Arial', 10, QFont.Weight.Bold))
-        main_layout.addWidget(ota_title)
-        # HEX文件选择行（独立按钮 + checkbox内置固件 + 独立标签）
-        hex_row = QHBoxLayout()
-        hex_row.setSpacing(5)
-        self.simplified_hex_button = QPushButton(t('📂 选择HEX'))
-        self.simplified_hex_button.setFixedHeight(22)
-        self.simplified_hex_button.setStyleSheet(
-            "QPushButton { font-size: 10px; padding: 2px 6px; border: 1px solid #ccc; border-radius: 3px; }"
-            "QPushButton:hover { background-color: #e8e8e8; }"
-        )
-        self.simplified_hex_button.clicked.connect(self._on_simplified_hex_select)
-        self.builtin_hex_checkbox = QCheckBox(t('使用内置固件'))
-        self.builtin_hex_checkbox.setStyleSheet("font-size: 9px;")
-        self.builtin_hex_checkbox.stateChanged.connect(self._on_builtin_hex_changed)
-        self.simplified_hex_filename_label = QLabel(t('未选择文件'))
-        self.simplified_hex_filename_label.setStyleSheet("font-size: 9px;")
-        hex_row.addWidget(self.simplified_hex_button)
-        hex_row.addWidget(self.builtin_hex_checkbox)
-        hex_row.addWidget(self.simplified_hex_filename_label, 1)
-        main_layout.addLayout(hex_row)
-        self.hex_version_display = self.bluetooth_tool.hex_version_label
-        main_layout.addWidget(self.hex_version_display)
-        self.ota_step_display = self.bluetooth_tool.ota_step_label
-        main_layout.addWidget(self.ota_step_display)
-        self.ota_progress_display = self.bluetooth_tool.ota_progress_bar
-        main_layout.addWidget(self.ota_progress_display)
-        self.program_button_display = self.bluetooth_tool.program_button
-        main_layout.addWidget(self.program_button_display)
-        self.packet_label_display = self.bluetooth_tool.packet_success_label
-        main_layout.addWidget(self.packet_label_display)
-
-        self.setLayout(main_layout)
-        self.setFixedSize(520, 720)
-
-    def _on_simplified_hex_select(self):
-        """简化窗口的HEX文件选择（调用原函数并同步文件名到独立标签）"""
-        self.bluetooth_tool.on_select_hex_file()
-        # 同步文件名到简化窗口的独立标签
-        text = self.bluetooth_tool.hex_file_label.text()
-        self.simplified_hex_filename_label.setText(text)
-
-    def _on_builtin_hex_changed(self, state):
-        """内置固件checkbox状态变化"""
-        checked = (state == 2)
-        # 勾选时禁用手动选择按钮
-        self.simplified_hex_button.setEnabled(not checked)
-        if checked:
-            bt = self.bluetooth_tool
-            try:
-                import importlib
-                builtin_hex_module = importlib.import_module('builtin_hex')
-                hex_b64_data = builtin_hex_module.BUILTIN_HEX_B64
-                if bt.hex_model.load_builtin_hex(hex_b64_data):
-                    ver_info = bt.hex_model.get_version_info()
-                    bt.hex_file_label.setText('[内置固件]')
-                    bt.hex_info_label.setText(f'大小: {bt.hex_model.size} 字节')
-                    if ver_info['error']:
-                        bt.hex_version_label.setText(t('版本: 读取失败'))
-                    else:
-                        bt.hex_version_label.setText(
-                            f'[{ver_info["platform"]}] {ver_info["version_str"]}  UID:{ver_info["uid_str"]}'
-                        )
-                    self.simplified_hex_filename_label.setText(t('[内置固件]'))
-                    # 同步主窗口checkbox
-                    bt.builtin_hex_checkbox.blockSignals(True)
-                    bt.builtin_hex_checkbox.setChecked(True)
-                    bt.hex_file_button.setEnabled(False)
-                    bt.builtin_hex_checkbox.blockSignals(False)
-                else:
-                    self.builtin_hex_checkbox.setChecked(False)
-                    bt._ota_msgbox(QMessageBox.Icon.Critical, '错误', '内置固件加载失败')
-            except ModuleNotFoundError:
-                self.builtin_hex_checkbox.setChecked(False)
-                bt.blue_write_log("❌ 错误：未找到内置固件文件 'builtin_hex.py'，请确保已正确打包。", color='red')
-                bt.blue_write_log("❌ Error: Built-in firmware file 'builtin_hex.py' not found. Please ensure it is correctly packaged.", color='red')
-                bt._ota_msgbox(QMessageBox.Icon.Warning, '错误 / Error',
-                               '未找到内置固件文件 (builtin_hex.py)。\n请确保已正确打包或选择外部HEX文件。\n\n'
-                               'Built-in firmware file (builtin_hex.py) not found.\nPlease ensure it is correctly packaged or select an external HEX file.')
-            except Exception as e:
-                self.builtin_hex_checkbox.setChecked(False)
-                bt.blue_write_log(f"❌ 加载内置固件失败: {e}", color='red')
-                bt._ota_msgbox(QMessageBox.Icon.Critical, '错误', f'内置固件加载失败: {e}')
-        else:
-            # 取消勾选时清空
-            bt = self.bluetooth_tool
-            bt.hex_file_label.setText(t('未选择文件'))
-            bt.hex_info_label.setText(t('大小: 0B'))
-            bt.hex_version_label.setText(t('版本: —'))
-            bt.hex_model.is_file_loaded = False
-            bt.hex_model.hex_data = None
-            bt.hex_model.filename = ''
-            self.simplified_hex_filename_label.setText(t('未选择文件'))
-            # 同步主窗口checkbox
-            bt.builtin_hex_checkbox.blockSignals(True)
-            bt.builtin_hex_checkbox.setChecked(False)
-            bt.hex_file_button.setEnabled(True)
-            bt.builtin_hex_checkbox.blockSignals(False)
-    
-    def focusOutEvent(self, event):
-        """失去焦点时隐藏（点击窗口外部）"""
-        # print(f"[简化窗口] focusOutEvent 被触发")
-        # 延迟检查，给下拉框时间展开（可能点击的就是下拉框）
-        # print(f"[简化窗口]   延迟150ms检查是否隐藏")
-        QTimer.singleShot(150, self._check_and_hide)
-        super().focusOutEvent(event)
-    
-    def _check_and_hide(self):
-        """延迟检查并隐藏（用于下拉框情况）"""
-        # print(f"[简化窗口] _check_and_hide 被调用")
-        from PyQt6.QtWidgets import QComboBox
-        from PyQt6.QtGui import QCursor
-        
-        # 有模态窗口（如QMessageBox）时不隐藏
-        if QApplication.instance().activeModalWidget() is not None:
-            return
-        
-        # 检查鼠标是否回到窗口内
-        cursor_pos = self.mapFromGlobal(QCursor.pos())
-        if self.rect().contains(cursor_pos):
-            # print(f"[简化窗口]   鼠标在窗口内，取消隐藏")
-            return
-        
-        # 检查下拉框是否展开
-        for combo in self.findChildren(QComboBox):
-            if combo.view().isVisible():
-                # print(f"[简化窗口]   下拉框展开中，取消隐藏")
-                return
-        
-        # 下拉框已关闭且鼠标不在窗口内，隐藏窗口
-        # print(f"[简化窗口]   可以隐藏，执行隐藏")
-        self.hide()
-    
-    def showEvent(self, event):
-        """窗口显示事件"""
-        # print(f"[简化窗口] showEvent - 窗口被显示")
-        # 把device_list添加到简化窗口的布局中
-        if self.device_list.parent() != self:
-            # 从当前父级移除
-            current_parent = self.device_list.parent()
-            if current_parent:
-                layout = current_parent.layout()
-                if layout:
-                    layout.removeWidget(self.device_list)
-            # 添加到简化窗口的布局
-            self.simplified_bluetooth_layout.insertWidget(self.device_list_position, self.device_list)
-        super().showEvent(event)
-    
-    def hideEvent(self, event):
-        """窗口隐藏事件"""
-        # print(f"[简化窗口] hideEvent - 窗口被隐藏")
-        super().hideEvent(event)
-    
-    def focusInEvent(self, event):
-        """简化窗口获得焦点"""
-        # print(f"[简化窗口] focusInEvent - 获得焦点")
-        super().focusInEvent(event)
-    
-    def enterEvent(self, event):
-        """鼠标进入窗口"""
-        # print(f"[简化窗口] enterEvent - 鼠标进入")
-        super().enterEvent(event)
-    
-    def leaveEvent(self, event):
-        """鼠标离开窗口"""
-        # print(f"[简化窗口] leaveEvent - 鼠标离开")
-        super().leaveEvent(event)
-    
-    def eventFilter(self, obj, event):
-        """全局事件过滤器：监听鼠标点击"""
-        from PyQt6.QtCore import QEvent
-        from PyQt6.QtGui import QMouseEvent
-        from PyQt6.QtWidgets import QComboBox
-        
-        # 只在窗口可见时处理
-        if not self.isVisible():
-            return super().eventFilter(obj, event)
-        
-        # 监听鼠标按下事件
-        if event.type() == QEvent.Type.MouseButtonPress:
-            mouse_event = event
-            # 获取全局坐标
-            global_pos = mouse_event.globalPosition().toPoint()
-            # 转换为窗口坐标
-            local_pos = self.mapFromGlobal(global_pos)
-            
-            # 判断点击是否在窗口外
-            if not self.rect().contains(local_pos):
-                # print(f"[简化窗口] eventFilter - 检测到窗口外点击")
-                
-                # 检查是否点击在下拉框的弹出列表上
-                for combo in self.findChildren(QComboBox):
-                    combo_view = combo.view()
-                    if combo_view.isVisible():
-                        # 获取下拉框弹出列表的几何信息
-                        view_geo = combo_view.geometry()
-                        view_global_pos = combo_view.mapToGlobal(view_geo.topLeft())
-                        view_rect = view_geo
-                        view_rect.moveTo(view_global_pos)
-                        
-                        # 判断点击是否在下拉列表上
-                        if view_rect.contains(global_pos):
-                            # print(f"[简化窗口]   点击在下拉列表上，不隐藏")
-                            return super().eventFilter(obj, event)
-                        
-                        # 下拉框展开，但点击不在列表上，延迟处理
-                        # print(f"[简化窗口]   下拉框展开中，延迟检查")
-                        QTimer.singleShot(100, self._check_and_hide)
-                        return super().eventFilter(obj, event)
-                
-                # 没有下拉框展开，且无模态窗口时才隐藏
-                # print(f"[简化窗口]   没有下拉框，隐藏窗口")
-                if QApplication.instance().activeModalWidget() is None:
-                    self.hide()
-                return False
-        
-        return super().eventFilter(obj, event)
-    
+# （SimplifiedBluetoothTool 已移除：统一使用 BluetoothTool + 简化模式）
 
 
 # 程序入口

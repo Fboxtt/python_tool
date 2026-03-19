@@ -14,7 +14,7 @@ from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QFont, QCursor, QIcon, QPixmap
 
 # 导入必要的模块
-from newblue3_17 import BluetoothTool, SimplifiedBluetoothTool, load_ui_dynamically
+from newblue3_17 import BluetoothTool, load_ui_dynamically
 from log_controller import LogManager, ComunManager
 from multi_window_manager import MultiWindowManager
 from struct_model import (
@@ -248,6 +248,7 @@ class EnhancedMainWindow(QMainWindow):
             # 工厂版/firstuse：可切换，默认原窗口
             self.use_simplified_window.setChecked(False)
             self.use_simplified_window.setEnabled(True)
+        self.use_simplified_window.stateChanged.connect(self._on_simplified_window_toggled)
         layout.addWidget(self.use_simplified_window)
         
         
@@ -369,13 +370,6 @@ class EnhancedMainWindow(QMainWindow):
         self.queue_timer.timeout.connect(self.update_status_display)
         self.queue_timer.start(500)  # 每0.5秒更新
         
-    def _activate_simplified_window(self):
-        """延迟激活简化窗口，确保获得焦点"""
-        if hasattr(self, 'simplified_bluetooth_tool') and self.simplified_bluetooth_tool.isVisible():
-            # print(f"[主窗口] 强制激活简化窗口")
-            self.simplified_bluetooth_tool.activateWindow()
-            self.simplified_bluetooth_tool.setFocus()
-    
     def _adjust_window_position(self, window, target_pos):
         """调整窗口位置，确保不超出屏幕边界
         
@@ -416,58 +410,27 @@ class EnhancedMainWindow(QMainWindow):
         
         from PyQt6.QtCore import QPoint
         return QPoint(x, y)
+
+    def _on_simplified_window_toggled(self):
+        """主界面「简化窗口」勾选切换时：若连接窗口已打开，则同步简化模式并改变窗口大小"""
+        if hasattr(self, 'bluetooth_tool') and self.bluetooth_tool.isVisible():
+            self.bluetooth_tool.set_simplified_mode(self.use_simplified_window.isChecked())
     
     def show_bluetooth_tool(self):
-        """显示/隐藏蓝牙工具窗口（切换功能）"""
+        """显示/隐藏蓝牙工具窗口（同一窗口，简化模式仅隐藏右侧接收区）"""
         cursor_pos = QCursor.pos()
-        
-        if self.use_simplified_window.isChecked():
-            # 简化窗口：切换显示/隐藏
-            if not hasattr(self, 'simplified_bluetooth_tool'):
-                # print(f"[主窗口] 创建简化窗口")
-                self.simplified_bluetooth_tool = SimplifiedBluetoothTool(self.bluetooth_tool)
-            
-            # 确保原窗口隐藏
-            if self.bluetooth_tool.isVisible():
-                self.bluetooth_tool.hide()
-            
-            is_visible = self.simplified_bluetooth_tool.isVisible()
-            # print(f"[主窗口] show_bluetooth_tool: 简化窗口可见性={is_visible}")
-            
-            if is_visible:
-                # print(f"[主窗口] 隐藏简化窗口")
-                self.simplified_bluetooth_tool.hide()
-            else:
-                # print(f"[主窗口] 显示简化窗口在: {cursor_pos}")
-                # 调整位置，确保不超出屏幕
-                adjusted_pos = self._adjust_window_position(self.simplified_bluetooth_tool, cursor_pos)
-                self.simplified_bluetooth_tool.move(adjusted_pos)
-                self.simplified_bluetooth_tool.show()
-                self.simplified_bluetooth_tool.raise_()
-                # 强制设置焦点
-                QTimer.singleShot(10, self._activate_simplified_window)
+        # 统一使用蓝牙工具窗口，根据「简化窗口」勾选设置简化模式
+        self.bluetooth_tool.set_simplified_mode(self.use_simplified_window.isChecked())
+        is_visible = self.bluetooth_tool.isVisible()
+        if is_visible:
+            self.bluetooth_tool.hide()
         else:
-            # 原窗口：切换显示/隐藏
-            # 确保简化窗口隐藏
-            if hasattr(self, 'simplified_bluetooth_tool') and self.simplified_bluetooth_tool.isVisible():
-                self.simplified_bluetooth_tool.hide()
-            
-            is_visible = self.bluetooth_tool.isVisible()
-            # print(f"[主窗口] show_bluetooth_tool: 原窗口可见性={is_visible}")
-            
-            if is_visible:
-                # print(f"[主窗口] 隐藏原窗口")
-                self.bluetooth_tool.hide()
-            else:
-                # print(f"[主窗口] 显示原窗口在: {cursor_pos}")
-                # 恢复device_list到原窗口
-                self.bluetooth_tool.restore_device_list()
-                # 调整位置，确保不超出屏幕
-                adjusted_pos = self._adjust_window_position(self.bluetooth_tool, cursor_pos)
-                self.bluetooth_tool.move(adjusted_pos)
-                self.bluetooth_tool.show()
-                self.bluetooth_tool.raise_()
-                self.bluetooth_tool.activateWindow()
+            self.bluetooth_tool.restore_device_list()
+            adjusted_pos = self._adjust_window_position(self.bluetooth_tool, cursor_pos)
+            self.bluetooth_tool.move(adjusted_pos)
+            self.bluetooth_tool.show()
+            self.bluetooth_tool.raise_()
+            self.bluetooth_tool.activateWindow()
         
         # 检查连接状态
         QTimer.singleShot(100, self.check_connection_status)
@@ -1211,23 +1174,11 @@ class EnhancedMainWindow(QMainWindow):
             traceback.print_exc()
             
     def focusInEvent(self, event):
-        """主窗口获得焦点时，隐藏简化窗口"""
-        # print(f"[主窗口] focusInEvent - 主窗口获得焦点")
-        if hasattr(self, 'simplified_bluetooth_tool'):
-            is_visible = self.simplified_bluetooth_tool.isVisible()
-            # print(f"[主窗口]   简化窗口可见性: {is_visible}")
-            if is_visible:
-                # print(f"[主窗口]   隐藏简化窗口")
-                self.simplified_bluetooth_tool.hide()
+        """主窗口获得焦点"""
         super().focusInEvent(event)
     
     def changeEvent(self, event):
-        """监听窗口状态变化，最小化时隐藏简化窗口"""
-        from PyQt6.QtCore import QEvent
-        if event.type() == QEvent.Type.WindowStateChange:
-            if self.isMinimized():
-                if hasattr(self, 'simplified_bluetooth_tool') and self.simplified_bluetooth_tool.isVisible():
-                    self.simplified_bluetooth_tool.hide()
+        """监听窗口状态变化"""
         super().changeEvent(event)
 
     def closeEvent(self, event):
@@ -1246,13 +1197,8 @@ class EnhancedMainWindow(QMainWindow):
         if self.bluetooth_tool.is_serial_connected:
             asyncio.create_task(self.bluetooth_tool.disconnect_serial())
         
-        # 关闭蓝牙工具窗口（newblue.py窗口）
+        # 关闭蓝牙工具窗口
         try:
-            # 关闭简化窗口
-            if hasattr(self, 'simplified_bluetooth_tool'):
-                self.simplified_bluetooth_tool.close()
-            
-            # 关闭原始蓝牙工具窗口
             if hasattr(self, 'bluetooth_tool'):
                 self.bluetooth_tool.close()
         except Exception as e:
