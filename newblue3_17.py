@@ -479,17 +479,7 @@ class BluetoothTool(QWidget):
         store_layout.addWidget(self.open_store_power_button)
         store_layout.addWidget(self.close_store_power_button)
         store_group.setLayout(store_layout)
-        simple_widget = QWidget()
-        simple_row = QHBoxLayout(simple_widget)
-        simple_row.setContentsMargins(0, 0, 0, 0)
-        self.simplified_mode_checkbox = QCheckBox(t('简化接收'))
-        self.simplified_mode_checkbox.setStyleSheet("font-size: 9px;")
-        self.simplified_mode_checkbox.setToolTip(t('简化模式：隐藏右侧接收数据区域'))
-        self.simplified_mode_checkbox.stateChanged.connect(
-            lambda s: self.set_simplified_mode(s == Qt.CheckState.Checked)
-        )
-        simple_row.addWidget(self.simplified_mode_checkbox)
-        simple_row.addStretch()
+        # 简化模式仅由主窗口「📱 简化窗口」勾选，此处不再放复选框
         self._connection_buttons_widget = QWidget()
         connection_buttons_layout = QVBoxLayout(self._connection_buttons_widget)
         connection_buttons_layout.setSpacing(2)
@@ -498,7 +488,6 @@ class BluetoothTool(QWidget):
         connection_buttons_layout.addWidget(shutdown_widget)
         connection_buttons_layout.addWidget(heating_group)
         connection_buttons_layout.addWidget(store_group)
-        connection_buttons_layout.addWidget(simple_widget)
         connection_buttons_layout.addStretch()
         connection_layout.addStretch()
         left_tabs.addTab(connection_tab, t('连接与控制'))
@@ -1261,10 +1250,6 @@ class BluetoothTool(QWidget):
             win.resize(530, 300)
         else:
             win.resize(920, 500)
-        if hasattr(self, 'simplified_mode_checkbox') and self.simplified_mode_checkbox:
-            self.simplified_mode_checkbox.blockSignals(True)
-            self.simplified_mode_checkbox.setChecked(self._simplified_mode)
-            self.simplified_mode_checkbox.blockSignals(False)
 
     def on_hex_display_changed(self, state):
         """当16进制显示选项改变时，重新显示接收到的数据"""
