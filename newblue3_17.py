@@ -261,13 +261,14 @@ class BluetoothTool(QWidget):
         
         # 创建左侧TabWidget（连接和控制）
         left_tabs = QTabWidget()
-        left_tabs.setMaximumWidth(450)  # 限制左侧宽度
+        self.left_tabs = left_tabs
+        left_tabs.setMaximumWidth(380)  # 左侧 Tab 区更紧凑
         
         # ==================== Tab 1: 连接设置 ====================
         connection_tab = QWidget()
         connection_layout = QVBoxLayout(connection_tab)
-        connection_layout.setSpacing(3)
-        connection_layout.setContentsMargins(5, 5, 5, 5)
+        connection_layout.setSpacing(2)
+        connection_layout.setContentsMargins(4, 4, 4, 4)
         
         # 自动连接配置（紧凑）
         auto_group = self._create_compact_group(t('自动连接'))
@@ -326,7 +327,7 @@ class BluetoothTool(QWidget):
         bt_layout.addWidget(self.label)
         
         self.device_list = QListWidget()
-        self.device_list.setMaximumHeight(100)
+        self.device_list.setMaximumHeight(72)
         self.device_list.setStyleSheet("font-size: 10px;")
         self.device_list.itemDoubleClicked.connect(self.on_device_double_clicked)
         bt_layout.addWidget(self.device_list)
@@ -367,7 +368,7 @@ class BluetoothTool(QWidget):
             QPushButton:hover { background-color: #229954; }
             QPushButton:pressed { background-color: #1e8449; }
         """)
-        self.scan_button.setFixedHeight(26)
+        self.scan_button.setFixedHeight(22)
         self.scan_button.clicked.connect(self.on_scan_all_clicked)
         bt_layout.addWidget(self.scan_button)
 
@@ -434,10 +435,10 @@ class BluetoothTool(QWidget):
         serial_group.setLayout(serial_layout)
         connection_layout.addWidget(serial_group)
 
-        # Tab1 续：充放电、关机、加热（与连接合并为「连接与控制」）
-        mos_group = self._create_compact_group(t('MOS控制'))
+        # Tab1 续：控制按钮放在主窗口中间列（与接收区并列），Tab 内不再重复堆叠
+        mos_group = self._create_side_compact_group(t('MOS'))
         mos_layout = QGridLayout()
-        mos_layout.setSpacing(2)
+        mos_layout.setSpacing(1)
         self.open_charge_button = self._create_compact_button(t('充电开'), '#27ae60')
         self.open_charge_button.clicked.connect(self.on_open_charge_clicked)
         self.close_charge_button = self._create_compact_button(t('充电关'), '#e74c3c')
@@ -451,16 +452,16 @@ class BluetoothTool(QWidget):
         mos_layout.addWidget(self.open_discharge_button, 1, 0)
         mos_layout.addWidget(self.close_discharge_button, 1, 1)
         mos_group.setLayout(mos_layout)
-        connection_layout.addWidget(mos_group)
-        shutdown_row = QHBoxLayout()
+        shutdown_widget = QWidget()
+        shutdown_row = QHBoxLayout(shutdown_widget)
+        shutdown_row.setContentsMargins(0, 0, 0, 0)
         self.shutdown_button = self._create_compact_button(t('🔌 设备关机'), '#95a5a6')
         self.shutdown_button.clicked.connect(self.on_shutdown_clicked)
         shutdown_row.addWidget(self.shutdown_button)
         shutdown_row.addStretch()
-        connection_layout.addLayout(shutdown_row)
-        heating_group = self._create_compact_group(t('加热模式'))
-        heating_layout = QHBoxLayout()
-        heating_layout.setSpacing(2)
+        heating_group = self._create_side_compact_group(t('加热'))
+        heating_layout = QVBoxLayout()
+        heating_layout.setSpacing(1)
         self.self_heating_button = self._create_compact_button(t('自加热'), '#e74c3c')
         self.self_heating_button.clicked.connect(self.on_self_heating_clicked)
         self.charger_heating_button = self._create_compact_button(t('充电器加热'), '#3498db')
@@ -468,27 +469,45 @@ class BluetoothTool(QWidget):
         heating_layout.addWidget(self.self_heating_button)
         heating_layout.addWidget(self.charger_heating_button)
         heating_group.setLayout(heating_layout)
-        connection_layout.addWidget(heating_group)
-
-        # 简化模式：隐藏右侧接收区
-        simple_row = QHBoxLayout()
-        self.simplified_mode_checkbox = QCheckBox(t('简化模式（隐藏接收区）'))
-        self.simplified_mode_checkbox.setStyleSheet("font-size: 10px;")
+        store_group = self._create_side_compact_group(t('保电'))
+        store_layout = QVBoxLayout()
+        store_layout.setSpacing(1)
+        self.open_store_power_button = self._create_compact_button(t('保电开'), '#27ae60')
+        self.open_store_power_button.clicked.connect(self.on_open_store_power_clicked)
+        self.close_store_power_button = self._create_compact_button(t('保电关'), '#e74c3c')
+        self.close_store_power_button.clicked.connect(self.on_close_store_power_clicked)
+        store_layout.addWidget(self.open_store_power_button)
+        store_layout.addWidget(self.close_store_power_button)
+        store_group.setLayout(store_layout)
+        simple_widget = QWidget()
+        simple_row = QHBoxLayout(simple_widget)
+        simple_row.setContentsMargins(0, 0, 0, 0)
+        self.simplified_mode_checkbox = QCheckBox(t('简化接收'))
+        self.simplified_mode_checkbox.setStyleSheet("font-size: 9px;")
+        self.simplified_mode_checkbox.setToolTip(t('简化模式：隐藏右侧接收数据区域'))
         self.simplified_mode_checkbox.stateChanged.connect(
             lambda s: self.set_simplified_mode(s == Qt.CheckState.Checked)
         )
         simple_row.addWidget(self.simplified_mode_checkbox)
         simple_row.addStretch()
-        connection_layout.addLayout(simple_row)
-
+        self._connection_buttons_widget = QWidget()
+        connection_buttons_layout = QVBoxLayout(self._connection_buttons_widget)
+        connection_buttons_layout.setSpacing(2)
+        connection_buttons_layout.setContentsMargins(0, 0, 0, 0)
+        connection_buttons_layout.addWidget(mos_group)
+        connection_buttons_layout.addWidget(shutdown_widget)
+        connection_buttons_layout.addWidget(heating_group)
+        connection_buttons_layout.addWidget(store_group)
+        connection_buttons_layout.addWidget(simple_widget)
+        connection_buttons_layout.addStretch()
         connection_layout.addStretch()
         left_tabs.addTab(connection_tab, t('连接与控制'))
         
         # ==================== Tab 2: OTA与密码（原高级） ====================
         advanced_tab = QWidget()
         advanced_layout = QVBoxLayout(advanced_tab)
-        advanced_layout.setSpacing(3)
-        advanced_layout.setContentsMargins(5, 5, 5, 5)
+        advanced_layout.setSpacing(2)
+        advanced_layout.setContentsMargins(4, 4, 4, 4)
         
         # HEX文件部分（紧凑）
         hex_group = self._create_compact_group(t('HEX文件'))
@@ -586,27 +605,11 @@ class BluetoothTool(QWidget):
         advanced_layout.addStretch()
         left_tabs.addTab(advanced_tab, t('OTA与密码'))
         
-        # ==================== Tab 3: 其他（保电/限流/RT/蓝牙名/测试） ====================
+        # ==================== Tab 3: 其他（限流/RT/蓝牙名/测试；保电在中间列加热下方） ====================
         control_tab = QWidget()
         control_layout = QVBoxLayout(control_tab)
-        control_layout.setSpacing(3)
-        control_layout.setContentsMargins(5, 5, 5, 5)
-        
-        # 保电控制
-        store_group = self._create_compact_group(t('保电控制'))
-        store_layout = QHBoxLayout()
-        store_layout.setSpacing(2)
-        
-        self.open_store_power_button = self._create_compact_button(t('保电开'), '#27ae60')
-        self.open_store_power_button.clicked.connect(self.on_open_store_power_clicked)
-        self.close_store_power_button = self._create_compact_button(t('保电关'), '#e74c3c')
-        self.close_store_power_button.clicked.connect(self.on_close_store_power_clicked)
-        
-        store_layout.addWidget(self.open_store_power_button)
-        store_layout.addWidget(self.close_store_power_button)
-        
-        store_group.setLayout(store_layout)
-        control_layout.addWidget(store_group)
+        control_layout.setSpacing(2)
+        control_layout.setContentsMargins(4, 4, 4, 4)
         
         # 限流控制（仅工厂模式下显示）
         chglimit_group = self._create_compact_group(t('限流控制'))
@@ -764,8 +767,8 @@ class BluetoothTool(QWidget):
         self._simplified_mode = False
         right_panel = QWidget()
         right_layout = QVBoxLayout(right_panel)
-        right_layout.setSpacing(3)
-        right_layout.setContentsMargins(5, 5, 5, 5)
+        right_layout.setSpacing(2)
+        right_layout.setContentsMargins(3, 3, 3, 3)
         
         self.receive_label = QLabel(t('接收数据:'))
         self.receive_label.setStyleSheet("font-size: 10px; font-weight: bold;")
@@ -790,11 +793,20 @@ class BluetoothTool(QWidget):
         right_layout.addLayout(rx_control_layout)
         
         self._right_panel = right_panel
+        # 中间列：MOS/关机/加热/简化（完整与简化模式共用，不再在 Tab 与主布局间搬动）
+        self._simplified_right_buttons = QWidget()
+        self._simplified_right_layout = QVBoxLayout(self._simplified_right_buttons)
+        self._simplified_right_layout.setContentsMargins(2, 4, 4, 4)
+        self._simplified_right_layout.setSpacing(0)
+        self._simplified_right_layout.addWidget(self._connection_buttons_widget)
+        self._simplified_right_buttons.setMinimumWidth(128)
+        self._simplified_right_buttons.setMaximumWidth(150)
         main_layout.addWidget(left_tabs)
+        main_layout.addWidget(self._simplified_right_buttons)
         main_layout.addWidget(right_panel, 1)
         
         self.setLayout(main_layout)
-        self.resize(850, 550)  # 紧凑的窗口尺寸
+        self.resize(920, 500)  # 含中间列，整体更紧凑
         
         # 初始化UI状态为断开（所有UI组件创建完成后）
         self.update_bluetooth_status(t('⭕ 断开'))
@@ -818,6 +830,26 @@ class BluetoothTool(QWidget):
                 subcontrol-origin: margin;
                 left: 8px;
                 padding: 0 3px;
+            }
+        """)
+        return group
+
+    def _create_side_compact_group(self, title):
+        """中间控制列用：更扁的分组框，省高度"""
+        group = QGroupBox(title)
+        group.setStyleSheet("""
+            QGroupBox {
+                font-size: 9px;
+                font-weight: bold;
+                border: 1px solid #ccc;
+                border-radius: 2px;
+                margin-top: 4px;
+                padding-top: 2px;
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                left: 4px;
+                padding: 0 2px;
             }
         """)
         return group
@@ -1219,16 +1251,16 @@ class BluetoothTool(QWidget):
             QMessageBox.critical(self, '发送失败', str(e))
 
     def set_simplified_mode(self, is_simplified: bool):
-        """简化模式：隐藏/显示右侧接收区，用固定宽度切换，避免恢复时宽度不对"""
+        """简化模式：仅隐藏接收区；中间控制列始终在 Tab 右侧，布局不再搬动"""
         self._simplified_mode = bool(is_simplified)
         win = self.window()
         if hasattr(self, '_right_panel') and self._right_panel:
-            if self._simplified_mode:
-                self._right_panel.setVisible(False)
-                win.resize(420, win.height())
-            else:
-                self._right_panel.setVisible(True)
-                win.resize(850, win.height())
+            self._right_panel.setVisible(not self._simplified_mode)
+        if self._simplified_mode:
+            # 无接收区：左 Tab + 中间列，明显压低高度
+            win.resize(530, 300)
+        else:
+            win.resize(920, 500)
         if hasattr(self, 'simplified_mode_checkbox') and self.simplified_mode_checkbox:
             self.simplified_mode_checkbox.blockSignals(True)
             self.simplified_mode_checkbox.setChecked(self._simplified_mode)
