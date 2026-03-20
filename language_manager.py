@@ -61,6 +61,13 @@ class LanguageManager:
                 'tab_control': '控制',
                 'tab_advanced': '高级',
                 'tab_test': '测试',
+                # 蓝牙工具合并 Tab / 侧栏短标题（与 newblue3_17.py 中 t() 一致）
+                'tab_connection_control': '连接与控制',
+                'tab_ota_password': 'OTA与密码',
+                'tab_other_misc': '其他',
+                'side_compact_mos': 'MOS',
+                'side_compact_heating': '加热',
+                'side_compact_store': '保电',
                 # 自动连接
                 'auto_connect_group': '自动连接',
                 'auto_connect_enable': '启用',
@@ -737,6 +744,13 @@ class LanguageManager:
                 'tab_control': 'Control',
                 'tab_advanced': 'Advanced',
                 'tab_test': 'Test',
+                # Bluetooth tool merged tabs / side column (must match t() in newblue3_17.py)
+                'tab_connection_control': 'Connection & Control',
+                'tab_ota_password': 'OTA & Password',
+                'tab_other_misc': 'Other',
+                'side_compact_mos': 'MOS',
+                'side_compact_heating': 'Heat',
+                'side_compact_store': 'Store',
                 # Auto connect
                 'auto_connect_group': 'Auto Connect',
                 'auto_connect_enable': 'Enable',
@@ -1413,6 +1427,12 @@ class LanguageManager:
                 'tab_control': '制御',
                 'tab_advanced': '詳細',
                 'tab_test': 'テスト',
+                'tab_connection_control': '接続・制御',
+                'tab_ota_password': 'OTA・パスワード',
+                'tab_other_misc': 'その他',
+                'side_compact_mos': 'MOS',
+                'side_compact_heating': '加熱',
+                'side_compact_store': '保電',
                 # Auto connect
                 'auto_connect_group': '自動接続',
                 'auto_connect_enable': '有効',
