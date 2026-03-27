@@ -577,6 +577,9 @@ class BluetoothTool(QWidget):
             QProgressBar::chunk { background: #27ae60; border-radius: 2px; }
         """)
         program_layout.addWidget(self.ota_progress_bar)
+        self.check_ver_button = self._create_compact_button(t('检测旧版本'), '#2980b9')
+        self.check_ver_button.clicked.connect(self.on_check_ver_clicked)
+        program_layout.addWidget(self.check_ver_button)
         self.program_button = self._create_compact_button(t('开始烧录'), '#e67e22')
         self.program_button.clicked.connect(self.on_program_clicked)
         program_layout.addWidget(self.program_button)
@@ -2532,6 +2535,69 @@ class BluetoothTool(QWidget):
             )
             return False
 
+    def on_check_ver_clicked(self):
+        """同步方法，触发异步旧版本检测"""
+        if not self.client or not self.client.is_connected:
+            if not self.serial_port or not self.serial_port.is_open:
+                QMessageBox.warning(self, '警告', '请先连接设备')
+                return
+        asyncio.create_task(self._async_check_ver_mismatch())
+
+    async def _async_check_ver_mismatch(self):
+        """查询0x16版本，若为旧版本(V100.0.0)则询问是否强制烧录"""
+        time512 = int(self.test512.text()) / 1000
+        self.last_ver_data_hex = bytearray()
+        self.text_decode.reset()
+        data16 = self.text_decode.send_hex_fill(0x16)
+        self.display_send_data(data16)
+        await self.byte_send(data16)
+        await asyncio.sleep(time512 * 2)
+        if not self.text_decode.have_hex:
+            await asyncio.sleep(time512 * 4)
+
+        if not self.text_decode.have_hex or self.text_decode.no80_cmd != 0x16 or len(self.last_ver_data_hex) < 10:
+            await self._show_msgbox_async(
+                QMessageBox.Icon.Critical, '检测失败',
+                '未收到0x16版本响应，请确认设备已连接。\nNo response from 0x16 query.'
+            )
+            return
+
+        try:
+            major16, minor16, rev16, year16, month16, day16 = struct.unpack_from('<HHHHBB', self.last_ver_data_hex, 0)
+        except Exception as e:
+            await self._show_msgbox_async(
+                QMessageBox.Icon.Critical, '检测失败',
+                f'0x16版本数据解析失败: {e}'
+            )
+            return
+
+        self.blue_write_log(f"🔍 [版本检测] 0x16版本: V{major16}.{minor16}.{rev16} ({year16}-{month16:02d}-{day16:02d})")
+
+        OLD_VER = (100, 0, 0, 2026, 3, 13)
+        if (major16, minor16, rev16, year16, month16, day16) == OLD_VER:
+            reply = await self._show_msgbox_async(
+                QMessageBox.Icon.Warning,
+                '⚠️ 检测到旧版本 — 需要强制升级',
+                f'检测到设备固件为旧版本，需要强制烧录才能恢复OTA功能。\n\n'
+                f'当前版本: V{major16}.{minor16}.{rev16}  {year16}-{month16:02d}-{day16:02d}\n\n'
+                f'Old firmware version detected. Forced flash is required.\n'
+                f'Current: V{major16}.{minor16}.{rev16}  {year16}-{month16:02d}-{day16:02d}\n\n'
+                f'是否继续强制烧录？  Continue with forced flash?',
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No
+            )
+            if reply == QMessageBox.StandardButton.Yes:
+                self._force_flash_mismatch = True
+                self.on_program_clicked()
+        else:
+            await self._show_msgbox_async(
+                QMessageBox.Icon.Information,
+                '✅ 版本检测 — 正常',
+                f'设备版本没有问题，无需强制升级。\n\n'
+                f'当前版本: V{major16}.{minor16}.{rev16}  {year16}-{month16:02d}-{day16:02d}\n\n'
+                f'Firmware version is OK. No forced flash needed.'
+            )
+
     def on_program_clicked(self):
         """同步方法，用于触发异步烧录"""
         if self.program_task:
@@ -2564,11 +2630,15 @@ class BluetoothTool(QWidget):
                 self._enhanced_window_ref.pause_monitoring_for_ota()
             # ======== OTA前置检查（版本&唯一ID验证）========
             self.ota_step_label.setText(t('🔍 查询设备信息...'))
-            can_proceed = await self._pre_ota_check()
-            if not can_proceed:
-                self.ota_step_label.setText(t('— 等待开始 —'))
-                self.ota_step_label.setStyleSheet("font-size: 9px;")
-                return
+            if getattr(self, '_force_flash_mismatch', False):
+                self._force_flash_mismatch = False
+                self.blue_write_log("⚠️ 强制烧录：已跳过OTA前置检查，直接开始烧录")
+            else:
+                can_proceed = await self._pre_ota_check()
+                if not can_proceed:
+                    self.ota_step_label.setText(t('— 等待开始 —'))
+                    self.ota_step_label.setStyleSheet("font-size: 9px;")
+                    return
             self.ota_start_count += 1
             time128 = int(self.test128.text()) / 1000
             time512 = int(self.test512.text()) / 1000
