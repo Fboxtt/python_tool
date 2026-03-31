@@ -675,7 +675,30 @@ class EnhancedMainWindow(QMainWindow):
             # 获取写入命令码
             from struct_model import get_write_command_code, STRUCT_FORMATS, STRUCT_VARIABLES, WRITE_VALIDATORS
             import struct
-            
+
+            if window_id == 'PC_GET_BALANCE':
+                window = self.multi_window_manager.windows.get(window_id)
+                if not window or not hasattr(window.table_model, 'pack_balance_mask_bytes'):
+                    self.logger.write_log(t('无法处理均衡写入'))
+                    return
+                if not window.table_model.get_modified_data():
+                    self.bluetooth_tool.blue_write_log(t('请在「写入」列至少填写一节 0 或 1 后再发送均衡指令'))
+                    return
+                cmd_code = get_write_command_code(window_id)
+                if not cmd_code:
+                    self.logger.write_log(t('窗口 {0} 不支持写入', window_id))
+                    return
+                packed_data = window.table_model.pack_balance_mask_bytes()
+                try:
+                    full_command = self.bluetooth_tool.text_decode.send_hex_fill(cmd_code, packed_data)
+                except Exception as e:
+                    self.logger.write_log(t('命令构造失败: {0}', str(e)))
+                    traceback.print_exc()
+                    return
+                await self.multi_window_manager.queue_send(full_command, priority=True)
+                self.logger.write_log(t('✅ 均衡指令已发送: {0}', window_id))
+                return
+
             cmd_code = get_write_command_code(window_id)
             if not cmd_code:
                 self.logger.write_log(t('窗口 {0} 不支持写入', window_id))
@@ -1165,6 +1188,15 @@ class EnhancedMainWindow(QMainWindow):
                     self.bluetooth_tool.blue_write_log("警告: BATTERY_STATUS 数据为空")
                 elif 'BATTERY_STATUS' not in self.multi_window_manager.windows:
                     self.bluetooth_tool.blue_write_log("警告: BATTERY_STATUS 窗口未创建")
+
+                # 均衡指令窗口：用 SBS「均衡状态」位图刷新「读取」列
+                if balance_key in sbs_data_dict and 'PC_GET_BALANCE' in self.multi_window_manager.windows:
+                    bal_win = self.multi_window_manager.windows['PC_GET_BALANCE']
+                    if hasattr(bal_win.table_model, 'set_read_mask_uint32'):
+                        try:
+                            bal_win.table_model.set_read_mask_uint32(int(sbs_data_dict[balance_key]))
+                        except (TypeError, ValueError):
+                            pass
                 
             # 更新电压参数窗口
             voltage_params_data = get_voltage_params_display_data(flat_dict)

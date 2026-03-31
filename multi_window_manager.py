@@ -10,7 +10,7 @@ from PyQt6.QtWidgets import (
     QCheckBox, QLabel, QPushButton, QScrollArea,
     QGroupBox, QTableView, QAbstractItemView, QSizePolicy, QHeaderView
 )
-from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QObject, QAbstractTableModel
+from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QObject, QAbstractTableModel, QModelIndex
 from PyQt6.QtGui import QFont, QColor, QPainter
 from display_widgets import BatteryTableModel, get_adaptive_colors, BitFlagsTableModel, _global_refresh_timer_manager
 from language_manager import t
@@ -660,6 +660,108 @@ class BitFlagsDisplayWindow(QWidget):
         pass  # 调试日志已移除
 
 
+# ============== 均衡指令（PC_SET_BALANCE 0x63，32位小端掩码）==============
+class CellBalanceTableModel(QAbstractTableModel):
+    """32节电芯均衡：读取列显示上次解析的位；写入列填 0/1，空则发送时沿用读取位。"""
+
+    NUM_CELLS = 32
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._headers = [t('电芯'), t('读取'), t('写入')]
+        self._write_enabled = True
+        self._read_bits = [0] * self.NUM_CELLS
+        self._write_bits = [''] * self.NUM_CELLS
+
+    def rowCount(self, parent=QModelIndex()):
+        if parent.isValid():
+            return 0
+        return self.NUM_CELLS
+
+    def columnCount(self, parent=QModelIndex()):
+        return 3
+
+    def headerData(self, section, orientation, role):
+        if role == Qt.ItemDataRole.DisplayRole and orientation == Qt.Orientation.Horizontal:
+            return self._headers[section]
+        return None
+
+    def data(self, index, role):
+        if not index.isValid():
+            return None
+        r, c = index.row(), index.column()
+        if r < 0 or r >= self.NUM_CELLS:
+            return None
+        if role in (Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.EditRole):
+            if c == 0:
+                return t('第【{0}】节', r + 1)
+            if c == 1:
+                return str(self._read_bits[r])
+            if c == 2:
+                return self._write_bits[r]
+        return None
+
+    def setData(self, index, value, role):
+        if not index.isValid() or role != Qt.ItemDataRole.EditRole:
+            return False
+        r, c = index.row(), index.column()
+        if c != 2 or not self._write_enabled:
+            return False
+        s = str(value).strip()
+        if s == '':
+            self._write_bits[r] = ''
+        elif s in ('0', '1'):
+            self._write_bits[r] = s
+        else:
+            return False
+        self.dataChanged.emit(index, index, [Qt.ItemDataRole.DisplayRole])
+        return True
+
+    def flags(self, index):
+        if not index.isValid():
+            return Qt.ItemFlag.NoItemFlags
+        fl = Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled
+        if index.column() == 2 and self._write_enabled:
+            fl |= Qt.ItemFlag.ItemIsEditable
+        return fl
+
+    def set_read_mask_uint32(self, mask: int):
+        """从设备或 SBS 更新读取列（低 32 位对应第 1～32 节）。"""
+        mask &= 0xFFFFFFFF
+        for i in range(self.NUM_CELLS):
+            self._read_bits[i] = 1 if (mask >> i) & 1 else 0
+        top_left = self.index(0, 1)
+        bottom_right = self.index(self.NUM_CELLS - 1, 1)
+        self.dataChanged.emit(top_left, bottom_right, [Qt.ItemDataRole.DisplayRole])
+
+    def get_modified_data(self):
+        for i in range(self.NUM_CELLS):
+            if self._write_bits[i].strip() != '':
+                return [(0, 'PC_SET_BALANCE', '', '')]
+        return []
+
+    def pack_balance_mask_bytes(self):
+        import struct
+        m = 0
+        for i in range(self.NUM_CELLS):
+            w = self._write_bits[i].strip()
+            if w == '':
+                bit = self._read_bits[i] & 1
+            else:
+                bit = 1 if w == '1' else 0
+            m |= (bit & 1) << i
+        return struct.pack('<L', m & 0xFFFFFFFF)
+
+    def clear_write_values(self):
+        self._write_bits = [''] * self.NUM_CELLS
+        top_left = self.index(0, 2)
+        bottom_right = self.index(self.NUM_CELLS - 1, 2)
+        self.dataChanged.emit(top_left, bottom_right, [Qt.ItemDataRole.DisplayRole])
+
+    def set_write_enabled(self, enabled):
+        self._write_enabled = bool(enabled)
+
+
 # ============== 单个数据显示窗口 ==============
 class DataDisplayWindow(QWidget):
     """单个数据显示窗口
@@ -702,6 +804,8 @@ class DataDisplayWindow(QWidget):
                 self.col_widths = [48, 260]
             else:
                 self.col_widths = [48, 260, 260]
+        elif self.window_type == 'cell_balance':
+            self.col_widths = [72, 44, 44]
         elif self.window_type == 'alarm_protect':
             # 告警-保护窗口：4列（告警名称, 告警值, 保护名称, 保护值）
             self.col_widths = [90, 15, 100, 15]  # 值列宽度从30减半到15
@@ -750,6 +854,11 @@ class DataDisplayWindow(QWidget):
                 headers=headers, 
                 value_columns=[1, 3, 5]
             )
+            self.table_view.setModel(self.table_model)
+            for col, width in enumerate(self.col_widths):
+                self.table_view.setColumnWidth(col, width)
+        elif self.window_type == 'cell_balance':
+            self.table_model = CellBalanceTableModel(self)
             self.table_view.setModel(self.table_model)
             for col, width in enumerate(self.col_widths):
                 self.table_view.setColumnWidth(col, width)
@@ -812,7 +921,22 @@ class DataDisplayWindow(QWidget):
         layout.addWidget(self.table_view)
         
         # 只有需要读取按钮的窗口才添加按钮
-        if self.window_type not in ['alarm_protect', 'other_status', 'battery_status', 'voltage_params']:
+        if self.window_type == 'cell_balance':
+            button_layout = QHBoxLayout()
+            button_layout.setSpacing(3)
+            button_layout.setContentsMargins(0, 0, 0, 0)
+            self.write_button = QPushButton(t('✏️ 发送均衡'))
+            self.write_button.setMinimumWidth(88)
+            self.write_button.setMaximumWidth(88)
+            self.write_button.setMinimumHeight(24)
+            font = self.write_button.font()
+            font.setBold(True)
+            font.setPointSize(9)
+            self.write_button.setFont(font)
+            button_layout.addWidget(self.write_button)
+            button_layout.addStretch()
+            layout.addLayout(button_layout)
+        elif self.window_type not in ['alarm_protect', 'other_status', 'battery_status', 'voltage_params']:
             # 添加按钮（所有数据窗口都有读取按钮）
             button_layout = QHBoxLayout()
             button_layout.setSpacing(3)
@@ -867,12 +991,17 @@ class DataDisplayWindow(QWidget):
             
     def get_modified_data(self):
         """获取修改的数据（仅3列模式）"""
+        if self.window_type == 'cell_balance' and hasattr(self.table_model, 'get_modified_data'):
+            return self.table_model.get_modified_data()
         if self.column_mode == 3 and hasattr(self.table_model, 'get_modified_data'):
             return self.table_model.get_modified_data()
         return []
         
     def clear_write_values(self):
         """清空写入值（仅3列模式）"""
+        if self.window_type == 'cell_balance' and hasattr(self.table_model, 'clear_write_values'):
+            self.table_model.clear_write_values()
+            return
         if self.column_mode == 3 and hasattr(self.table_model, 'clear_write_values'):
             self.table_model.clear_write_values()
     
@@ -1575,14 +1704,14 @@ class MultiWindowManager(QWidget):
         if self.logger:
             if window_type == 'bitflags':
                 window_type_name = "位标志窗口"
-            elif window_type in ['alarm_protect', 'other_status', 'battery_status']:
+            elif window_type in ['alarm_protect', 'other_status', 'battery_status', 'cell_balance']:
                 window_type_name = f"{window_type}窗口"
             else:
                 window_type_name = f"数据窗口({column_mode}列)"
             self.logger.write_log(f"创建{window_type_name}: {title}")
         
         # 使用bluetooth_tool的日志记录窗口创建（特殊窗口）
-        if window_id in ['ALARM_PROTECT', 'BATTERY_STATUS', 'OTHER_STATUS']:
+        if window_id in ['ALARM_PROTECT', 'BATTERY_STATUS', 'OTHER_STATUS', 'PC_GET_BALANCE']:
             if hasattr(self, 'bluetooth_tool') and self.bluetooth_tool:
                 self.bluetooth_tool.blue_write_log(f"创建{window_id}窗口: {title} (类型: {window_type}, 列数: {column_mode})")
             

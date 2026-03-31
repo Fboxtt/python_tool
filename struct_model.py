@@ -673,6 +673,8 @@ STRUCT_FORMATS = {
     "PC_GET_FUSESTATE": "<HH",  # 保险丝信息：使能状态、保险丝状态
     "PC_SET_FUSESTATE": "<HH",  # 保险丝信息：使能状态、保险丝状态
     "PC_GET_SOC_STOP_PARA": "<HHHH",
+    "PC_GET_BALANCE": "<L",  # 32电芯均衡位图，4字节小端序
+    "PC_SET_BALANCE": "<L",
     "PC_GET_CLUSTER_SBS": "<"
         "BB"  # byBrand, byCurrRate
         "H"   # wBattModuleCap
@@ -802,6 +804,9 @@ STRUCT_VARIABLES = {
     "PC_SET_FUSESTATE": [
         t('保险丝使能'),
         t('保险丝状态')
+    ],
+    "PC_GET_BALANCE": [
+        *[t('第【{0}】节均衡', i + 1) for i in range(32)]
     ],
     "PC_GET_SOC_STOP_PARA": [
         "停止充电SOC", "停止放电SOC", "预留1", "预留2"
@@ -986,6 +991,7 @@ WRITE_READ_COMMAND_MAPPING = {
     "PC_SET_SOC_STOP_PARA": "PC_GET_SOC_STOP_PARA",
     "PC_SET_SERIALNUM": "PC_GET_SERIALNUM",
     "PC_SET_FUSESTATE": "PC_GET_FUSESTATE",
+    "PC_SET_BALANCE": "PC_GET_BALANCE",
 }
 
 # 读取写入对应关系管理（反向映射）
@@ -1000,6 +1006,7 @@ READ_WRITE_COMMAND_MAPPING = {
     "PC_GET_SOC_STOP_PARA": "PC_SET_SOC_STOP_PARA",
     "PC_GET_SERIALNUM": "PC_SET_SERIALNUM",
     "PC_GET_FUSESTATE": "PC_SET_FUSESTATE",
+    "PC_GET_BALANCE": "PC_SET_BALANCE",
 }
 
 def get_write_command_from_read(read_command_name):
@@ -1302,6 +1309,10 @@ def reload_struct_variables(cell_config=None):
         t('保险丝使能'),
         t('保险丝状态')
     ]
+
+    STRUCT_VARIABLES["PC_GET_BALANCE"] = [
+        *[t('第【{0}】节均衡', i + 1) for i in range(32)]
+    ]
     
     STRUCT_VARIABLES["PC_GET_CLUSTER_SBS"] = [
         t('品牌'), t('当前倍率'),
@@ -1417,6 +1428,9 @@ def get_all_display_windows():
         # 只为 PC_GET_* 命令生成窗口
         if not struct_name.startswith('PC_GET_'):
             continue
+        # 均衡指令使用专用位图窗口，在下方单独注册
+        if struct_name == 'PC_GET_BALANCE':
+            continue
 
         # 英文用户版过滤：只允许指定的窗口
         if allowed_windows and struct_name not in allowed_windows:
@@ -1444,6 +1458,7 @@ def get_all_display_windows():
             'FUSESTATE': t('🔌 保险丝信息'),
             'CLUSTER_SBS': t('🔗 并机信息'),
             'SOC_STOP_PARA': t('🔋 保电SOC设置'),
+            'BALANCE': t('⚖️ 均衡指令'),
         }
 
         title = title_map.get(display_name, f'📄 {display_name}')
@@ -1470,6 +1485,18 @@ def get_all_display_windows():
             'expected_row_count': expected_row_count
         })
     
+    # 均衡指令（PC_SET_BALANCE 0x63，4字节小端位图控制32节）
+    if not allowed_windows or 'PC_GET_BALANCE' in allowed_windows:
+        windows.append({
+            'window_id': 'PC_GET_BALANCE',
+            'title': t('⚖️ 均衡指令'),
+            'column_mode': 3,
+            'default_visible': False,
+            'cmd_code': 0,
+            'expected_row_count': 32,
+            'window_type': 'cell_balance'
+        })
+
     # 添加告警-保护信息窗口
     # 告警和保护最多各32位，按位对应，所以最多32行
     if not allowed_windows or 'ALARM_PROTECT' in allowed_windows:
