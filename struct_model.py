@@ -56,6 +56,7 @@ PROTECT_BQ_SCD = 0x00200000  # BQ769X0检测短路
 PROTECT_BQ_OCD = 0x00400000  # BQ769X0检测放电过流
 PROTECT_MOS_HT = 0x00800000
 PROTECT_CHG_UT_LIMIT = 0x01000000  # 充电低温极限保护值
+PROTECT_FAN_OC = 0x02000000  # 风扇过流保护（风扇端检测电压异常）
 
 # 失效状态位 (FAULT)
 FAULT_V_SENSOR = 0x00000001
@@ -97,6 +98,7 @@ INFO_PSWFUNCTION_ON = 0x00200000
 INFO_POWERSAVE_ON = 0x00400000
 INFO_FORCEDDIS_ON = 0x00800000
 INFO_HEATERMODE_SELF = 0x01000000
+INFO_FAN_ON = 0x02000000  # 风扇开启（PB4 使能为高）
 
 # 充放电状态 (STATUS)
 STATUS_IDLE = 0x00
@@ -146,6 +148,7 @@ STATUS_BIT_NAMES = {
         PROTECT_BQ_OCD: t('BQ_OCD'),
         PROTECT_MOS_HT: t('MOS过温'),
         PROTECT_CHG_UT_LIMIT: t('充低温限'),
+        PROTECT_FAN_OC: t('风扇过流保护'),
     },
     # 失效状态 (FAULT)
     'FAULT': {
@@ -189,6 +192,7 @@ STATUS_BIT_NAMES = {
         INFO_POWERSAVE_ON: t('省电开'),
         INFO_FORCEDDIS_ON: t('强放开'),
         INFO_HEATERMODE_SELF: t('自加热'),
+        INFO_FAN_ON: t('风扇开启'),
     },
     # 均衡状态 (BALANCE) - 每一位代表一个电芯的均衡状态
     'BALANCE': {
@@ -1151,6 +1155,7 @@ def reload_struct_variables(cell_config=None):
             PROTECT_BQ_OCD: t('BQ_OCD'),
             PROTECT_MOS_HT: t('MOS过温'),
             PROTECT_CHG_UT_LIMIT: t('充低温限'),
+            PROTECT_FAN_OC: t('风扇过流保护'),
         },
         # 失效状态 (FAULT)
         'FAULT': {
@@ -1194,6 +1199,7 @@ def reload_struct_variables(cell_config=None):
             INFO_POWERSAVE_ON: t('省电开'),
             INFO_FORCEDDIS_ON: t('强放开'),
             INFO_HEATERMODE_SELF: t('自加热'),
+            INFO_FAN_ON: t('风扇开启'),
         },
         # 均衡状态 (BALANCE)
         'BALANCE': {
