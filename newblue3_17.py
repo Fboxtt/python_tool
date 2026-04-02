@@ -722,10 +722,6 @@ class BluetoothTool(QWidget):
         self.test512.setFixedWidth(50)
         self.test512.setStyleSheet("font-size: 10px;")
         test_row1.addWidget(self.test512)
-        self.packet_split_checkbox = QCheckBox('分包')
-        self.packet_split_checkbox.setChecked(True)
-        self.packet_split_checkbox.setStyleSheet("font-size: 10px;")
-        test_row1.addWidget(self.packet_split_checkbox)
         test_row1.addStretch()
         continuous_layout.addLayout(test_row1)
         
@@ -1922,16 +1918,35 @@ class BluetoothTool(QWidget):
                     raise Exception("未连接到设备")
                 """蓝牙发送"""
             if self.client and self.client.is_connected:
-                if self.packet_split_checkbox.isChecked():
+                # 按实际MTU大小决定是否分包（不再依赖“分包”按钮）
+                # 兼容不同Bleak版本：可能存在 client.mtu_size
+                mtu_size = getattr(self.client, "mtu_size", None)
+                mtu_payload = (mtu_size - 3) if isinstance(mtu_size, int) and mtu_size > 3 else None
+
+                # 需求：如果是“128 MTU”就按128分包发送，否则直接整包发
+                # 这里同时兼容两种说法：
+                # - mtu_size == 128（把MTU当成payload的人）
+                # - mtu_payload == 128（ATT MTU=131 → payload=128）
+                should_split_128 = (mtu_size == 128) or (mtu_payload == 128)
+
+                if should_split_128:
                     time_interval = int(self.test128.text()) / 1000
-                    packet_count = len(data) // 128 + 1 if len(data) % 128 != 0 else len(data) // 128
-                    for i in range(0, packet_count):
-                        left = i * 128
-                        right = len(data) if i + 1 == packet_count else (i + 1) * 128
-                        await self.client.write_gatt_char("0000ffe1-0000-1000-8000-00805f9b34fb", data[left:right])
-                        await asyncio.sleep(time_interval)
+                    chunk_size = 128
+                    packet_count = (len(data) + chunk_size - 1) // chunk_size
+                    for i in range(packet_count):
+                        left = i * chunk_size
+                        right = min(len(data), (i + 1) * chunk_size)
+                        await self.client.write_gatt_char(
+                            "0000ffe1-0000-1000-8000-00805f9b34fb",
+                            data[left:right],
+                        )
+                        if time_interval > 0:
+                            await asyncio.sleep(time_interval)
                 else:
-                    await self.client.write_gatt_char("0000ffe1-0000-1000-8000-00805f9b34fb", data)
+                    await self.client.write_gatt_char(
+                        "0000ffe1-0000-1000-8000-00805f9b34fb",
+                        data,
+                    )
                 """串口发送"""
             elif self.serial_port and self.serial_port.is_open:
                 # 检查串口连接状态
