@@ -365,7 +365,7 @@ class BluetoothTool(QWidget):
                 font-weight: bold;
                 font-size: 10px;
             }
-            QPushButton:hover { background-color: #229954; }
+            QPushButton:hover { background-color: #229954; }2222222222
             QPushButton:pressed { background-color: #1e8449; }
         """)
         self.scan_button.setFixedHeight(22)
@@ -1561,6 +1561,22 @@ class BluetoothTool(QWidget):
                     'rssi': advertisement_data.rssi,
                     'password_status': password_status_short
                 })
+
+                # 打印完整广播数据
+                self.blue_write_log(f"── 发现设备: {device.name}  地址: {device.address}  RSSI: {advertisement_data.rssi} dBm{password_status_short}")
+                if advertisement_data.local_name:
+                    self.blue_write_log(f"   本地名称: {advertisement_data.local_name}")
+                if advertisement_data.service_uuids:
+                    uuids_str = ', '.join(str(u) for u in advertisement_data.service_uuids)
+                    self.blue_write_log(f"   服务UUID: {uuids_str}")
+                if advertisement_data.service_data:
+                    for uuid, sd in advertisement_data.service_data.items():
+                        self.blue_write_log(f"   服务数据  UUID={uuid}  HEX={sd.hex().upper()}")
+                if advertisement_data.manufacturer_data:
+                    for company_id, mfr in advertisement_data.manufacturer_data.items():
+                        self.blue_write_log(f"   厂商数据  公司ID=0x{company_id:04X}  HEX={mfr.hex().upper()}")
+                if advertisement_data.tx_power is not None:
+                    self.blue_write_log(f"   发射功率: {advertisement_data.tx_power} dBm")
         # 按信号强度降序排序（从强到弱）
         device_info_list.sort(key=lambda x: x['rssi'], reverse=True)
         # 添加到设备列表
