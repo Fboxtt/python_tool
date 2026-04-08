@@ -1524,7 +1524,7 @@ class BluetoothTool(QWidget):
             discovered_devices = await BleakScanner.discover(timeout=2.0, return_adv=True)
         except Exception as e:
             # QMessageBox.critical(self, '扫描失败', str(e))
-            self.blue_write_log(f"扫描失败 {str(e)}")
+            self.blue_write_log(t('扫描失败: {0}', str(e)))
             traceback.print_exc()
             return
 
@@ -1545,11 +1545,11 @@ class BluetoothTool(QWidget):
 
                             if second_last_byte == 0x50:  # 支持密码功能
                                 if last_byte == 0x00:
-                                    password_status_short = " [密码:未设置]"
+                                    password_status_short = t(' [密码:未设置]')
                                 elif last_byte == 0x01:
-                                    password_status_short = " [密码:已设置]"
+                                    password_status_short = t(' [密码:已设置]')
                                 else:
-                                    password_status_short = f" [密码:未知{last_byte:02X}]"
+                                    password_status_short = t(' [密码:未知{0}]', f'{last_byte:02X}')
                                 break  # 找到了就退出循环
 
                 # 保存设备名到地址的映射
@@ -1563,25 +1563,31 @@ class BluetoothTool(QWidget):
                 })
 
                 # 打印完整广播数据
-                self.blue_write_log(f"── 发现设备: {device.name}  地址: {device.address}  RSSI: {advertisement_data.rssi} dBm{password_status_short}")
+                self.blue_write_log(
+                    t('── 发现设备: {0}  地址: {1}  RSSI: {2} dBm{3}', device.name, device.address, advertisement_data.rssi, password_status_short)
+                )
                 if advertisement_data.local_name:
-                    self.blue_write_log(f"   本地名称: {advertisement_data.local_name}")
+                    self.blue_write_log(t('   本地名称: {0}', advertisement_data.local_name))
                 if advertisement_data.service_uuids:
                     uuids_str = ', '.join(str(u) for u in advertisement_data.service_uuids)
-                    self.blue_write_log(f"   服务UUID: {uuids_str}")
+                    self.blue_write_log(t('   服务UUID: {0}', uuids_str))
                 if advertisement_data.service_data:
                     for uuid, sd in advertisement_data.service_data.items():
-                        self.blue_write_log(f"   服务数据  UUID={uuid}  HEX={sd.hex().upper()}")
+                        self.blue_write_log(t('   服务数据  UUID={0}  HEX={1}', str(uuid), sd.hex().upper()))
                 if advertisement_data.manufacturer_data:
                     for company_id, mfr in advertisement_data.manufacturer_data.items():
-                        self.blue_write_log(f"   厂商数据  公司ID=0x{company_id:04X}  HEX={mfr.hex().upper()}")
+                        self.blue_write_log(
+                            t('   厂商数据  公司ID=0x{0}  HEX={1}', f'{company_id:04X}', mfr.hex().upper())
+                        )
                 if advertisement_data.tx_power is not None:
-                    self.blue_write_log(f"   发射功率: {advertisement_data.tx_power} dBm")
+                    self.blue_write_log(t('   发射功率: {0} dBm', advertisement_data.tx_power))
         # 按信号强度降序排序（从强到弱）
         device_info_list.sort(key=lambda x: x['rssi'], reverse=True)
         # 添加到设备列表
         for device_info in device_info_list:
-            self.device_list.addItem(f"{device_info['name']} (RSSI: {device_info['rssi']}){device_info['password_status']}")
+            self.device_list.addItem(
+                t('{0} (RSSI: {1}){2}', device_info['name'], device_info['rssi'], device_info['password_status'])
+            )
                 # 获取更有用的设备信息
                 # device_info = f"发现设备: {device.name} - {device.address} - (RSSI: {advertisement_data.rssi})"
 
