@@ -126,6 +126,10 @@ class LanguageManager:
                 # 其他控制
                 'other_control_group': '其他控制',
                 'btn_shutdown': '🔌 设备关机',
+                'btn_battery_sleep': '😴 电池睡眠',
+                'msg_sleep_confirm_title': '确认睡眠',
+                'msg_sleep_confirm_text': '确定要让电池进入睡眠吗？\n进入睡眠后需按产品说明唤醒。',
+                'log_sleep_cmd_sent': '已发送电池睡眠指令 (0x64)',
                 'bt_name_label': '名称:',
                 'bt_name_placeholder': '输入新蓝牙名称',
                 'btn_change_bt_name': '修改蓝牙名称',
@@ -831,6 +835,10 @@ class LanguageManager:
                 # Other control
                 'other_control_group': 'Other Control',
                 'btn_shutdown': '🔌 Shutdown Device',
+                'btn_battery_sleep': '😴 Battery Sleep',
+                'msg_sleep_confirm_title': 'Confirm Sleep',
+                'msg_sleep_confirm_text': 'Put the battery into sleep mode?\nWake it according to the product manual.',
+                'log_sleep_cmd_sent': 'Sleep command sent (0x64)',
                 'bt_name_label': 'Name:',
                 'bt_name_placeholder': 'Enter new BT name',
                 'btn_change_bt_name': 'Change BT Name',
@@ -1535,6 +1543,10 @@ class LanguageManager:
                 # Other control
                 'other_control_group': 'その他',
                 'btn_shutdown': '🔌 電源OFF',
+                'btn_battery_sleep': '😴 バッテリ睡眠',
+                'msg_sleep_confirm_title': '睡眠の確認',
+                'msg_sleep_confirm_text': 'バッテリを睡眠モードにしますか？\n復帰方法は製品説明に従ってください。',
+                'log_sleep_cmd_sent': '睡眠コマンド送信 (0x64)',
                 'bt_name_label': '名前:',
                 'bt_name_placeholder': '新BT名',
                 'btn_change_bt_name': 'BT名変更',

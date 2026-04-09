@@ -32,7 +32,7 @@ from OTA_controller import TextDecode
 from OTA_controller import ReceveDataStatus,BmsCmdType,ComStatus,DownloadErr
 from struct_model import (
     HexParserApp, get_write_command_code, can_command_be_written,
-    STRUCT_FORMATS, STRUCT_VARIABLES, get_write_command_from_read,
+    STRUCT_FORMATS, STRUCT_VARIABLES, STRUCT_COMMANDS, get_write_command_from_read,
     get_all_status_bits_for_display, parse_all_status_from_sbs,
     reload_struct_variables
 )
@@ -458,6 +458,9 @@ class BluetoothTool(QWidget):
         self.shutdown_button = self._create_compact_button(t('🔌 设备关机'), '#95a5a6')
         self.shutdown_button.clicked.connect(self.on_shutdown_clicked)
         shutdown_row.addWidget(self.shutdown_button)
+        self.battery_sleep_button = self._create_compact_button(t('😴 电池睡眠'), '#7f8c8d')
+        self.battery_sleep_button.clicked.connect(self.on_battery_sleep_clicked)
+        shutdown_row.addWidget(self.battery_sleep_button)
         shutdown_row.addStretch()
         heating_group = self._create_side_compact_group(t('加热'))
         heating_layout = QVBoxLayout()
@@ -3041,6 +3044,24 @@ class BluetoothTool(QWidget):
     def send_shutdown_cmd(self):
         """发送关机指令"""
         self.send_command(self.text_decode.send_hex_fill(0x60))
+
+    def on_battery_sleep_clicked(self):
+        """电池睡眠 PC_SET_SLEEP 0x64"""
+        from PyQt6.QtWidgets import QMessageBox
+        reply = QMessageBox.question(
+            self,
+            t('确认睡眠'),
+            t('确定要让电池进入睡眠吗？\n进入睡眠后需按产品说明唤醒。'),
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if reply == QMessageBox.StandardButton.Yes:
+            self.send_battery_sleep_cmd()
+            self.blue_write_log(t('已发送电池睡眠指令 (0x64)'))
+
+    def send_battery_sleep_cmd(self):
+        """发送电池睡眠指令"""
+        self.send_command(self.text_decode.send_hex_fill(STRUCT_COMMANDS["PC_SET_SLEEP"]))
 
     def on_self_heating_clicked(self):
         """处理自加热模式按钮点击事件"""
