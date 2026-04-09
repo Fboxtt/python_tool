@@ -458,15 +458,17 @@ class BatteryTableModel(QAbstractTableModel):
         """完全更新所有数据（性能优化版 + 记录更新时间）"""
         # 检查数据有效性
         if not data:
-            old_row_count = len(self._original_data)
+            old_visible_rows = len(self._organized_data)
             self._original_data = []
             self._organize_data()
-            if old_row_count > 0:
+            if old_visible_rows > 0:
                 self.beginResetModel()
                 self.endResetModel()
             return
-        
-        old_row_count = len(self._original_data)
+
+        # 必须用「表格实际行数」比较：9 列模式下参数可 70+ 行但界面只排 min(25,n) 行，
+        # 若误用 len(_original_data) 与 len(_organized_data) 比较会导致该 reset 时不 reset，界面不刷新。
+        old_visible_rows = len(self._organized_data)
         self._original_data = data
 
         # 清除缓存
@@ -479,17 +481,16 @@ class BatteryTableModel(QAbstractTableModel):
 
         self._organize_data()
 
-        # 性能优化：只在行数变化时重置模型
-        new_row_count = len(self._organized_data)
-        if new_row_count != old_row_count:
+        new_visible_rows = len(self._organized_data)
+        if new_visible_rows != old_visible_rows:
             self.beginResetModel()
             self.endResetModel()
         else:
             # 行数未变，使用dataChanged信号（更高效）
             # 🎨 立即刷新背景色（数据更新后立即显示白色）
-            if new_row_count > 0:
+            if new_visible_rows > 0:
                 top_left = self.index(0, 0)
-                bottom_right = self.index(new_row_count - 1, self._columns - 1)
+                bottom_right = self.index(new_visible_rows - 1, self._columns - 1)
                 self.dataChanged.emit(top_left, bottom_right, [Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.BackgroundRole])
 
     def update_row(self, row, row_data):

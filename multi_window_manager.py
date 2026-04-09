@@ -1128,18 +1128,19 @@ class TwoColumnTableModel(BatteryTableModel):
         """重新组织数据为2列"""
         self._organized_data = []
         
-        for row_data in self._original_data:
+        for idx, row_data in enumerate(self._original_data):
             if len(row_data) >= 3:
                 self._organized_data.append([
                     row_data[0],  # 名称
-                    self._get_cached_display_value(self._original_data.index(row_data), row_data[2])  # 当前值
+                    self._get_cached_display_value(idx, row_data[2])  # 当前值
                 ])
     
     def update_data(self, data):
         """更新数据（只在数据变化时才刷新）"""
         if not data:
+            BatteryTableModel.update_data(self, [])
             return
-        
+
         # 检查数据是否变化
         data_changed = False
         if len(data) != len(self._original_data):
@@ -1180,19 +1181,20 @@ class ThreeColumnTableModel(BatteryTableModel):
         old_write_values = {row[0]: row[2] for row in self._organized_data if len(row) >= 3 and row[2]}
         
         self._organized_data = []
-        for row_data in self._original_data:
+        for idx, row_data in enumerate(self._original_data):
             if len(row_data) >= 3:
                 self._organized_data.append([
                     row_data[0],  # 名称
-                    self._get_cached_display_value(self._original_data.index(row_data), row_data[2]),  # 读取值
+                    self._get_cached_display_value(idx, row_data[2]),  # 读取值
                     old_write_values.get(row_data[0], "")  # 写入值（保留或为空）
                 ])
     
     def update_data(self, data):
         """更新数据（只在读取值变化时才刷新，保护用户输入）"""
         if not data:
+            BatteryTableModel.update_data(self, [])
             return
-        
+
         # 检查数据是否变化
         data_changed = False
         if len(data) != len(self._original_data):
@@ -1519,7 +1521,10 @@ class MultiWindowManager(QWidget):
         # 用户模式状态（默认工厂模式）
         self._is_user_mode = False
         # 用户模式允许的窗口列表
-        self._user_allowed_windows = {'PC_GET_SBS', 'PC_GET_VER', 'ALARM_PROTECT', 'OTHER_STATUS', 'BATTERY_STATUS'}
+        self._user_allowed_windows = {
+            'PC_GET_SBS', 'PC_GET_VER', 'ALARM_PROTECT', 'OTHER_STATUS', 'BATTERY_STATUS',
+            'VOLTAGE_PARAMS',
+        }
 
         # 初始化蓝牙队列发送器
         self.queue_sender = BluetoothQueueSender(bluetooth_tool, logger)
@@ -2016,7 +2021,10 @@ class MultiWindowManager(QWidget):
 
         if is_user_mode:
             # 用户模式：只允许特定的窗口
-            allowed_windows = {'PC_GET_SBS', 'PC_GET_VER', 'ALARM_PROTECT', 'OTHER_STATUS', 'BATTERY_STATUS'}
+            allowed_windows = {
+                'PC_GET_SBS', 'PC_GET_VER', 'ALARM_PROTECT', 'OTHER_STATUS', 'BATTERY_STATUS',
+                'VOLTAGE_PARAMS',
+            }
 
             # 取消勾选不允许的窗口
             for window_id, checkbox in self.checkboxes.items():

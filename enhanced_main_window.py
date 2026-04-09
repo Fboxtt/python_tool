@@ -1119,15 +1119,25 @@ class EnhancedMainWindow(QMainWindow):
             balance_key = t('均衡状态')
             battery_key = t('电池状态')
             
-            # 遍历dict_data，找到对应的状态位字段并转换为整数
-            # 变量名就是翻译后的名称，直接精确匹配
+            # 遍历dict_data：
+            #   - flat_dict 收录所有字段（供电压参数等通用计算使用）
+            #   - sbs_data_dict 只收录状态位字段（供位标志解析）
             all_names = []
             for category, items in dict_data.items():
                 for item in items:
                     if len(item) >= 3:
                         name, unit, value_str = item[0], item[1], item[2]
                         all_names.append(name)
-                        
+
+                        # 写入 flat_dict（整数优先，失败则存原始字符串）
+                        try:
+                            if isinstance(value_str, str) and value_str.startswith('0x'):
+                                flat_dict[name] = int(value_str, 16)
+                            else:
+                                flat_dict[name] = int(value_str)
+                        except (ValueError, TypeError):
+                            flat_dict[name] = value_str
+
                         # 精确匹配变量名（name就是翻译后的名称）
                         if name == alarm_key:
                             try:

@@ -571,6 +571,43 @@ def get_battery_status_display_data(sbs_data_dict):
     return result
 
 
+def _coerce_numeric_mv(raw):
+    """将 flat_dict 中的值转为浮点数（mV），失败返回 None。"""
+    if raw is None:
+        return None
+    if isinstance(raw, (int, float)):
+        return float(raw)
+    if isinstance(raw, str):
+        s = raw.strip()
+        if not s:
+            return None
+        if s.startswith(('0x', '0X')):
+            try:
+                return float(int(s, 16))
+            except ValueError:
+                return None
+        try:
+            return float(s)
+        except ValueError:
+            return None
+    return None
+
+
+def _sbs_cell_voltage_var_names():
+    """
+    从当前 STRUCT_VARIABLES['PC_GET_SBS'] 中取电芯电压变量名列表
+    （PACK、BATT 之后、电流字段之前的连续项，与固件结构体顺序一致）。
+    """
+    vars_sbs = STRUCT_VARIABLES.get("PC_GET_SBS") or []
+    try:
+        idx_cur = vars_sbs.index(t('电流'))
+    except ValueError:
+        idx_cur = len(vars_sbs)
+    if idx_cur <= 2:
+        return []
+    return list(vars_sbs[2:idx_cur])
+
+
 def get_voltage_params_display_data(sbs_data_dict):
     """
     获取电压参数窗口的显示数据
@@ -585,16 +622,18 @@ def get_voltage_params_display_data(sbs_data_dict):
     result = []
     
     try:
-        # 提取所有电芯电压（从第1节到第16节，根据实际配置可能是32节）
         cell_voltages = []
-        for i in range(1, 33):  # 最多支持32节
-            voltage_key = t('第【{0}】节电压', i)
-            if voltage_key in sbs_data_dict:
-                voltage_value = sbs_data_dict[voltage_key]
-                # 确保是数值类型且大于100mV才算有效电压
-                if isinstance(voltage_value, (int, float)) and voltage_value > 100:
-                    cell_voltages.append(voltage_value)
-        
+        cell_names = _sbs_cell_voltage_var_names()
+        if not cell_names:
+            cell_names = [t('第【{0}】节电压', i) for i in range(1, 33)]
+
+        for name in cell_names:
+            if name not in sbs_data_dict:
+                continue
+            mv = _coerce_numeric_mv(sbs_data_dict[name])
+            if mv is not None and mv > 100:
+                cell_voltages.append(mv)
+
         # 如果没有找到电芯电压，返回空
         if not cell_voltages:
             return [
