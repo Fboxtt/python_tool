@@ -1122,7 +1122,7 @@ class TwoColumnTableModel(BatteryTableModel):
     def __init__(self, data=None, parent=None):
         super().__init__(data, parent)
         self._columns = 2
-        self._headers = ['Para', 'Val']
+        self._headers = [t('参数'), t('当前值')]
         
     def _organize_data(self):
         """重新组织数据为2列"""
@@ -1311,11 +1311,11 @@ class VerticalTableModel(BatteryTableModel):
         if col == 0:
             if role == Qt.ItemDataRole.DisplayRole:
                 if row == 0:
-                    return "参数名"
+                    return t('参数名')
                 elif row == 1:
-                    return "读取值"
+                    return t('读取值')
                 elif row == 2:
-                    return "写入值"
+                    return t('写入值')
             return None
         
         # 其他列是数据

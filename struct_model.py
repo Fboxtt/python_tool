@@ -588,7 +588,7 @@ def get_voltage_params_display_data(sbs_data_dict):
         # 提取所有电芯电压（从第1节到第16节，根据实际配置可能是32节）
         cell_voltages = []
         for i in range(1, 33):  # 最多支持32节
-            voltage_key = f"第【{i}】节电压"
+            voltage_key = t('第【{0}】节电压', i)
             if voltage_key in sbs_data_dict:
                 voltage_value = sbs_data_dict[voltage_key]
                 # 确保是数值类型且大于100mV才算有效电压
@@ -598,10 +598,10 @@ def get_voltage_params_display_data(sbs_data_dict):
         # 如果没有找到电芯电压，返回空
         if not cell_voltages:
             return [
-                ['平均电压', '', '-'],
-                ['最大电压', '', '-'],
-                ['最小电压', '', '-'],
-                ['电压差值', '', '-']
+                [t('平均电压'), '', '-'],
+                [t('最大电压'), '', '-'],
+                [t('最小电压'), '', '-'],
+                [t('电压差值'), '', '-']
             ]
         
         # 计算电压参数
@@ -612,19 +612,19 @@ def get_voltage_params_display_data(sbs_data_dict):
         
         # 格式化显示（假设电压单位是mV）
         # 使用3元素格式：(名称, 十六进制, 十进制值)，与其他窗口数据格式统一
-        result.append(['平均电压', '', f"{avg_voltage:.1f} mV"])
-        result.append(['最大电压', '', f"{max_voltage} mV"])
-        result.append(['最小电压', '', f"{min_voltage} mV"])
-        result.append(['电压差值', '', f"{voltage_diff} mV"])
+        result.append([t('平均电压'), '', f"{avg_voltage:.1f} mV"])
+        result.append([t('最大电压'), '', f"{max_voltage} mV"])
+        result.append([t('最小电压'), '', f"{min_voltage} mV"])
+        result.append([t('电压差值'), '', f"{voltage_diff} mV"])
         
     except Exception as e:
         import traceback
         traceback.print_exc()
         result = [
-            ['平均电压', '', 'Error'],
-            ['最大电压', '', 'Error'],
-            ['最小电压', '', 'Error'],
-            ['电压差值', '', 'Error']
+            [t('平均电压'), '', t('错误')],
+            [t('最大电压'), '', t('错误')],
+            [t('最小电压'), '', t('错误')],
+            [t('电压差值'), '', t('错误')]
         ]
     
     return result
@@ -1544,7 +1544,7 @@ def get_all_display_windows():
     # 添加电压参数窗口
     windows.append({
         'window_id': 'VOLTAGE_PARAMS',
-        'title': '⚡ 电压参数',
+        'title': t('⚡ 电压参数'),
         'column_mode': 2,
         'default_visible': True,
         'cmd_code': 0,

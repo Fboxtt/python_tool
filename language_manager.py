@@ -277,6 +277,10 @@ class LanguageManager:
                 'table_header_status_value': '状态',
                 'table_header_read_value': '读取',
                 'table_header_write_value': '写入',
+                'table_header_current_display': '当前值',
+                'vertical_table_row_param': '参数名',
+                'vertical_table_row_read': '读取值',
+                'vertical_table_row_write': '写入值',
                 # 以下为界面文案（原硬编码中文改 t() 后新增）
                 'language_zh_item': 'language: 中文',
                 'comm_status_colon': '通讯状态:',
@@ -510,6 +514,7 @@ class LanguageManager:
                 'alarm_protect': '⚠️ 告警-保护信息',
                 'other_status': 'ℹ️ 其他状态信息',
                 'battery_status': '🔋 电池状态',
+                'voltage_params': '⚡ 电压参数',
             },
             
             # ========== 变量名模板 ==========
@@ -536,6 +541,10 @@ class LanguageManager:
                 'discharge_count': '放电次数',
                 'total_discharge_cap': '总放电容量',
                 'reserve': '保留{0}',
+                'voltage_avg': '平均电压',
+                'voltage_max': '最大电压',
+                'voltage_min': '最小电压',
+                'voltage_diff': '电压差值',
                 
                 # BMS变量
                 'chg_power_voltage': '充电功耗电压值',
@@ -973,6 +982,10 @@ class LanguageManager:
                 'table_header_status_value': 'Status',
                 'table_header_read_value': 'Read',
                 'table_header_write_value': 'Write',
+                'table_header_current_display': 'Current',
+                'vertical_table_row_param': 'Name',
+                'vertical_table_row_read': 'Read value',
+                'vertical_table_row_write': 'Write value',
                 # UI strings (matching zh_CN keys above)
                 'language_zh_item': 'language: 中文',
                 'comm_status_colon': 'Comm:',
@@ -1206,6 +1219,7 @@ class LanguageManager:
                 'alarm_protect': '⚠️ Alarm-Protect',
                 'other_status': 'ℹ️ Other Status',
                 'battery_status': '🔋 Battery Stat',
+                'voltage_params': '⚡ Voltage Params',
             },
             
             # ========== Variable Name Templates ==========
@@ -1232,6 +1246,10 @@ class LanguageManager:
                 'discharge_count': 'Dis Count',
                 'total_discharge_cap': 'Total Dis Cap',
                 'reserve': 'Reserve {0}',
+                'voltage_avg': 'Avg Voltage',
+                'voltage_max': 'Max Voltage',
+                'voltage_min': 'Min Voltage',
+                'voltage_diff': 'Voltage Delta',
                 
                 # BMS variables
                 'chg_power_voltage': 'Chg Power Volt',
@@ -1667,6 +1685,10 @@ class LanguageManager:
                 'table_header_status_value': '状態',
                 'table_header_read_value': '読取',
                 'table_header_write_value': '書込',
+                'table_header_current_display': '現在値',
+                'vertical_table_row_param': '項目名',
+                'vertical_table_row_read': '読取値',
+                'vertical_table_row_write': '書込値',
                 # UI strings (matching zh_CN keys above)
                 'language_zh_item': '言語: 中国語',
                 'comm_status_colon': '通信:',
@@ -1805,6 +1827,7 @@ class LanguageManager:
                 'alarm_protect': '⚠️ 警報・保護',
                 'other_status': 'ℹ️ その他状態',
                 'battery_status': '🔋 電池状態',
+                'voltage_params': '⚡ 電圧パラメータ',
             },
             
             # ========== Status Bit Names (ja) ==========
@@ -1925,6 +1948,10 @@ class LanguageManager:
                 'discharge_count': '放電回数',
                 'total_discharge_cap': '総放電容量',
                 'reserve': '保留{0}',
+                'voltage_avg': '平均電圧',
+                'voltage_max': '最大電圧',
+                'voltage_min': '最小電圧',
+                'voltage_diff': '電圧差',
                 'chg_power_voltage': '充電電力電圧',
                 'chg_power_diff': '充電Pack-Batt差',
                 'chg_full_start': '充満開始電圧',
