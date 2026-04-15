@@ -1583,17 +1583,26 @@ class MultiWindowManager(QWidget):
         self.read_all_btn.setFont(font)
         button_layout.addWidget(self.read_all_btn)
         
-        # 通讯状态指示器
-        status_layout = QHBoxLayout()
+        # 通讯状态指示器 + 最近正确通讯时间（仅结构化解析成功时更新）
+        status_outer = QVBoxLayout()
+        status_outer.setSpacing(2)
+        status_row = QHBoxLayout()
         status_label = QLabel(t('通讯状态:'))
         font = status_label.font()
         font.setPointSize(10)
         status_label.setFont(font)
         self.comm_indicator = CommStatusIndicator(size=16)
-        status_layout.addWidget(status_label)
-        status_layout.addWidget(self.comm_indicator)
-        status_layout.addStretch()
-        button_layout.addLayout(status_layout)
+        status_row.addWidget(status_label)
+        status_row.addWidget(self.comm_indicator)
+        status_row.addStretch()
+        status_outer.addLayout(status_row)
+        self.comm_last_ok_label = QLabel(t('最近正确通讯: {0}', '—'))
+        lf = self.comm_last_ok_label.font()
+        lf.setPointSize(8)
+        self.comm_last_ok_label.setFont(lf)
+        self.comm_last_ok_label.setWordWrap(True)
+        status_outer.addWidget(self.comm_last_ok_label)
+        button_layout.addLayout(status_outer)
         
         left_layout.addLayout(button_layout)
         left_layout.addStretch()
@@ -1934,6 +1943,24 @@ class MultiWindowManager(QWidget):
         for window_id in checked_windows:
             self.window_read_requested.emit(window_id)
             
+    def set_last_valid_rx_time(self, dt=None):
+        """更新「最近正确通讯」显示。dt 可为 None（当前时刻）、datetime 或 time.time() 浮点秒。"""
+        from datetime import datetime
+        if dt is None:
+            d = datetime.now()
+        elif isinstance(dt, (int, float)):
+            d = datetime.fromtimestamp(dt)
+        else:
+            d = dt
+        ts = d.strftime('%Y-%m-%d %H:%M:%S')
+        if hasattr(self, 'comm_last_ok_label'):
+            self.comm_last_ok_label.setText(t('最近正确通讯: {0}', ts))
+
+    def clear_last_valid_rx_time(self):
+        """断开连接等场景恢复占位显示。"""
+        if hasattr(self, 'comm_last_ok_label'):
+            self.comm_last_ok_label.setText(t('最近正确通讯: {0}', '—'))
+
     def _on_comm_status_changed(self, status):
         """通讯状态改变回调（优化版）"""
         if status == 'success':

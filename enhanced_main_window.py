@@ -185,7 +185,10 @@ class EnhancedMainWindow(QMainWindow):
         # 连接信号
         self.multi_window_manager.window_read_requested.connect(self.on_window_read)
         self.multi_window_manager.window_write_requested.connect(self.on_window_write)
-        
+        self.bluetooth_tool.valid_comm_timestamp_signal.connect(
+            self.multi_window_manager.set_last_valid_rx_time
+        )
+
         main_layout.addWidget(self.multi_window_manager, 1)  # 占据主要空间
         
         # ========== 底部状态栏 ==========
@@ -473,6 +476,7 @@ class EnhancedMainWindow(QMainWindow):
             self.scan_task.cancel()
             self.scan_task = None
             self.monitor_btn.setText(t('▶️ 开始监控'))
+        self.multi_window_manager.clear_last_valid_rx_time()
         self.multi_window_manager.clear_send_queue()
         self.bluetooth_tool.blue_write_log("🧹 监控已停止，发送队列已清空")
         self.check_connection_status()  # 立即更新按钮状态
@@ -997,6 +1001,7 @@ class EnhancedMainWindow(QMainWindow):
                 else:
                     # 其他OTA指令正常处理
                     self.bluetooth_tool.text_decode.split_data(bytearray(data_buffer))
+                    self.bluetooth_tool.mark_valid_communication(data_buffer)
                     if hasattr(self.bluetooth_tool, 'received_data_buffer'):
                         self.bluetooth_tool.received_data_buffer.clear()
                     return

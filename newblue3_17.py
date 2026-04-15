@@ -178,7 +178,9 @@ class SplashScreen(QSplashScreen):
 
 # 修改现有的BluetoothTool类为二级窗口
 class BluetoothTool(QWidget):
-    receive_ok_signal = pyqtSignal(int,bytes)
+    receive_ok_signal = pyqtSignal(int, bytes)
+    # 含短 ACK、结构体解析成功等路径更新后发射 time.time()，供大窗口刷新「最近正确通讯」
+    valid_comm_timestamp_signal = pyqtSignal(float)
     device_disconnected = pyqtSignal()  # 蓝牙或串口断开时发射
     device_connected = pyqtSignal()     # 蓝牙或串口连接成功时发射
     def __init__(self):
@@ -231,6 +233,8 @@ class BluetoothTool(QWidget):
         self.last_ver_data_hex = bytearray()
         # 用户主动断开标志，避免断开回调重复弹窗
         self._manual_disconnect = False
+        # 最近一次符合协议的应答时间戳（time.time()），与 valid_comm_timestamp_signal 同步
+        self._last_valid_comm_ts = None
         # 响应状态标志（用于test_send_data等功能，基于信号机制）
         self.last_response_status = None  # None=未收到, True=已收到
         self.last_response_ack = None  # 响应的ACK码
@@ -2019,6 +2023,20 @@ class BluetoothTool(QWidget):
         else:
             self.blue_write_log("⚠️ 蓝牙设备已断开连接")
     
+    def mark_valid_communication(self, data_buffer=None):
+        """在收到带 55 AA 标识的有效应答帧时更新「最近正确通讯」并发射 valid_comm_timestamp_signal。
+
+        data_buffer 为 None 时不校验帧格式（仅内部保留场景）；正常应传入完整 RX 字节。
+        """
+        if data_buffer is not None:
+            if len(data_buffer) < 8:
+                return
+            if data_buffer[5] != 0x55 or data_buffer[6] != 0xAA:
+                return
+        ts = time.time()
+        self._last_valid_comm_ts = ts
+        self.valid_comm_timestamp_signal.emit(ts)
+
     def _on_receive_response(self, cmd_code, data):
         """内部槽函数：处理接收到的响应（用于test_send_data等功能）
         
@@ -2028,6 +2046,7 @@ class BluetoothTool(QWidget):
             cmd_code: 命令码
             data: 响应数据
         """
+        self.mark_valid_communication(data)
         if len(data) >= 8:
             self.last_response_status = True
             self.last_response_ack = data[7]
@@ -2096,11 +2115,13 @@ class BluetoothTool(QWidget):
             if self.is_ota_command(self.received_data_buffer):
                 # OTA指令：使用 text_decode 解析
                 self.text_decode.split_data(self.received_data_buffer)
+                self.mark_valid_communication(bytes(self.received_data_buffer))
             # 正常数据指令：使用 data_display_mgr 解析
             elif hasattr(self, 'data_display_mgr') and hasattr(self.data_display_mgr, 'parse_and_update_displays'):
                 # 一站式：解析 + 自动更新显示（方案A优化）
                 success, result = self.data_display_mgr.parse_and_update_displays(self.received_data_buffer)
                 if success:
+                    self.mark_valid_communication(bytes(self.received_data_buffer))
                     # 只需处理CSV记录
                     struct_name = result['struct_name']
                     dict_data = result['data']
@@ -2109,6 +2130,8 @@ class BluetoothTool(QWidget):
                     ComunManager.get_instance().write_csv(f"{header},{csv_data}")
                 else:
                     self.blue_write_log(f"数据解析失败: {result}")
+                    # 短 ACK（如控制类指令）等：帧合法但长度不匹配结构体时仍视为有效通讯
+                    self.mark_valid_communication(bytes(self.received_data_buffer))
             else:
                 self.blue_write_log("错误：data_display_mgr未初始化")
         self.display_received_data(self.received_data_buffer)

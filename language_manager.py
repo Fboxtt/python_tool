@@ -288,6 +288,7 @@ class LanguageManager:
                 # 以下为界面文案（原硬编码中文改 t() 后新增）
                 'language_zh_item': 'language: 中文',
                 'comm_status_colon': '通讯状态:',
+                'last_valid_comm': '最近正确通讯: {0}',
                 'bt_broadcast_title': '蓝牙广播信号控制器',
                 'bt_broadcast_title_dot': '🔵 蓝牙广播信号控制器',
                 'placeholder_device_broadcast_name': '输入设备广播名称',
@@ -997,6 +998,7 @@ class LanguageManager:
                 # UI strings (matching zh_CN keys above)
                 'language_zh_item': 'language: 中文',
                 'comm_status_colon': 'Comm:',
+                'last_valid_comm': 'Last valid comm: {0}',
                 'bt_broadcast_title': 'BT Broadcast Controller',
                 'bt_broadcast_title_dot': '🔵 BT Broadcast Controller',
                 'placeholder_device_broadcast_name': 'Enter device broadcast name',
@@ -1704,6 +1706,7 @@ class LanguageManager:
                 # UI strings (matching zh_CN keys above)
                 'language_zh_item': '言語: 中国語',
                 'comm_status_colon': '通信:',
+                'last_valid_comm': '直近の正常通信: {0}',
                 'bt_broadcast_title': 'BTブロードキャスト',
                 'bt_broadcast_title_dot': '🔵 BT放送',
                 'placeholder_device_broadcast_name': 'デバイス名',
