@@ -228,6 +228,8 @@ class BluetoothTool(QWidget):
         self.ota_start_count = 0
         self.ota_ok_count = 0
         self.batch_task = None
+        # True 时批量烧录：OTA 前置/成功提示不写弹窗，只打日志并自动「是」，避免卡住
+        self._ota_batch_mode = False
         # 保存最近一次71指令的data_hex，供OTA前置检查使用
         self.last_inf_data_hex = bytearray()
         self.last_ver_data_hex = bytearray()
@@ -2394,12 +2396,17 @@ class BluetoothTool(QWidget):
             return False
         hex_ver = self.hex_model.get_version_info()
         if hex_ver['error']:
-            reply = await self._show_msgbox_async(
-                QMessageBox.Icon.Question, 'OTA检查',
-                f'无法读取HEX版本信息：{hex_ver["error"]}\n是否仍然继续OTA？',
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                QMessageBox.StandardButton.No
-            )
+            _msg = f'无法读取HEX版本信息：{hex_ver["error"]}\n是否仍然继续OTA？'
+            if self._ota_batch_mode:
+                self.blue_write_log(f'[OTA批量] OTA检查\n{_msg}\n(自动：继续)')
+                reply = QMessageBox.StandardButton.Yes
+            else:
+                reply = await self._show_msgbox_async(
+                    QMessageBox.Icon.Question, 'OTA检查',
+                    _msg,
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                    QMessageBox.StandardButton.No
+                )
             return reply == QMessageBox.StandardButton.Yes
         # ======== 步骤1：查询0x16（PC_GET_VER）获取运行版本 ========
         self.ota_step_label.setText(t('🔍 查询0x16版本...'))
@@ -2426,8 +2433,7 @@ class BluetoothTool(QWidget):
         elif not self.text_decode.have_hex:
             # 0x16 完全无回复，与0x71无回复同等对待
             self.blue_write_log("❌ 未收到0x16版本响应，设备连接不正确或不支持OTA")
-            await self._show_msgbox_async(
-                QMessageBox.Icon.Critical, 'OTA检查 — 无法升级 / Cannot Upgrade',
+            _msg = (
                 '未收到版本查询(0x16)响应，无法继续OTA。\n\n'
                 '可能原因：\n'
                 '  • 设备连接不正确\n'
@@ -2437,6 +2443,12 @@ class BluetoothTool(QWidget):
                 '  • Device is not connected correctly\n'
                 '  • Device firmware does not support OTA'
             )
+            if not self._ota_batch_mode:
+                await self._show_msgbox_async(
+                    QMessageBox.Icon.Critical, 'OTA检查 — 无法升级 / Cannot Upgrade', _msg
+                )
+            else:
+                self.blue_write_log(f'[OTA批量] OTA检查 — 无法升级 / Cannot Upgrade\n{_msg}')
             return False
         # ======== 步骤2：查询0x71（PC_GET_INF）获取固件信息 ========
         self.last_inf_data_hex = None
@@ -2450,8 +2462,7 @@ class BluetoothTool(QWidget):
             await asyncio.sleep(time512 * 4)
         # 检查是否收到71响应
         if not self.text_decode.have_hex or self.text_decode.no80_cmd != BmsCmdType.READ_IC_INF or self.text_decode.cmd_ack != 0x00:
-            await self._show_msgbox_async(
-                QMessageBox.Icon.Critical, 'OTA检查 — 无法升级 / Cannot Upgrade',
+            _msg = (
                 '未收到设备信息响应，无法继续OTA。\n\n'
                 '可能原因：\n'
                 '  • 设备连接不正确\n'
@@ -2461,6 +2472,12 @@ class BluetoothTool(QWidget):
                 '  • Device is not connected correctly\n'
                 '  • Device firmware does not support OTA'
             )
+            if not self._ota_batch_mode:
+                await self._show_msgbox_async(
+                    QMessageBox.Icon.Critical, 'OTA检查 — 无法升级 / Cannot Upgrade', _msg
+                )
+            else:
+                self.blue_write_log(f'[OTA批量] OTA检查 — 无法升级 / Cannot Upgrade\n{_msg}')
             return False
         # ======== 步骤3：比较0x16与0x71的版本号，或处理boot-only情况 ========
         if boot_only:
@@ -2472,9 +2489,7 @@ class BluetoothTool(QWidget):
                     f"\n0x71 app版本: V{dev_inf_boot['app_major']}.{dev_inf_boot['app_minor']}.{dev_inf_boot['app_rev']}"
                     f"  ({dev_inf_boot['app_year']}-{dev_inf_boot['app_month']:02d}-{dev_inf_boot['app_day']:02d})"
                 )
-            reply = await self._show_msgbox_async(
-                QMessageBox.Icon.Warning,
-                '⚠️ 强制升级确认 / Forced Upgrade Confirm',
+            _msg = (
                 f'检测到设备处于 boot-only 模式（仅有boot固件，无app固件）。{dev_ver_info}\n'
                 f'之前的OTA可能造成了固件损坏，强制升级可解决此问题。\n'
                 f'需要强制烧录固件以恢复设备功能。\n\n'
@@ -2482,10 +2497,19 @@ class BluetoothTool(QWidget):
                 f'Device is in boot-only mode (boot firmware only, no app firmware).\n'
                 f'A previous OTA may have corrupted the firmware; a forced upgrade can fix this.\n'
                 f'A forced firmware flash is needed to restore device functionality.\n\n'
-                f'Continue with forced upgrade?',
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                QMessageBox.StandardButton.Yes
+                f'Continue with forced upgrade?'
             )
+            if self._ota_batch_mode:
+                self.blue_write_log(f'[OTA批量] ⚠️ 强制升级确认 / Forced Upgrade Confirm\n{_msg}\n(自动：是)')
+                reply = QMessageBox.StandardButton.Yes
+            else:
+                reply = await self._show_msgbox_async(
+                    QMessageBox.Icon.Warning,
+                    '⚠️ 强制升级确认 / Forced Upgrade Confirm',
+                    _msg,
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                    QMessageBox.StandardButton.Yes
+                )
             return reply == QMessageBox.StandardButton.Yes
         elif ver16 is not None:
             dev_inf_quick = self._parse_inf_for_ota()
@@ -2497,8 +2521,7 @@ class BluetoothTool(QWidget):
                     f"🔍 0x71 app版本: V{ver71[0]}.{ver71[1]}.{ver71[2]} ({ver71[3]}-{ver71[4]:02d}-{ver71[5]:02d})"
                 )
                 if ver16 != ver71:
-                    await self._show_msgbox_async(
-                        QMessageBox.Icon.Critical, 'OTA检查 — 不支持OTA / OTA Not Supported',
+                    _msg = (
                         f'0x16版本与0x71版本不一致，设备不支持OTA功能。\n\n'
                         f'0x16运行版本:  V{major16}.{minor16}.{rev16}  {year16}-{month16:02d}-{day16:02d}\n'
                         f'0x71 app版本: V{ver71[0]}.{ver71[1]}.{ver71[2]}  {ver71[3]}-{ver71[4]:02d}-{ver71[5]:02d}\n\n'
@@ -2507,18 +2530,29 @@ class BluetoothTool(QWidget):
                         f'0x16 running: V{major16}.{minor16}.{rev16}  {year16}-{month16:02d}-{day16:02d}\n'
                         f'0x71 app:     V{ver71[0]}.{ver71[1]}.{ver71[2]}  {ver71[3]}-{ver71[4]:02d}-{ver71[5]:02d}'
                     )
+                    if not self._ota_batch_mode:
+                        await self._show_msgbox_async(
+                            QMessageBox.Icon.Critical, 'OTA检查 — 不支持OTA / OTA Not Supported', _msg
+                        )
+                    else:
+                        self.blue_write_log(f'[OTA批量] OTA检查 — 不支持OTA / OTA Not Supported\n{_msg}')
                     return False
                 else:
                     self.blue_write_log("✅ 0x16与0x71版本一致，设备支持OTA")
         # 解析设备信息
         dev_inf = self._parse_inf_for_ota()
         if dev_inf is None:
-            reply = await self._show_msgbox_async(
-                QMessageBox.Icon.Question, 'OTA检查',
-                '设备信息解析失败\n是否仍然继续OTA？',
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                QMessageBox.StandardButton.No
-            )
+            _msg = '设备信息解析失败\n是否仍然继续OTA？'
+            if self._ota_batch_mode:
+                self.blue_write_log(f'[OTA批量] OTA检查\n{_msg}\n(自动：继续)')
+                reply = QMessageBox.StandardButton.Yes
+            else:
+                reply = await self._show_msgbox_async(
+                    QMessageBox.Icon.Question, 'OTA检查',
+                    _msg,
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                    QMessageBox.StandardButton.No
+                )
             return reply == QMessageBox.StandardButton.Yes
         dev_ver_str = f"V{dev_inf['app_major']}.{dev_inf['app_minor']}.{dev_inf['app_rev']} ({dev_inf['app_year']}-{dev_inf['app_month']:02d}-{dev_inf['app_day']:02d})"
         hex_ver_str = hex_ver['version_str']
@@ -2581,18 +2615,26 @@ class BluetoothTool(QWidget):
                 title = '⚠️ OTA检查 - 版本相同'
             else:
                 title = '✅ OTA检查 - 可以升级'
-            reply = await self._show_msgbox_async(
-                QMessageBox.Icon.Question, title,
-                msg + '\n\n是否继续OTA升级？',
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                QMessageBox.StandardButton.Yes
-            )
+            _msg = msg + '\n\n是否继续OTA升级？'
+            if self._ota_batch_mode:
+                self.blue_write_log(f'[OTA批量] {title}\n{_msg}\n(自动：是)')
+                reply = QMessageBox.StandardButton.Yes
+            else:
+                reply = await self._show_msgbox_async(
+                    QMessageBox.Icon.Question, title,
+                    _msg,
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                    QMessageBox.StandardButton.Yes
+                )
             return reply == QMessageBox.StandardButton.Yes
         else:
-            await self._show_msgbox_async(
-                QMessageBox.Icon.Critical, '❌ OTA检查 - 无法升级',
-                msg + '\n\n请检查后重试。'
-            )
+            _fail = msg + '\n\n请检查后重试。'
+            if not self._ota_batch_mode:
+                await self._show_msgbox_async(
+                    QMessageBox.Icon.Critical, '❌ OTA检查 - 无法升级', _fail
+                )
+            else:
+                self.blue_write_log(f'[OTA批量] ❌ OTA检查 - 无法升级\n{_fail}')
             return False
 
     def on_program_clicked(self):
@@ -2835,9 +2877,7 @@ class BluetoothTool(QWidget):
                     else:
                         dev_ver_str = '读取失败 / Read Failed'
                     hex_ver_str = hex_ver_ok['version_str'] if not hex_ver_ok.get('error') else '读取失败 / Read Failed'
-                    await self._show_msgbox_async(
-                        QMessageBox.Icon.Information,
-                        '✅ OTA烧录成功 / OTA Flash Success',
+                    _succ_body = (
                         f'固件烧录成功！设备已恢复正常运行。\n\n'
                         f'烧录固件版本:  {hex_ver_str}\n'
                         f'设备当前版本:  {dev_ver_str}\n\n'
@@ -2845,6 +2885,16 @@ class BluetoothTool(QWidget):
                         f'Flashed firmware:  {hex_ver_str}\n'
                         f'Device version:    {dev_ver_str}'
                     )
+                    if self._ota_batch_mode:
+                        self.blue_write_log(
+                            f'[OTA批量] ✅ OTA烧录成功 / OTA Flash Success\n{_succ_body}'
+                        )
+                    else:
+                        await self._show_msgbox_async(
+                            QMessageBox.Icon.Information,
+                            '✅ OTA烧录成功 / OTA Flash Success',
+                            _succ_body
+                        )
                     break
                 else:
                     self.blue_write_log(f"❌ 71指令回复异常 (第{err_count+1}次) {self._ota_rx_diag(BmsCmdType.READ_IC_INF)}")
@@ -3104,6 +3154,7 @@ class BluetoothTool(QWidget):
         """同步方法，批量烧录100次"""
         if self.batch_task:
             self.batch_task.cancel()
+            self._ota_batch_mode = False
             self.batch_program_button.setText(t('开始烧录100'))
             self.batch_task = None
             return
@@ -3114,17 +3165,26 @@ class BluetoothTool(QWidget):
         self.batch_task = asyncio.create_task(self.batch_programming())
 
     async def batch_programming(self):
-        """异步方法，批量烧录100次"""
-        for i in range(100):
-            try:
-                await self.start_programming()
-                self.batch_success_label.setText(t('总数: {0} 成功数: {1}', str(self.ota_start_count), str(self.ota_ok_count)))
-            except Exception as e:
-                self.blue_write_log(f'第{i+1}次烧录失败: {e}')
-                traceback.print_exc()
-                self.batch_task = None
-                continue
-        self.batch_program_button.setText(t('开始烧录100'))
+        """异步方法，批量烧录100次（不弹窗，仅日志；单次烧录仍走原确认弹窗）"""
+        self._ota_batch_mode = True
+        try:
+            for i in range(100):
+                try:
+                    await self.start_programming()
+                    self.batch_success_label.setText(
+                        t('总数: {0} 成功数: {1}', str(self.ota_start_count), str(self.ota_ok_count))
+                    )
+                except asyncio.CancelledError:
+                    self.blue_write_log('[OTA批量] 已取消')
+                    raise
+                except Exception as e:
+                    self.blue_write_log(f'第{i+1}次烧录失败: {e}')
+                    traceback.print_exc()
+                    continue
+        finally:
+            self._ota_batch_mode = False
+            self.batch_task = None
+            self.batch_program_button.setText(t('开始烧录100'))
 
     def on_register_clicked(self):
         asyncio.create_task(self.send_register_cmd())
